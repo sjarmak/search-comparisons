@@ -1,0 +1,135 @@
+"""
+Caching utilities for the search-comparisons application.
+
+This module provides functions for caching search results to reduce API calls
+and improve performance. It handles generating cache keys, saving results to
+the cache, and loading results from the cache.
+"""
+import os
+import json
+import time
+import hashlib
+import logging
+from typing import List, Optional, Dict, Any
+from pathlib import Path
+
+from ..api.models import SearchResult
+
+# Setup logging
+logger = logging.getLogger(__name__)
+
+# Cache configuration
+CACHE_DIR = os.environ.get('CACHE_DIR', os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'cache'))
+CACHE_EXPIRY = int(os.environ.get('CACHE_EXPIRY', 86400))  # Default: 1 day in seconds
+
+
+def get_cache_key(source: str, query: str, fields: List[str]) -> str:
+    """
+    Generate a cache key for storing search results.
+    
+    Creates a unique key based on the source, query, and requested fields.
+    This allows for caching based on the specific search parameters.
+    
+    Args:
+        source: The search engine source (e.g., 'ads', 'scholar')
+        query: The search query string
+        fields: List of requested fields
+    
+    Returns:
+        str: A unique cache key as a hex string
+    """
+    # Create a string to hash
+    hash_input = f"{source}:{query}:{':'.join(sorted(fields))}"
+    
+    # Create SHA-256 hash
+    return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()
+
+
+def save_to_cache(key: str, data: List[SearchResult], expiry: int = CACHE_EXPIRY) -> bool:
+    """
+    Save search results to the cache.
+    
+    Writes the search results to a JSON file in the cache directory with the
+    specified expiration time.
+    
+    Args:
+        key: The cache key (from get_cache_key)
+        data: List of SearchResult objects to cache
+        expiry: Cache expiry time in seconds (default: CACHE_EXPIRY)
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        # Ensure cache directory exists
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        
+        # Prepare cache path
+        cache_path = Path(CACHE_DIR) / f"{key}.json"
+        
+        # Convert SearchResult objects to dictionaries
+        serializable_data = [result.dict() for result in data]
+        
+        # Prepare cache content with metadata
+        cache_content = {
+            "timestamp": time.time(),
+            "expiry": expiry,
+            "results": serializable_data
+        }
+        
+        # Write to cache file
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            json.dump(cache_content, f, ensure_ascii=False, indent=2)
+        
+        logger.debug(f"Saved {len(data)} results to cache with key {key}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error saving to cache: {str(e)}")
+        return False
+
+
+def load_from_cache(key: str) -> Optional[List[SearchResult]]:
+    """
+    Load search results from the cache if available and not expired.
+    
+    Checks if a cache file exists for the given key and whether it has expired.
+    If valid, loads and returns the cached results.
+    
+    Args:
+        key: The cache key (from get_cache_key)
+    
+    Returns:
+        Optional[List[SearchResult]]: List of SearchResult objects if cache hit,
+                                     None if cache miss or expired
+    """
+    try:
+        # Prepare cache path
+        cache_path = Path(CACHE_DIR) / f"{key}.json"
+        
+        # Check if cache file exists
+        if not cache_path.exists():
+            logger.debug(f"Cache miss: No cache file found for key {key}")
+            return None
+        
+        # Read cache file
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            cache_content = json.load(f)
+        
+        # Check if cache has expired
+        timestamp = cache_content.get("timestamp", 0)
+        expiry = cache_content.get("expiry", CACHE_EXPIRY)
+        
+        if time.time() - timestamp > expiry:
+            logger.debug(f"Cache expired for key {key}")
+            return None
+        
+        # Convert dictionaries back to SearchResult objects
+        results = [SearchResult(**item) for item in cache_content.get("results", [])]
+        
+        logger.debug(f"Cache hit: Loaded {len(results)} results for key {key}")
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error loading from cache: {str(e)}")
+        return None 
