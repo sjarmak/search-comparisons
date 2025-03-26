@@ -10,7 +10,8 @@ from enum import Enum
 from typing import List, Dict, Any, Optional, Set, Union
 from pathlib import Path
 
-from pydantic import BaseSettings, validator, Field, AnyHttpUrl
+from pydantic import validator, Field, AnyHttpUrl
+from pydantic_settings import BaseSettings
 
 
 class EnvironmentType(str, Enum):
@@ -68,18 +69,14 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Search Engine Comparator"
     PROJECT_DESCRIPTION: str = "API for comparing search engine results across multiple academic sources"
     VERSION: str = "1.0.0"
-    ENVIRONMENT: EnvironmentType = EnvironmentType.LOCAL
+    ENVIRONMENT: str = "local"
     DEBUG: bool = False
     API_PREFIX: str = "/api"
-    LOG_LEVEL: str = LogLevel.INFO
+    LOG_LEVEL: str = "INFO"
     
-    # CORS settings
-    CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173", 
-        "http://127.0.0.1:5173",
-    ]
+    # CORS settings - not used anymore (hardcoded in main.py)
+    # Only kept for backward compatibility
+    CORS_ORIGINS: str = "*"
     
     # Cache settings
     CACHE_ENABLED: bool = True
@@ -100,63 +97,6 @@ class Settings(BaseSettings):
     WEB_OF_SCIENCE_API_KEY: Optional[str] = None
     WEB_OF_SCIENCE_ENDPOINT: str = "https://wos-api.clarivate.com/api/woslite/v1"
     
-    @validator("ENVIRONMENT", pre=True)
-    def validate_environment(cls, v: str) -> str:
-        """
-        Validate and normalize the environment string.
-        
-        Args:
-            v: Environment string from environment variable
-            
-        Returns:
-            str: Normalized environment string
-            
-        Raises:
-            ValueError: If the environment is not valid
-        """
-        if isinstance(v, str):
-            normalized = v.lower()
-            if normalized in [e.value for e in EnvironmentType]:
-                return normalized
-            raise ValueError(f"Invalid environment: {v}")
-        return v
-    
-    @validator("LOG_LEVEL", pre=True)
-    def validate_log_level(cls, v: str) -> str:
-        """
-        Validate and normalize the log level string.
-        
-        Args:
-            v: Log level string from environment variable
-            
-        Returns:
-            str: Normalized log level string
-            
-        Raises:
-            ValueError: If the log level is not valid
-        """
-        if isinstance(v, str):
-            normalized = v.upper()
-            if normalized in [level.value for level in LogLevel]:
-                return normalized
-            raise ValueError(f"Invalid log level: {v}")
-        return v
-    
-    @validator("CORS_ORIGINS", pre=True)
-    def validate_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        """
-        Parse CORS origins from string or list.
-        
-        Args:
-            v: CORS origins as comma-separated string or list
-            
-        Returns:
-            List[str]: List of validated origins
-        """
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
-        
     class Config:
         """
         Pydantic configuration for the Settings class.
@@ -166,47 +106,22 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
         env_file_encoding = "utf-8"
-        env_prefix = ""  # No prefix for environment variables
 
-
-# Determine which .env file to load based on environment
-ENV = os.getenv("APP_ENVIRONMENT", "local").lower()
-env_files = {
-    "local": ".env.local",
-    "development": ".env.dev",
-    "staging": ".env.staging",
-    "production": ".env.prod",
-}
-
-# Set environment-specific .env file if it exists
-if ENV in env_files and Path(env_files[ENV]).exists():
-    Settings.Config.env_file = env_files[ENV]
 
 # Initialize settings
 settings = Settings()
 
 # Update DEBUG based on environment if not explicitly set
 if os.getenv("DEBUG") is None:
-    settings.DEBUG = settings.ENVIRONMENT in [EnvironmentType.LOCAL, EnvironmentType.DEVELOPMENT]
-
-# Add production domains to CORS if in production
-if settings.ENVIRONMENT == EnvironmentType.PRODUCTION:
-    production_domains = [
-        "https://search-comparisons.onrender.com",
-        "https://search.sjarmak.ai"
-    ]
-    
-    for domain in production_domains:
-        if domain not in settings.CORS_ORIGINS:
-            settings.CORS_ORIGINS.append(domain)
+    settings.DEBUG = settings.ENVIRONMENT.lower() in ["local", "development"]
 
 # Set log level in Python's logging module
 log_level_map = {
-    LogLevel.DEBUG.value: logging.DEBUG,
-    LogLevel.INFO.value: logging.INFO,
-    LogLevel.WARNING.value: logging.WARNING,
-    LogLevel.ERROR.value: logging.ERROR,
-    LogLevel.CRITICAL.value: logging.CRITICAL,
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
 }
 
 logging.basicConfig(

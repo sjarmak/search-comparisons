@@ -64,4 +64,18 @@ class SearchResult(BaseModel):
     rank_change: Optional[int] = None
     original_score: Optional[float] = None
     boosted_score: Optional[float] = None
-    boost_factors: Optional[Dict[str, float]] = None 
+    boost_factors: Optional[Dict[str, float]] = None
+
+
+class ErrorResponse(BaseModel):
+    """
+    Model representing an error response from the API.
+    
+    Attributes:
+        status_code: HTTP status code
+        message: Human-readable error message
+        details: Additional error details (optional)
+    """
+    status_code: int
+    message: str
+    details: Optional[Any] = None 

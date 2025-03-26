@@ -17,7 +17,7 @@ from ...api.models import SearchResult
 from ...services.ads_service import get_bibcode_from_doi, get_ads_results
 from ...services.scholar_service import get_scholar_direct_html, get_scholar_results
 from ...services.semantic_scholar_service import get_semantic_scholar_results, get_paper_details_by_doi
-from ...services.web_of_science_service import get_web_of_science_results, get_wos_auth_token
+from ...services.web_of_science_service import get_web_of_science_results
 from ...services.search_service import get_paper_details
 
 # Setup logging
@@ -136,10 +136,10 @@ async def ping_source(source: str) -> Dict[str, Any]:
             message = "Successfully retrieved paper details" if success else "Failed to retrieve paper details"
             
         elif source == "webOfScience":
-            # Test Web of Science by getting an auth token
-            token = await get_wos_auth_token()
-            success = token is not None
-            message = "Successfully retrieved auth token" if success else "Failed to retrieve auth token"
+            # Test Web of Science by performing a simple search
+            results = await get_web_of_science_results("astronomy", ["title", "authors"])
+            success = results is not None and len(results) > 0
+            message = f"Successfully retrieved {len(results)} results" if success else "Failed to retrieve results"
             
         else:
             raise HTTPException(status_code=404, detail=f"Unknown source: {source}")

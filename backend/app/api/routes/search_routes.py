@@ -19,7 +19,7 @@ router = APIRouter(
 )
 
 
-@router.post("/compare")
+@router.post("/search/compare")
 async def compare_search_engines(
     search_request: SearchRequest
 ) -> Dict[str, Any]:

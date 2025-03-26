@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 # API Constants
 ADS_API_URL = "https://api.adsabs.harvard.edu/v1/search/query"
-ADS_API_KEY = os.environ.get("ADS_API_KEY", "")
 NUM_RESULTS = 20
 TIMEOUT_SECONDS = 15
 
@@ -34,6 +33,29 @@ ADS_FIELD_MAPPING = {
     "doctype": "doctype",
     "property": "property"
 }
+
+
+def get_ads_api_key() -> str:
+    """
+    Get the ADS API key from environment variables.
+    
+    Checks both ADS_API_KEY and ADS_API_TOKEN environment variables.
+    
+    Returns:
+        str: The API key if found, empty string otherwise
+    """
+    api_key = os.environ.get("ADS_API_KEY", "")
+    if not api_key:
+        api_key = os.environ.get("ADS_API_TOKEN", "")
+        
+    if not api_key:
+        logger.error("ADS_API_KEY not found in environment")
+    else:
+        # Log masked key for debugging
+        masked_key = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "[KEY]"
+        logger.debug(f"Using ADS API key: {masked_key}")
+        
+    return api_key
 
 
 async def get_bibcode_from_doi(doi: str) -> Optional[str]:
@@ -51,9 +73,10 @@ async def get_bibcode_from_doi(doi: str) -> Optional[str]:
     if not doi:
         logger.warning("Empty DOI provided to get_bibcode_from_doi")
         return None
-        
-    if not ADS_API_KEY:
-        logger.error("ADS_API_KEY not found in environment")
+    
+    # Get API key at runtime
+    ads_api_key = get_ads_api_key()
+    if not ads_api_key:
         return None
     
     # Format DOI query
@@ -63,7 +86,7 @@ async def get_bibcode_from_doi(doi: str) -> Optional[str]:
         async with httpx.AsyncClient() as client:
             # Set API key
             headers = {
-                "Authorization": f"Bearer {ADS_API_KEY}",
+                "Authorization": f"Bearer {ads_api_key}",
                 "Content-Type": "application/json",
             }
             
@@ -124,15 +147,16 @@ async def get_ads_results(
     Returns:
         List[SearchResult]: List of search results from ADS
     """
-    if not ADS_API_KEY:
-        logger.error("ADS_API_KEY not found in environment")
+    # Get API key at runtime
+    ads_api_key = get_ads_api_key()
+    if not ads_api_key:
         return []
     
     try:
         async with httpx.AsyncClient() as client:
             # Set headers with API key
             headers = {
-                "Authorization": f"Bearer {ADS_API_KEY}", 
+                "Authorization": f"Bearer {ads_api_key}", 
                 "Content-Type": "application/json",
             }
             

@@ -3,13 +3,19 @@ import {
   Container, Box, Typography, TextField, Button, 
   Checkbox, FormControlLabel, FormGroup, Grid, 
   CircularProgress, Paper, Tabs, Tab, Divider, Alert,
-  IconButton, AppBar, Toolbar
+  IconButton, AppBar, Toolbar, TableContainer, Table,
+  TableHead, TableBody, TableRow, TableCell, Chip,
+  List, ListItem, ListItemAvatar, ListItemText, ListItemSecondaryAction,
+  Avatar, Tooltip
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import ScienceIcon from '@mui/icons-material/Science';
 import SearchIcon from '@mui/icons-material/Search';
 import GitHubIcon from '@mui/icons-material/GitHub';
+import LaunchIcon from '@mui/icons-material/Launch';
+import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
+import CheckIcon from '@mui/icons-material/Check';
 
 import { searchService, experimentService, debugService } from './services/api';
 
@@ -36,14 +42,15 @@ function App() {
     ads: true,
     scholar: true,
     semanticScholar: false,
-    webOfScience: false
+    webOfScience: true
   });
   
   // State for similarity metrics selection
   const [metrics, setMetrics] = useState({
-    exact_match: true,
-    rank_correlation: true,
-    content_similarity: false
+    jaccard: true,
+    rankBiased: true,
+    cosine: false,
+    euclidean: false
   });
   
   // State for metadata fields to compare
@@ -52,7 +59,8 @@ function App() {
     abstract: true,
     authors: false,
     doi: true,
-    year: false
+    year: false,
+    citation_count: true
   });
 
   // Boost experiment state
@@ -73,6 +81,10 @@ function App() {
   const [sourcesList, setSourcesList] = useState(null);
   const [pingResults, setPingResults] = useState({});
   const [testSearchResults, setTestSearchResults] = useState(null);
+
+  // Result tab state
+  const [resultTab, setResultTab] = useState(0);
+  const [filterText, setFilterText] = useState('');
 
   // Load environment info on startup
   useEffect(() => {
@@ -147,13 +159,22 @@ function App() {
     try {
       const selectedSources = Object.keys(sources).filter(key => sources[key]);
       const selectedMetrics = Object.keys(metrics).filter(key => metrics[key]);
-      const selectedFields = Object.keys(fields).filter(key => fields[key]);
+      
+      // Always include these fields for proper display
+      const selectedFields = [
+        ...Object.keys(fields).filter(key => fields[key]),
+        'abstract',  // Always include abstract
+        'citation_count'  // Always include citation_count
+      ];
+      
+      // Remove duplicates
+      const uniqueFields = Array.from(new Set(selectedFields));
       
       const requestBody = {
         query,
         sources: selectedSources,
         metrics: selectedMetrics,
-        fields: selectedFields
+        fields: uniqueFields
       };
 
       if (DEBUG) {
@@ -336,6 +357,58 @@ function App() {
     }
   };
 
+  // Format source name for display
+  const formatSourceName = (source) => {
+    switch(source) {
+      case 'ads':
+        return 'ADS/SciX';
+      case 'scholar':
+        return 'Google Scholar';
+      case 'webOfScience':
+        return 'Web of Science';
+      case 'semanticScholar':
+        return 'Semantic Scholar';
+      default:
+        return source.charAt(0).toUpperCase() + source.slice(1);
+    }
+  };
+
+  // Format metric name for display
+  const formatMetricName = (metric) => {
+    switch(metric) {
+      case 'jaccard':
+        return 'Jaccard Similarity';
+      case 'rankBiased':
+      case 'rank_biased':
+        return 'Rank-Biased Overlap';
+      case 'cosine':
+        return 'Cosine Similarity';
+      case 'euclidean':
+        return 'Euclidean Distance';
+      default:
+        return metric.replace(/_/g, ' ').split(' ').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+    }
+  };
+
+  // Helper function to get metric description
+  const getMetricDescription = (metric) => {
+    switch(metric) {
+      case 'jaccard':
+        return 'Measures the similarity between finite sample sets, and is defined as the size of the intersection divided by the size of the union of the sample sets.';
+      case 'rankBiased':
+      case 'rank_biased':
+        return 'Rank-Biased Overlap (RBO) measures the similarity between two ranked lists, weighting items towards the top of the lists more heavily.';
+      case 'cosine':
+        return 'Measures the cosine of the angle between two vectors, representing how similar the two vectors are irrespective of their size.';
+      case 'euclidean':
+        return 'Measures the straight-line distance between two points in Euclidean space.';
+      default:
+        return 'No description available for this metric.';
+    }
+  };
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
@@ -423,16 +496,16 @@ function App() {
                     <Typography variant="subtitle1">Similarity Metrics</Typography>
                     <FormGroup>
                       <FormControlLabel
-                        control={<Checkbox checked={metrics.exact_match} onChange={handleMetricsChange} name="exact_match" />}
-                        label="Exact Match"
+                        control={<Checkbox checked={metrics.jaccard} onChange={handleMetricsChange} name="jaccard" />}
+                        label="Jaccard Similarity"
                       />
                       <FormControlLabel
-                        control={<Checkbox checked={metrics.rank_correlation} onChange={handleMetricsChange} name="rank_correlation" />}
-                        label="Rank Correlation"
+                        control={<Checkbox checked={metrics.rankBiased} onChange={handleMetricsChange} name="rankBiased" />}
+                        label="Rank-Biased Overlap"
                       />
                       <FormControlLabel
-                        control={<Checkbox checked={metrics.content_similarity} onChange={handleMetricsChange} name="content_similarity" />}
-                        label="Content Similarity"
+                        control={<Checkbox checked={metrics.cosine} onChange={handleMetricsChange} name="cosine" />}
+                        label="Cosine Similarity"
                       />
                     </FormGroup>
                   </Grid>
@@ -460,6 +533,10 @@ function App() {
                         control={<Checkbox checked={fields.year} onChange={handleFieldsChange} name="year" />}
                         label="Publication Year"
                       />
+                      <FormControlLabel
+                        control={<Checkbox checked={fields.citation_count} onChange={handleFieldsChange} name="citation_count" />}
+                        label="Citation Count"
+                      />
                     </FormGroup>
                   </Grid>
                   
@@ -484,11 +561,407 @@ function App() {
                 <Typography variant="h5" gutterBottom>
                   Search Results
                 </Typography>
-                <Paper elevation={2} sx={{ p: 2 }}>
-                  <pre>{JSON.stringify(results, null, 2)}</pre>
-                </Paper>
+                
+                {Object.keys(results.results).length > 0 ? (
+                  <Box>
+                    <Paper elevation={3} sx={{ mb: 3 }}>
+                      <Tabs 
+                        value={resultTab || 0} 
+                        onChange={(e, newValue) => setResultTab(newValue)}
+                        variant="fullWidth"
+                      >
+                        <Tab label="Results Table" />
+                        <Tab label="Comparison" />
+                        <Tab label="Visualization" />
+                      </Tabs>
+                      
+                      <Box sx={{ p: 3 }}>
+                        {/* Results Table Tab */}
+                        {resultTab === 0 && (
+                          <Box>
+                            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="subtitle1">
+                                Showing results for: <strong>{results.query}</strong>
+                              </Typography>
+                              <TextField
+                                size="small"
+                                variant="outlined"
+                                placeholder="Filter results..."
+                                value={filterText}
+                                onChange={(e) => setFilterText(e.target.value)}
+                                sx={{ width: 250 }}
+                              />
+                            </Box>
+                            
+                            {Object.keys(results.results).map(source => {
+                              const sourceResults = results.results[source];
+                              const filteredResults = filterText
+                                ? sourceResults.filter(result => 
+                                    result.title.toLowerCase().includes(filterText.toLowerCase()) ||
+                                    (result.abstract && result.abstract.toLowerCase().includes(filterText.toLowerCase())) ||
+                                    (result.authors && result.authors.some(author => 
+                                      author && author.toLowerCase().includes(filterText.toLowerCase())
+                                    ))
+                                  )
+                                : sourceResults;
+                                
+                              return (
+                                <Box key={source} sx={{ mb: 3 }}>
+                                  <Typography variant="h6" color="primary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
+                                    <Chip 
+                                      label={formatSourceName(source)} 
+                                      color={
+                                        source === 'ads' ? 'primary' :
+                                        source === 'scholar' ? 'error' :
+                                        source === 'semanticScholar' ? 'warning' : 'success'
+                                      }
+                                      sx={{ mr: 1 }} 
+                                    />
+                                    <span>{filteredResults.length} results</span>
+                                  </Typography>
+                                  
+                                  <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                                    <Table size="small" stickyHeader>
+                                      <TableHead>
+                                        <TableRow>
+                                          <TableCell>Rank</TableCell>
+                                          <TableCell>Title</TableCell>
+                                          <TableCell>Authors</TableCell>
+                                          <TableCell>Year</TableCell>
+                                          <TableCell>Citations</TableCell>
+                                          <TableCell>Actions</TableCell>
+                                        </TableRow>
+                                      </TableHead>
+                                      <TableBody>
+                                        {filteredResults.map((result, idx) => (
+                                          <TableRow key={idx} hover>
+                                            <TableCell>{result.rank}</TableCell>
+                                            <TableCell>
+                                              <Typography variant="body2">
+                                                {result.title}
+                                              </Typography>
+                                              {result.abstract && (
+                                                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
+                                                  {result.abstract.length > 150 
+                                                    ? `${result.abstract.slice(0, 150)}...` 
+                                                    : result.abstract}
+                                                </Typography>
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              {Array.isArray(result.authors) 
+                                                ? result.authors.slice(0, 3).join(', ') + (result.authors.length > 3 ? ', et al.' : '') 
+                                                : result.authors}
+                                            </TableCell>
+                                            <TableCell>{result.year}</TableCell>
+                                            <TableCell>{result.citation_count}</TableCell>
+                                            <TableCell>
+                                              {result.url && (
+                                                <IconButton 
+                                                  size="small" 
+                                                  href={result.url} 
+                                                  target="_blank" 
+                                                  aria-label="View source"
+                                                >
+                                                  <LaunchIcon fontSize="small" />
+                                                </IconButton>
+                                              )}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </TableContainer>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        )}
+                        
+                        {/* Comparison Tab */}
+                        {resultTab === 1 && (
+                          <Box>
+                            <Grid container spacing={3}>
+                              {/* Summary Stats */}
+                              <Grid item xs={12}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 3 }}>
+                                  <Paper elevation={2} sx={{ p: 2, minWidth: 160, textAlign: 'center' }}>
+                                    <Typography variant="h4" color="primary">
+                                      {Object.keys(results.results).length}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Total Sources
+                                    </Typography>
+                                  </Paper>
+                                  
+                                  <Paper elevation={2} sx={{ p: 2, minWidth: 160, textAlign: 'center' }}>
+                                    <Typography variant="h4" color="primary">
+                                      {Object.values(results.results).reduce((acc, val) => acc + val.length, 0)}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      Total Results
+                                    </Typography>
+                                  </Paper>
+                                  
+                                  {results.comparison && results.comparison.similarity && (
+                                    <Paper elevation={2} sx={{ p: 2, minWidth: 160, textAlign: 'center' }}>
+                                      <Typography variant="h4" color="primary">
+                                        {Object.keys(results.comparison.similarity).length}
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        Metrics Computed
+                                      </Typography>
+                                    </Paper>
+                                  )}
+                                </Box>
+                              </Grid>
+                              
+                              {/* Metrics Table */}
+                              {results.comparison && results.comparison.overlap && Object.keys(results.comparison.overlap).length > 0 && (
+                                <Grid item xs={12}>
+                                  <Paper elevation={2} sx={{ p: 2 }}>
+                                    <Typography variant="h6" color="primary" gutterBottom>
+                                      Similarity Metrics
+                                    </Typography>
+                                    
+                                    {/* Metrics explanation */}
+                                    <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #eee' }}>
+                                      <Typography variant="subtitle2" gutterBottom>
+                                        Understanding the Metrics:
+                                      </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Overlap:</strong> Records are matched by DOI (when available) or by title. The total shows unique matching papers.
+                                      </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Same Rank:</strong> Papers that appear at the same rank position in both source results (e.g., paper appears as #3 in both sources).
+                                      </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Jaccard Similarity:</strong> Measures overlap regardless of ranking - number of shared records divided by total unique records from both sources.
+                                      </Typography>
+                                      <Typography variant="body2">
+                                        <strong>Rank-Biased Overlap:</strong> Measures similarity considering the ranking of results, giving more weight to matches at higher positions.
+                                      </Typography>
+                                    </Box>
+                                    
+                                    <TableContainer>
+                                      <Table size="small">
+                                        <TableHead>
+                                          <TableRow>
+                                            <TableCell>Sources</TableCell>
+                                            <TableCell align="center">Total Overlap</TableCell>
+                                            <TableCell align="center">Breakdown</TableCell>
+                                            <TableCell align="center">Same Rank</TableCell>
+                                            <TableCell align="right">
+                                              <Tooltip title={getMetricDescription('jaccard')}>
+                                                <Typography variant="body2" display="inline" sx={{ cursor: 'help', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                                                  Jaccard Similarity
+                                                </Typography>
+                                              </Tooltip>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                              <Tooltip title={getMetricDescription('rankBiased')}>
+                                                <Typography variant="body2" display="inline" sx={{ cursor: 'help', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                                                  Rank-Biased Overlap
+                                                </Typography>
+                                              </Tooltip>
+                                            </TableCell>
+                                          </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                          {Object.entries(results.comparison.overlap).map(([key, stats]) => {
+                                            const [source1, source2] = key.split('_vs_');
+                                            const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
+                                            const comparisonLabel = `${sourceNames[0]} vs ${sourceNames[1]}`;
+                                            
+                                            // Calculate metrics
+                                            const jaccardValue = results.comparison.similarity?.jaccard?.[key];
+                                            const rankBiasedValue = results.comparison.similarity?.rankBiased?.[key];
+                                            
+                                            const doiMatches = stats.matching_dois?.length || 0;
+                                            const titleMatches = stats.all_matching_titles?.length || 0;
+                                            const sameRankCount = stats.same_rank_count || 0;
+                                            
+                                            return (
+                                              <TableRow key={key}>
+                                                <TableCell>{comparisonLabel}</TableCell>
+                                                <TableCell align="center">
+                                                  <Chip 
+                                                    label={stats.overlap}
+                                                    size="small" 
+                                                    color="success"
+                                                    sx={{ fontWeight: 'bold' }}
+                                                  />
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                  <Typography variant="caption">
+                                                    {doiMatches} by DOI, {titleMatches} by title
+                                                  </Typography>
+                                                </TableCell>
+                                                <TableCell align="center">
+                                                  <Tooltip title="Papers that appear at the same rank position in both sources">
+                                                    <Chip 
+                                                      label={sameRankCount}
+                                                      size="small" 
+                                                      color="info"
+                                                      sx={{ fontWeight: 'bold' }}
+                                                    />
+                                                  </Tooltip>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                  <strong>{jaccardValue !== undefined ? jaccardValue.toFixed(4) : '0.0000'}</strong>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                  <strong>{rankBiasedValue !== undefined ? rankBiasedValue.toFixed(4) : '0.0000'}</strong>
+                                                </TableCell>
+                                              </TableRow>
+                                            );
+                                          })}
+                                        </TableBody>
+                                      </Table>
+                                    </TableContainer>
+                                  </Paper>
+                                </Grid>
+                              )}
+                            </Grid>
+                          </Box>
+                        )}
+                        
+                        {/* Overlap Visualization */}
+                        {results.comparison && results.comparison.overlap && Object.keys(results.comparison.overlap).length > 0 && (
+                          <Grid item xs={12}>
+                            <Paper elevation={2} sx={{ p: 2 }}>
+                              <Typography variant="h6" color="primary" gutterBottom>
+                                Overlap Visualization
+                              </Typography>
+                              
+                              {Object.entries(results.comparison.overlap).map(([key, stats], index) => {
+                                const [source1, source2] = key.split('_vs_');
+                                const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
+                                const totalResults = stats.overlap + stats.source1_only + stats.source2_only;
+                                const overlapPercentage = (stats.overlap / totalResults * 100).toFixed(1);
+                                const doiMatches = stats.matching_dois?.length || 0;
+                                const titleMatches = stats.all_matching_titles?.length || 0;
+                                
+                                return (
+                                  <Box key={key} sx={{ mb: 3 }}>
+                                    <Typography variant="subtitle1" gutterBottom>
+                                      {sourceNames[0]} vs {sourceNames[1]}
+                                    </Typography>
+                                    
+                                    {/* Stats summary */}
+                                    <Grid container spacing={2} sx={{ mb: 2 }}>
+                                      <Grid item xs={12}>
+                                        <Paper elevation={1} sx={{ p: 1, textAlign: 'center', bgcolor: 'success.light', color: 'white' }}>
+                                          <Typography variant="subtitle2">
+                                            Overlap: {stats.overlap} papers ({doiMatches} by DOI, {titleMatches} by title, {stats.same_rank_count || 0} at same rank)
+                                          </Typography>
+                                        </Paper>
+                                      </Grid>
+                                    </Grid>
+                                    
+                                    <Box sx={{ 
+                                      display: 'flex', 
+                                      height: 50, 
+                                      mb: 1, 
+                                      border: '1px solid #ddd', 
+                                      borderRadius: 1,
+                                      overflow: 'hidden'
+                                    }}>
+                                      <Tooltip title={`${stats.source1_only} results found only in ${sourceNames[0]}`}>
+                                        <Box sx={{ 
+                                          width: `${stats.source1_only / (stats.overlap + stats.source1_only + stats.source2_only) * 100}%`, 
+                                          bgcolor: source1 === 'ads' ? 'primary.main' : source1 === 'scholar' ? 'error.main' : source1 === 'semanticScholar' ? 'warning.main' : 'info.main',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: 'white',
+                                          fontSize: '0.75rem',
+                                          p: 1,
+                                          cursor: 'help'
+                                        }}>
+                                          {stats.source1_only > 0 ? stats.source1_only : ''}
+                                        </Box>
+                                      </Tooltip>
+                                      <Tooltip title={`${stats.overlap} results found in both sources (${overlapPercentage}% overlap)`}>
+                                        <Box sx={{ 
+                                          width: `${stats.overlap / (stats.overlap + stats.source1_only + stats.source2_only) * 100}%`, 
+                                          bgcolor: 'success.main',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: 'white',
+                                          fontSize: '0.75rem',
+                                          p: 1,
+                                          cursor: 'help'
+                                        }}>
+                                          {stats.overlap > 0 ? stats.overlap : ''}
+                                        </Box>
+                                      </Tooltip>
+                                      <Tooltip title={`${stats.source2_only} results found only in ${sourceNames[1]}`}>
+                                        <Box sx={{ 
+                                          width: `${stats.source2_only / (stats.overlap + stats.source1_only + stats.source2_only) * 100}%`, 
+                                          bgcolor: source2 === 'ads' ? 'primary.main' : source2 === 'scholar' ? 'error.main' : source2 === 'semanticScholar' ? 'warning.main' : 'info.main',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          color: 'white',
+                                          fontSize: '0.75rem',
+                                          p: 1,
+                                          cursor: 'help'
+                                        }}>
+                                          {stats.source2_only > 0 ? stats.source2_only : ''}
+                                        </Box>
+                                      </Tooltip>
+                                    </Box>
+                                    
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                                      <Typography variant="caption">
+                                        {sourceNames[0]} only: {stats.source1_only}
+                                      </Typography>
+                                      <Typography variant="caption">
+                                        <strong>Overlap: {stats.overlap} ({overlapPercentage}%)</strong>
+                                      </Typography>
+                                      <Typography variant="caption">
+                                        {sourceNames[1]} only: {stats.source2_only}
+                                      </Typography>
+                                    </Box>
+                                    
+                                    {/* Summary of overlapping records instead of detailed breakdown */}
+                                    {stats.overlap > 0 && (
+                                      <Alert severity="info" sx={{ mb: 2 }}>
+                                        <Typography variant="body2">
+                                          <strong>Match Details:</strong> Found {stats.overlap} papers that appear in both sources. 
+                                          {doiMatches > 0 && ` ${doiMatches} papers matched by DOI.`}
+                                          {titleMatches > 0 && ` ${titleMatches} papers matched by title.`}
+                                          {stats.same_rank_count > 0 && ` ${stats.same_rank_count} papers appear at the same rank position in both sources.`}
+                                          {stats.matching_dois && stats.matching_dois.length > 0 && stats.all_matching_titles && stats.all_matching_titles.length > 0 && 
+                                            ` Some papers were matched by both DOI and title.`}
+                                        </Typography>
+                                      </Alert>
+                                    )}
+                                  </Box>
+                                );
+                              })}
+                            </Paper>
+                          </Grid>
+                        )}
+                      </Box>
+                    </Paper>
+                  </Box>
+                ) : (
+                  <Alert severity="info">No results found for the given query and sources.</Alert>
+                )}
               </Box>
             )}
+          </Box>
+        )}
+
+        {/* Visualization Tab */}
+        {resultTab === 2 && (
+          <Box sx={{ height: 400, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Typography variant="h6" color="text.secondary">
+              Visualization features coming soon
+            </Typography>
           </Box>
         )}
 
@@ -837,44 +1310,88 @@ function App() {
                     {loading ? <CircularProgress size={24} /> : "List Sources"}
                   </Button>
 
-                  {sourcesList && sourcesList.sources && (
-                    <Box>
-                      <Typography variant="h6" gutterBottom>
-                        Available Sources
-                      </Typography>
-                      <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
-                        <pre>{JSON.stringify(sourcesList.sources, null, 2)}</pre>
+                  {/* Source Info */}
+                  {sourcesList && (
+                    <Grid item xs={12}>
+                      <Paper elevation={2} sx={{ p: 2 }}>
+                        <Typography variant="h6" gutterBottom>
+                          Available Search Sources
+                        </Typography>
+                        <List>
+                          {sourcesList.map(source => (
+                            <ListItem key={source.id}>
+                              <ListItemAvatar>
+                                <Avatar sx={{ 
+                                  bgcolor: 
+                                    source.id === 'ads' ? 'primary.main' :
+                                    source.id === 'scholar' ? 'error.main' :
+                                    source.id === 'semanticScholar' ? 'warning.main' : 'success.main' 
+                                }}>
+                                  <SearchIcon />
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText 
+                                primary={formatSourceName(source.id)} 
+                                secondary={`Status: ${source.status}, Max Results: ${source.max_results}`} 
+                              />
+                              <ListItemSecondaryAction>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handlePingSource(source.id)}
+                                  startIcon={<NetworkCheckIcon />}
+                                >
+                                  Ping
+                                </Button>
+                                <Button 
+                                  size="small" 
+                                  onClick={() => handleTestSearch(source.id)}
+                                  disabled={!query.trim()}
+                                  startIcon={<CheckIcon />}
+                                  sx={{ ml: 1 }}
+                                >
+                                  Test Search
+                                </Button>
+                              </ListItemSecondaryAction>
+                            </ListItem>
+                          ))}
+                        </List>
                       </Paper>
-                      
-                      <Typography variant="h6" gutterBottom>
-                        Ping Sources
-                      </Typography>
-                      <Box display="flex" flexWrap="wrap" gap={2} mb={2}>
-                        {Object.keys(sourcesList.sources).map(source => (
-                          <Button
-                            key={source}
-                            variant="outlined"
-                            onClick={() => handlePingSource(source)}
-                            disabled={pingResults[source]?.loading}
-                          >
-                            {pingResults[source]?.loading ? (
-                              <CircularProgress size={24} />
-                            ) : (
-                              `Ping ${source}`
-                            )}
-                          </Button>
-                        ))}
-                      </Box>
-                      
-                      {Object.keys(pingResults).length > 0 && (
-                        <Paper elevation={2} sx={{ p: 2 }}>
-                          <Typography variant="subtitle1" gutterBottom>
-                            Ping Results
-                          </Typography>
-                          <pre>{JSON.stringify(pingResults, null, 2)}</pre>
-                        </Paper>
-                      )}
-                    </Box>
+                    </Grid>
+                  )}
+
+                  {/* Ping Results */}
+                  {Object.keys(pingResults).length > 0 && (
+                    <Grid item xs={12}>
+                      <Paper elevation={2} sx={{ p: 2 }}>
+                        <Typography variant="h6" gutterBottom>
+                          Ping Results
+                        </Typography>
+                        <List>
+                          {Object.entries(pingResults).map(([sourceId, result]) => (
+                            <ListItem key={sourceId}>
+                              <ListItemAvatar>
+                                <Avatar sx={{ 
+                                  bgcolor: 
+                                    sourceId === 'ads' ? 'primary.main' :
+                                    sourceId === 'scholar' ? 'error.main' :
+                                    sourceId === 'semanticScholar' ? 'warning.main' : 'success.main' 
+                                }}>
+                                  <SearchIcon />
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText 
+                                primary={formatSourceName(sourceId)} 
+                                secondary={
+                                  result.loading ? 'Pinging...' :
+                                  result.error ? `Error: ${result.error}` :
+                                  `Response time: ${result.response_time_ms}ms, Status: ${result.status}`
+                                } 
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Paper>
+                    </Grid>
                   )}
                 </Box>
               )}

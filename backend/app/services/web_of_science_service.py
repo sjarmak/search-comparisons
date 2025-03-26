@@ -16,13 +16,27 @@ from ..utils.http import safe_api_request
 # Setup logging
 logger = logging.getLogger(__name__)
 
-# API Constants
-WOS_API_URL = "https://api.clarivate.com/apis/wos-starter/v1/documents"
-WOS_AUTH_URL = "https://api.clarivate.com/apis/wos-api/auth/v1/token"
-WOS_API_KEY = os.environ.get("WOS_API_KEY", "")
-WOS_API_SECRET = os.environ.get("WOS_API_SECRET", "")
+# API Constants - Exactly matching the search-engine-comparator
+WOS_API_URL = "https://api.clarivate.com/apis/wos-starter/v1/"
+WOS_API_KEY = os.environ.get("WEB_OF_SCIENCE_API_KEY", "")  # Using the exact environment variable name
+
+# Log the API key for debugging (masking most of it)
+if WOS_API_KEY:
+    masked_key = f"{WOS_API_KEY[:4]}...{WOS_API_KEY[-4:]}" if len(WOS_API_KEY) > 8 else "[MASKED]"
+    logger.info(f"WEB_OF_SCIENCE_API_KEY found in environment: {masked_key}")
+else:
+    logger.error("WEB_OF_SCIENCE_API_KEY not found in environment - searched for 'WEB_OF_SCIENCE_API_KEY'")
+    # Try alternate environment variable names
+    alternate_keys = ["WOS_API_KEY", "WEBOFSCIENCE_API_KEY", "WOS_KEY"]
+    for alt_key in alternate_keys:
+        alt_value = os.environ.get(alt_key)
+        if alt_value:
+            logger.info(f"Found alternative key '{alt_key}' - using this instead")
+            WOS_API_KEY = alt_value
+            break
+
 NUM_RESULTS = 20
-TIMEOUT_SECONDS = 20
+TIMEOUT_SECONDS = 30  # Increased to match search-engine-comparator
 
 # Field mappings
 FIELD_MAPPING = {
@@ -30,75 +44,9 @@ FIELD_MAPPING = {
     "authors": "authors",
     "abstract": "abstract",
     "doi": "doi",
-    "year": "publicationYear",
+    "year": "publishYear",
     "citation_count": "citationCount"
 }
-
-# Auth token cache
-auth_token: Optional[str] = None
-
-
-async def get_wos_auth_token() -> Optional[str]:
-    """
-    Get an authentication token for the Web of Science API.
-    
-    Uses the API key and secret to authenticate with the Web of Science API
-    and returns an access token for subsequent requests.
-    
-    Returns:
-        Optional[str]: Authentication token if successful, None otherwise
-    """
-    global auth_token
-    
-    # Return cached token if available
-    if auth_token:
-        return auth_token
-    
-    # Check if credentials are available
-    if not WOS_API_KEY or not WOS_API_SECRET:
-        logger.error("WOS_API_KEY or WOS_API_SECRET not found in environment")
-        return None
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            # Prepare auth request
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-            }
-            
-            data = {
-                "grant_type": "client_credentials"
-            }
-            
-            # Make request with basic auth
-            logger.info("Requesting Web of Science auth token")
-            response = await client.post(
-                WOS_AUTH_URL,
-                headers=headers,
-                data=data,
-                auth=(WOS_API_KEY, WOS_API_SECRET),
-                timeout=TIMEOUT_SECONDS
-            )
-            
-            # Check response
-            response.raise_for_status()
-            response_data = response.json()
-            
-            # Extract token
-            token = response_data.get("access_token")
-            if not token:
-                logger.error("No access token returned from Web of Science auth endpoint")
-                return None
-                
-            # Cache and return token
-            auth_token = token
-            logger.info("Successfully obtained Web of Science auth token")
-            return token
-            
-    except Exception as e:
-        logger.error(f"Error getting Web of Science auth token: {str(e)}")
-        return None
-
 
 async def get_web_of_science_results(
     query: str, 
@@ -108,8 +56,8 @@ async def get_web_of_science_results(
     """
     Get search results from the Web of Science API.
     
-    Authenticates with the Web of Science API, performs the search query,
-    and formats the results as SearchResult objects.
+    Uses the Web of Science API key to authenticate and perform the search query,
+    then formats the results as SearchResult objects.
     
     Args:
         query: Search query string
@@ -119,117 +67,156 @@ async def get_web_of_science_results(
     Returns:
         List[SearchResult]: List of search results from Web of Science
     """
-    # Get auth token
-    token = await get_wos_auth_token()
-    if not token:
-        logger.error("Unable to authenticate with Web of Science API")
+    # Check if API key is available
+    if not WOS_API_KEY:
+        logger.error("WEB_OF_SCIENCE_API_KEY not found in environment")
         return []
+    
+    logger.info(f"Using WOS_API_KEY: {WOS_API_KEY[:4]}...{WOS_API_KEY[-4:] if len(WOS_API_KEY) > 8 else ''}")
+    
+    # Format query with proper WoS syntax - EXACTLY as in search-engine-comparator
+    wos_query = f'AU=({query}) OR TS=({query})'
+    
+    # The correct WoS Starter API endpoint
+    base_url = f"{WOS_API_URL}documents"
+    
+    headers = {
+        "X-ApiKey": WOS_API_KEY,
+        "Accept": "application/json"
+    }
+    
+    params = {
+        "db": "WOS",
+        "q": wos_query,
+        "limit": min(num_results, 50),
+        "page": 1
+    }
+    
+    logger.info(f"Making Web of Science API request with query: {wos_query}")
+    logger.info(f"Request URL: {base_url}")
+    logger.info(f"Request headers: {headers}")
+    logger.info(f"Request parameters: {params}")
     
     try:
         async with httpx.AsyncClient() as client:
-            # Set headers with auth token
-            headers = {
-                "Accept": "application/json",
-                "Authorization": f"Bearer {token}",
-                "X-ApiKey": WOS_API_KEY
-            }
-            
-            # Set query parameters
-            params = {
-                "q": query,
-                "count": num_results,
-                "sortField": "relevance"
-            }
-            
-            # Make request
-            logger.info(f"Querying Web of Science API with: {query}")
-            response_data = await safe_api_request(
-                client, 
-                "GET", 
-                WOS_API_URL, 
-                headers=headers, 
+            response = await client.get(
+                base_url,
+                headers=headers,
                 params=params,
                 timeout=TIMEOUT_SECONDS
             )
             
-            # Check if we got a response
-            documents = response_data.get("hits", [])
-            if not documents:
-                logger.warning(f"No results found from Web of Science for query: {query}")
+            # Log response status
+            logger.info(f"Web of Science API response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.warning(f"WoS API error: Status {response.status_code}")
+                logger.debug(f"Response: {response.text[:500]}")
+                # Return empty list for error case
                 return []
             
-            # Process results
-            results: List[SearchResult] = []
+            data = response.json()
             
-            for rank, doc in enumerate(documents, 1):
-                # Get document data
-                doc_data: Dict[str, Any] = doc.get("document", {})
-                
-                # Extract title
-                title = ""
-                for title_data in doc_data.get("title", {}).get("titles", []):
-                    if title_data.get("type") == "item":
-                        title = title_data.get("value", "")
+            # Check if there are results
+            documents = data.get('hits', [])
+            total = data.get('metadata', {}).get('total', 0)
+            
+            logger.info(f"WoS query returned {total} total results, {len(documents)} in this page")
+            
+            if not documents:
+                # No results found
+                logger.warning(f"No results found in Web of Science for '{query}'")
+                return []
+            
+            # Process the results
+            results = []
+            for i, doc in enumerate(documents[:num_results], 1):
+                try:
+                    # Get document data
+                    doc_data = doc.get("document", {})
+                    
+                    # Extract title
+                    title = ""
+                    title_obj = doc_data.get("title", {})
+                    titles = title_obj.get("titles", [])
+                    for title_data in titles:
+                        if title_data.get("type") == "item":
+                            title = title_data.get("value", "")
+                            break
+                    
+                    # Extract authors
+                    authors = []
+                    author_obj = doc_data.get("authors", {})
+                    author_list = author_obj.get("authors", [])
+                    for author in author_list:
+                        name_parts = []
+                        if author.get("lastName"):
+                            name_parts.append(author.get("lastName"))
+                        if author.get("firstName"):
+                            name_parts.append(author.get("firstName"))
+                        if name_parts:
+                            authors.append(" ".join(name_parts))
+                    
+                    # Extract abstract
+                    abstract = ""
+                    abstract_obj = doc_data.get("abstract", {})
+                    abstract_list = abstract_obj.get("abstract", [])
+                    for abstract_data in abstract_list:
+                        abstract = abstract_data.get("value", "")
                         break
-                
-                # Extract authors
-                authors: List[str] = []
-                for author in doc_data.get("authors", {}).get("authors", []):
-                    name_parts = []
-                    if author.get("lastName"):
-                        name_parts.append(author.get("lastName"))
-                    if author.get("firstName"):
-                        name_parts.append(author.get("firstName"))
-                    if name_parts:
-                        authors.append(" ".join(name_parts))
-                
-                # Extract abstract
-                abstract = ""
-                for abstract_data in doc_data.get("abstract", {}).get("abstract", []):
-                    abstract = abstract_data.get("value", "")
-                    break
-                
-                # Extract DOI
-                doi = None
-                for id_data in doc_data.get("identifiers", {}).get("identifiers", []):
-                    if id_data.get("type") == "doi":
-                        doi = id_data.get("value")
-                        break
-                
-                # Extract year
-                year = None
-                pub_info = doc_data.get("source", {}).get("publishYear", None)
-                if pub_info:
-                    try:
-                        year = int(pub_info)
-                    except (ValueError, TypeError):
-                        year = None
-                
-                # Extract citation count
-                citation_count = None
-                metrics = doc_data.get("metrics", {})
-                if metrics:
-                    citation_count = metrics.get("citationCount", 0)
-                
-                # Create result object
-                result = SearchResult(
-                    title=title,
-                    authors=authors,
-                    abstract=abstract,
-                    doi=doi,
-                    year=year,
-                    url=f"https://www.webofscience.com/wos/woscc/full-record/{doc_data.get('uid')}" if doc_data.get('uid') else None,
-                    source="webOfScience",
-                    rank=rank,
-                    citation_count=citation_count
-                )
-                results.append(result)
+                    
+                    # Extract DOI
+                    doi = None
+                    identifiers = doc_data.get("identifiers", {}).get("identifiers", [])
+                    for id_data in identifiers:
+                        if id_data.get("type") == "doi":
+                            doi = id_data.get("value")
+                            break
+                    
+                    # Extract year
+                    year = None
+                    source = doc_data.get("source", {})
+                    pub_year = source.get("publishYear")
+                    if pub_year:
+                        try:
+                            year = int(pub_year)
+                        except (ValueError, TypeError):
+                            year = None
+                    
+                    # Extract citation count
+                    citation_count = None
+                    metrics = doc_data.get("metrics", {})
+                    if metrics:
+                        citation_count = metrics.get("citationCount", 0)
+                    
+                    # Create URL
+                    uid = doc_data.get('uid')
+                    url = f"https://www.webofscience.com/wos/woscc/full-record/{uid}" if uid else None
+                    if doi and not url:
+                        url = f"https://doi.org/{doi}"
+                    
+                    # Create result object
+                    result = SearchResult(
+                        title=title,
+                        authors=authors,
+                        abstract=abstract,
+                        doi=doi,
+                        year=year,
+                        url=url,
+                        source="webOfScience",
+                        rank=i,
+                        citation_count=citation_count
+                    )
+                    results.append(result)
+                except Exception as e:
+                    logger.error(f"Error processing WoS result {i}: {str(e)}")
+                    continue
             
             logger.info(f"Retrieved {len(results)} results from Web of Science")
             return results
             
     except Exception as e:
-        logger.error(f"Error retrieving results from Web of Science: {str(e)}")
+        logger.error(f"Error in WoS API request: {str(e)}")
         return []
 
 
@@ -237,7 +224,7 @@ async def get_wos_paper_details(doi: str) -> Optional[Dict[str, Any]]:
     """
     Get detailed paper information from Web of Science using a DOI.
     
-    Authenticates with the Web of Science API and retrieves comprehensive
+    Uses the Web of Science API key to retrieve comprehensive
     metadata for a paper identified by its DOI.
     
     Args:
@@ -250,39 +237,49 @@ async def get_wos_paper_details(doi: str) -> Optional[Dict[str, Any]]:
         logger.warning("Empty DOI provided to get_wos_paper_details")
         return None
     
-    # Get auth token
-    token = await get_wos_auth_token()
-    if not token:
-        logger.error("Unable to authenticate with Web of Science API")
+    # Check if API key is available
+    if not WOS_API_KEY:
+        logger.error("WEB_OF_SCIENCE_API_KEY not found in environment")
         return None
+    
+    # The correct WoS Starter API endpoint
+    base_url = f"{WOS_API_URL}documents"
+    
+    headers = {
+        "X-ApiKey": WOS_API_KEY,
+        "Accept": "application/json"
+    }
+    
+    params = {
+        "db": "WOS",
+        "q": f"DO=({doi})"
+    }
+    
+    logger.info(f"Querying Web of Science API for DOI: {doi}")
+    logger.info(f"Request URL: {base_url}")
+    logger.info(f"Request parameters: {params}")
     
     try:
         async with httpx.AsyncClient() as client:
-            # Set headers with auth token
-            headers = {
-                "Accept": "application/json",
-                "Authorization": f"Bearer {token}",
-                "X-ApiKey": WOS_API_KEY
-            }
-            
-            # Set query parameters
-            params = {
-                "q": f"DO=({doi})"
-            }
-            
-            # Make request
-            logger.info(f"Querying Web of Science API for DOI: {doi}")
-            response_data = await safe_api_request(
-                client, 
-                "GET", 
-                WOS_API_URL, 
-                headers=headers, 
+            response = await client.get(
+                base_url,
+                headers=headers,
                 params=params,
                 timeout=TIMEOUT_SECONDS
             )
             
+            # Log response status
+            logger.info(f"Web of Science API response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.warning(f"WoS API error: Status {response.status_code}")
+                logger.debug(f"Response: {response.text[:500]}")
+                return None
+            
+            data = response.json()
+            
             # Check if we got a response
-            documents = response_data.get("hits", [])
+            documents = data.get("hits", [])
             if not documents:
                 logger.warning(f"No document found for DOI: {doi} in Web of Science")
                 return None
