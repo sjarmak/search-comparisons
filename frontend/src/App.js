@@ -424,7 +424,7 @@ function App() {
           )}
           <IconButton 
             color="inherit" 
-            href="https://github.com/yourusername/search-comparisons" 
+            href="https://github.com/adsabs/search-comparisons" 
             target="_blank"
             aria-label="GitHub repository"
           >
@@ -825,126 +825,6 @@ function App() {
                             </Grid>
                           </Box>
                         )}
-                        
-                        {/* Overlap Visualization */}
-                        {results.comparison && results.comparison.overlap && Object.keys(results.comparison.overlap).length > 0 && (
-                          <Grid item xs={12}>
-                            <Paper elevation={2} sx={{ p: 2 }}>
-                              <Typography variant="h6" color="primary" gutterBottom>
-                                Overlap Visualization
-                              </Typography>
-                              
-                              {Object.entries(results.comparison.overlap).map(([key, stats], index) => {
-                                const [source1, source2] = key.split('_vs_');
-                                const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
-                                const totalResults = stats.overlap + stats.source1_only + stats.source2_only;
-                                const overlapPercentage = (stats.overlap / totalResults * 100).toFixed(1);
-                                const doiMatches = stats.matching_dois?.length || 0;
-                                const titleMatches = stats.all_matching_titles?.length || 0;
-                                
-                                return (
-                                  <Box key={key} sx={{ mb: 3 }}>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                      {sourceNames[0]} vs {sourceNames[1]}
-                                    </Typography>
-                                    
-                                    {/* Stats summary */}
-                                    <Grid container spacing={2} sx={{ mb: 2 }}>
-                                      <Grid item xs={12}>
-                                        <Paper elevation={1} sx={{ p: 1, textAlign: 'center', bgcolor: 'success.light', color: 'white' }}>
-                                          <Typography variant="subtitle2">
-                                            Overlap: {stats.overlap} papers ({doiMatches} by DOI, {titleMatches} by title, {stats.same_rank_count || 0} at same rank)
-                                          </Typography>
-                                        </Paper>
-                                      </Grid>
-                                    </Grid>
-                                    
-                                    <Box sx={{ 
-                                      display: 'flex', 
-                                      height: 50, 
-                                      mb: 1, 
-                                      border: '1px solid #ddd', 
-                                      borderRadius: 1,
-                                      overflow: 'hidden'
-                                    }}>
-                                      <Tooltip title={`${stats.source1_only} results found only in ${sourceNames[0]}`}>
-                                        <Box sx={{ 
-                                          width: `${stats.source1_only / (stats.overlap + stats.source1_only + stats.source2_only) * 100}%`, 
-                                          bgcolor: source1 === 'ads' ? 'primary.main' : source1 === 'scholar' ? 'error.main' : source1 === 'semanticScholar' ? 'warning.main' : 'info.main',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          color: 'white',
-                                          fontSize: '0.75rem',
-                                          p: 1,
-                                          cursor: 'help'
-                                        }}>
-                                          {stats.source1_only > 0 ? stats.source1_only : ''}
-                                        </Box>
-                                      </Tooltip>
-                                      <Tooltip title={`${stats.overlap} results found in both sources (${overlapPercentage}% overlap)`}>
-                                        <Box sx={{ 
-                                          width: `${stats.overlap / (stats.overlap + stats.source1_only + stats.source2_only) * 100}%`, 
-                                          bgcolor: 'success.main',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          color: 'white',
-                                          fontSize: '0.75rem',
-                                          p: 1,
-                                          cursor: 'help'
-                                        }}>
-                                          {stats.overlap > 0 ? stats.overlap : ''}
-                                        </Box>
-                                      </Tooltip>
-                                      <Tooltip title={`${stats.source2_only} results found only in ${sourceNames[1]}`}>
-                                        <Box sx={{ 
-                                          width: `${stats.source2_only / (stats.overlap + stats.source1_only + stats.source2_only) * 100}%`, 
-                                          bgcolor: source2 === 'ads' ? 'primary.main' : source2 === 'scholar' ? 'error.main' : source2 === 'semanticScholar' ? 'warning.main' : 'info.main',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          color: 'white',
-                                          fontSize: '0.75rem',
-                                          p: 1,
-                                          cursor: 'help'
-                                        }}>
-                                          {stats.source2_only > 0 ? stats.source2_only : ''}
-                                        </Box>
-                                      </Tooltip>
-                                    </Box>
-                                    
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                                      <Typography variant="caption">
-                                        {sourceNames[0]} only: {stats.source1_only}
-                                      </Typography>
-                                      <Typography variant="caption">
-                                        <strong>Overlap: {stats.overlap} ({overlapPercentage}%)</strong>
-                                      </Typography>
-                                      <Typography variant="caption">
-                                        {sourceNames[1]} only: {stats.source2_only}
-                                      </Typography>
-                                    </Box>
-                                    
-                                    {/* Summary of overlapping records instead of detailed breakdown */}
-                                    {stats.overlap > 0 && (
-                                      <Alert severity="info" sx={{ mb: 2 }}>
-                                        <Typography variant="body2">
-                                          <strong>Match Details:</strong> Found {stats.overlap} papers that appear in both sources. 
-                                          {doiMatches > 0 && ` ${doiMatches} papers matched by DOI.`}
-                                          {titleMatches > 0 && ` ${titleMatches} papers matched by title.`}
-                                          {stats.same_rank_count > 0 && ` ${stats.same_rank_count} papers appear at the same rank position in both sources.`}
-                                          {stats.matching_dois && stats.matching_dois.length > 0 && stats.all_matching_titles && stats.all_matching_titles.length > 0 && 
-                                            ` Some papers were matched by both DOI and title.`}
-                                        </Typography>
-                                      </Alert>
-                                    )}
-                                  </Box>
-                                );
-                              })}
-                            </Paper>
-                          </Grid>
-                        )}
                       </Box>
                     </Paper>
                   </Box>
@@ -958,10 +838,348 @@ function App() {
 
         {/* Visualization Tab */}
         {resultTab === 2 && (
-          <Box sx={{ height: 400, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Typography variant="h6" color="text.secondary">
-              Visualization features coming soon
-            </Typography>
+          <Box sx={{ p: 2 }}>
+            {results && results.comparison && results.comparison.similarity && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Similarity Metrics Visualization
+                </Typography>
+                
+                <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    About this visualization:
+                  </Typography>
+                  <Typography variant="body2">
+                    These scatter plots show the Jaccard similarity and Rank-Biased Overlap (RBO) metrics between ADS/SciX and other search engines.
+                    Higher values indicate greater similarity between result sets.
+                  </Typography>
+                  <Alert severity="info" sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                      Current Query: <strong>{results.query}</strong>
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic' }}>
+                      In future versions, multiple queries will be displayed with different shapes/colors to identify patterns in search engine behavior across query types.
+                    </Typography>
+                  </Alert>
+                </Paper>
+
+                {/* Jaccard Similarity Scatter Plot */}
+                <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom color="primary">
+                    Jaccard Similarity
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    Jaccard similarity measures the proportion of shared results regardless of ranking position.
+                  </Typography>
+                  
+                  <Box sx={{ height: 300, position: 'relative', border: '1px solid #eee', borderRadius: 1, p: 2, mb: 2 }}>
+                    {/* Y-axis */}
+                    <Box sx={{ 
+                      position: 'absolute', 
+                      left: 0, 
+                      top: 0, 
+                      bottom: 0, 
+                      width: 50, 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'flex-end', 
+                      pr: 1,
+                      borderRight: '1px solid #eee' 
+                    }}>
+                      <Typography variant="caption">1.0</Typography>
+                      <Typography variant="caption">0.8</Typography>
+                      <Typography variant="caption">0.6</Typography>
+                      <Typography variant="caption">0.4</Typography>
+                      <Typography variant="caption">0.2</Typography>
+                      <Typography variant="caption">0.0</Typography>
+                    </Box>
+                    
+                    {/* X-axis labels */}
+                    <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                    </Box>
+                    
+                    {/* Grid lines */}
+                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      {[0, 0.2, 0.4, 0.6, 0.8, 1].map((line) => (
+                        <Box key={line} sx={{ borderBottom: line < 1 ? '1px dashed #ddd' : 'none', width: '100%', height: 0 }} />
+                      ))}
+                    </Box>
+                    
+                    {/* Plot area */}
+                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20 }}>
+                      {/* Data points */}
+                      {Object.entries(results.comparison.similarity.jaccard || {}).map(([key, value], index) => {
+                        const [source1, source2] = key.split('_vs_');
+                        const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
+                        
+                        // Only show comparisons with ADS
+                        if (!(source1 === 'ads' || source2 === 'ads')) {
+                          return null;
+                        }
+                        
+                        // Determine X position based on the comparison 
+                        let xPosition;
+                        let color;
+                        
+                        if ((source1 === 'ads' && source2 === 'scholar') || 
+                            (source2 === 'ads' && source1 === 'scholar')) {
+                          xPosition = '25%';
+                          color = 'error.main';
+                        } else if ((source1 === 'ads' && source2 === 'semanticScholar') || 
+                                   (source2 === 'ads' && source1 === 'semanticScholar')) {
+                          xPosition = '50%';
+                          color = 'warning.main';
+                        } else if ((source1 === 'ads' && source2 === 'webOfScience') || 
+                                   (source2 === 'ads' && source1 === 'webOfScience')) {
+                          xPosition = '75%';
+                          color = 'success.main';
+                        } else {
+                          return null; // Skip other comparisons
+                        }
+                        
+                        // Y position is based on the value (1.0 at top, 0.0 at bottom)
+                        const yPosition = `${(1 - value) * 100}%`;
+                        
+                        return (
+                          <Tooltip
+                            key={key}
+                            title={`${sourceNames[0]} vs ${sourceNames[1]}: ${value.toFixed(4)} (Query: "${results.query}")`}
+                            placement="top"
+                          >
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                left: xPosition,
+                                top: yPosition,
+                                width: 12,
+                                height: 12,
+                                bgcolor: color,
+                                borderRadius: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                '&:hover': {
+                                  transform: 'translate(-50%, -50%) scale(1.5)',
+                                  zIndex: 10
+                                }
+                              }}
+                            />
+                          </Tooltip>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                  
+                  {/* Legend */}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main', mr: 1 }} />
+                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'warning.main', mr: 1 }} />
+                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main', mr: 1 }} />
+                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                    </Box>
+                  </Box>
+                </Paper>
+                
+                {/* Rank-Biased Overlap Scatter Plot */}
+                <Paper elevation={2} sx={{ p: 2 }}>
+                  <Typography variant="subtitle1" gutterBottom color="primary">
+                    Rank-Biased Overlap
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 2 }}>
+                    Rank-Biased Overlap considers the order of results, giving higher weight to matches at the top of result lists.
+                  </Typography>
+                  
+                  <Box sx={{ height: 300, position: 'relative', border: '1px solid #eee', borderRadius: 1, p: 2, mb: 2 }}>
+                    {/* Y-axis */}
+                    <Box sx={{ 
+                      position: 'absolute', 
+                      left: 0, 
+                      top: 0, 
+                      bottom: 0, 
+                      width: 50, 
+                      display: 'flex', 
+                      flexDirection: 'column', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'flex-end', 
+                      pr: 1,
+                      borderRight: '1px solid #eee' 
+                    }}>
+                      <Typography variant="caption">1.0</Typography>
+                      <Typography variant="caption">0.8</Typography>
+                      <Typography variant="caption">0.6</Typography>
+                      <Typography variant="caption">0.4</Typography>
+                      <Typography variant="caption">0.2</Typography>
+                      <Typography variant="caption">0.0</Typography>
+                    </Box>
+                    
+                    {/* X-axis labels */}
+                    <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                    </Box>
+                    
+                    {/* Grid lines */}
+                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                      {[0, 0.2, 0.4, 0.6, 0.8, 1].map((line) => (
+                        <Box key={line} sx={{ borderBottom: line < 1 ? '1px dashed #ddd' : 'none', width: '100%', height: 0 }} />
+                      ))}
+                    </Box>
+                    
+                    {/* Plot area */}
+                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20 }}>
+                      {/* Data points */}
+                      {Object.entries(results.comparison.similarity.rankBiased || {}).map(([key, value], index) => {
+                        const [source1, source2] = key.split('_vs_');
+                        const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
+                        
+                        // Only show comparisons with ADS
+                        if (!(source1 === 'ads' || source2 === 'ads')) {
+                          return null;
+                        }
+                        
+                        // Determine X position based on the comparison 
+                        let xPosition;
+                        let color;
+                        
+                        if ((source1 === 'ads' && source2 === 'scholar') || 
+                            (source2 === 'ads' && source1 === 'scholar')) {
+                          xPosition = '25%';
+                          color = 'error.main';
+                        } else if ((source1 === 'ads' && source2 === 'semanticScholar') || 
+                                   (source2 === 'ads' && source1 === 'semanticScholar')) {
+                          xPosition = '50%';
+                          color = 'warning.main';
+                        } else if ((source1 === 'ads' && source2 === 'webOfScience') || 
+                                   (source2 === 'ads' && source1 === 'webOfScience')) {
+                          xPosition = '75%';
+                          color = 'success.main';
+                        } else {
+                          return null; // Skip other comparisons
+                        }
+                        
+                        // Y position is based on the value (1.0 at top, 0.0 at bottom)
+                        const yPosition = `${(1 - value) * 100}%`;
+                        
+                        return (
+                          <Tooltip
+                            key={key}
+                            title={`${sourceNames[0]} vs ${sourceNames[1]}: ${value.toFixed(4)} (Query: "${results.query}")`}
+                            placement="top"
+                          >
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                left: xPosition,
+                                top: yPosition,
+                                width: 12,
+                                height: 12,
+                                bgcolor: color,
+                                borderRadius: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                border: '2px solid #fff',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s',
+                                '&:hover': {
+                                  transform: 'translate(-50%, -50%) scale(1.5)',
+                                  zIndex: 10
+                                }
+                              }}
+                            />
+                          </Tooltip>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                  
+                  {/* Legend */}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main', mr: 1, border: '2px solid #fff' }} />
+                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'warning.main', mr: 1, border: '2px solid #fff' }} />
+                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main', mr: 1, border: '2px solid #fff' }} />
+                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                    </Box>
+                  </Box>
+                  
+                  {/* Overlap Stats Summary Table - ADS focused */}
+                  <Box sx={{ mt: 4 }}>
+                    <Typography variant="subtitle1" gutterBottom color="primary">
+                      ADS Comparison Statistics for "{results.query}"
+                    </Typography>
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Comparison</TableCell>
+                            <TableCell align="center">Total Overlap</TableCell>
+                            <TableCell align="center">Same Rank</TableCell>
+                            <TableCell align="right">Jaccard</TableCell>
+                            <TableCell align="right">RBO</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {Object.entries(results.comparison.overlap || {}).map(([key, stats]) => {
+                            const [source1, source2] = key.split('_vs_');
+                            
+                            // Only show ADS comparisons
+                            if (!(source1 === 'ads' || source2 === 'ads')) {
+                              return null;
+                            }
+                            
+                            const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
+                            const comparisonLabel = `${sourceNames[0]} vs ${sourceNames[1]}`;
+                            
+                            // Get metrics
+                            const jaccardValue = results.comparison.similarity?.jaccard?.[key];
+                            const rankBiasedValue = results.comparison.similarity?.rankBiased?.[key];
+                            const sameRankCount = stats.same_rank_count || 0;
+                            
+                            return (
+                              <TableRow key={key}>
+                                <TableCell>{comparisonLabel}</TableCell>
+                                <TableCell align="center">{stats.overlap}</TableCell>
+                                <TableCell align="center">{sameRankCount}</TableCell>
+                                <TableCell align="right">{jaccardValue !== undefined ? jaccardValue.toFixed(4) : '0.0000'}</TableCell>
+                                <TableCell align="right">{rankBiasedValue !== undefined ? rankBiasedValue.toFixed(4) : '0.0000'}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                </Paper>
+              </Box>
+            )}
+            
+            {(!results || !results.comparison || !results.comparison.similarity) && (
+              <Box sx={{ height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No data to visualize
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Run a search across multiple sources to see similarity metrics visualized here.
+                </Typography>
+              </Box>
+            )}
           </Box>
         )}
 

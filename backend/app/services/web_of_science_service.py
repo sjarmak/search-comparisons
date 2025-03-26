@@ -70,7 +70,20 @@ async def get_web_of_science_results(
     # Check if API key is available
     if not WOS_API_KEY:
         logger.error("WEB_OF_SCIENCE_API_KEY not found in environment")
-        return []
+        # Return a placeholder result instead of empty list
+        no_results_msg = f"Web of Science API key not found in environment variables."
+        placeholder = SearchResult(
+            title="[Web of Science API Error]",
+            authors=[],
+            abstract=no_results_msg,
+            doi=None,
+            year=None,
+            url="https://webofknowledge.com",
+            source="webOfScience",
+            rank=1,
+            citation_count=0
+        )
+        return [placeholder]
     
     logger.info(f"Using WOS_API_KEY: {WOS_API_KEY[:4]}...{WOS_API_KEY[-4:] if len(WOS_API_KEY) > 8 else ''}")
     
@@ -112,10 +125,33 @@ async def get_web_of_science_results(
             if response.status_code != 200:
                 logger.warning(f"WoS API error: Status {response.status_code}")
                 logger.debug(f"Response: {response.text[:500]}")
-                # Return empty list for error case
-                return []
+                # Return placeholder for error case
+                no_results_msg = f"Error accessing Web of Science API: Status {response.status_code}"
+                placeholder = SearchResult(
+                    title="[Web of Science API Error]",
+                    authors=[],
+                    abstract=no_results_msg,
+                    doi=None,
+                    year=None,
+                    url="https://webofknowledge.com",
+                    source="webOfScience",
+                    rank=1,
+                    citation_count=0
+                )
+                return [placeholder]
             
             data = response.json()
+            
+            # Log the API response structure for debugging
+            if 'hits' in data and len(data['hits']) > 0:
+                first_hit = data['hits'][0]
+                logger.debug(f"First WoS result structure: {first_hit}")
+                if 'document' in first_hit:
+                    doc_fields = list(first_hit['document'].keys())
+                    logger.debug(f"Document fields available: {doc_fields}")
+                    # Log title structure specifically
+                    if 'title' in first_hit['document']:
+                        logger.debug(f"Title field structure: {first_hit['document']['title']}")
             
             # Check if there are results
             documents = data.get('hits', [])
@@ -126,74 +162,104 @@ async def get_web_of_science_results(
             if not documents:
                 # No results found
                 logger.warning(f"No results found in Web of Science for '{query}'")
-                return []
+                no_results_msg = f"The term '{query}' did not match any documents in the Web of Science Core Collection."
+                placeholder = SearchResult(
+                    title="[No results found in Web of Science database]",
+                    authors=[],
+                    abstract=no_results_msg,
+                    doi=None,
+                    year=None,
+                    url="https://webofknowledge.com",
+                    source="webOfScience",
+                    rank=1,
+                    citation_count=0
+                )
+                return [placeholder]
             
-            # Process the results
+            # Process the results - COMPLETELY CHANGED TO MATCH WORKING IMPLEMENTATION
             results = []
             for i, doc in enumerate(documents[:num_results], 1):
                 try:
-                    # Get document data
-                    doc_data = doc.get("document", {})
+                    # Extract fields directly from top-level document or from document.document
+                    doc_data = doc.get("document", doc)  # Try document field first, fall back to doc itself
                     
-                    # Extract title
-                    title = ""
-                    title_obj = doc_data.get("title", {})
-                    titles = title_obj.get("titles", [])
-                    for title_data in titles:
-                        if title_data.get("type") == "item":
-                            title = title_data.get("value", "")
-                            break
+                    # Get title - try different possible locations
+                    title = None
+                    if "title" in doc_data:
+                        title_field = doc_data.get("title")
+                        if isinstance(title_field, str):
+                            title = title_field
+                        elif isinstance(title_field, dict) and "value" in title_field:
+                            title = title_field.get("value")
                     
-                    # Extract authors
-                    authors = []
-                    author_obj = doc_data.get("authors", {})
-                    author_list = author_obj.get("authors", [])
-                    for author in author_list:
-                        name_parts = []
-                        if author.get("lastName"):
-                            name_parts.append(author.get("lastName"))
-                        if author.get("firstName"):
-                            name_parts.append(author.get("firstName"))
-                        if name_parts:
-                            authors.append(" ".join(name_parts))
+                    # If no title found, use placeholder
+                    if not title:
+                        title = f"[Web of Science Record #{i}]"
                     
-                    # Extract abstract
-                    abstract = ""
-                    abstract_obj = doc_data.get("abstract", {})
-                    abstract_list = abstract_obj.get("abstract", [])
-                    for abstract_data in abstract_list:
-                        abstract = abstract_data.get("value", "")
-                        break
-                    
-                    # Extract DOI
+                    # Get DOI - try different possible locations
                     doi = None
-                    identifiers = doc_data.get("identifiers", {}).get("identifiers", [])
-                    for id_data in identifiers:
-                        if id_data.get("type") == "doi":
-                            doi = id_data.get("value")
-                            break
+                    if "identifiers" in doc_data:
+                        identifiers = doc_data.get("identifiers")
+                        if isinstance(identifiers, dict):
+                            doi = identifiers.get("doi")
+                        elif isinstance(identifiers, dict) and "identifiers" in identifiers:
+                            for id_item in identifiers.get("identifiers", []):
+                                if id_item.get("type") == "doi":
+                                    doi = id_item.get("value")
+                                    break
                     
-                    # Extract year
+                    # Get authors - try different possible locations
+                    authors = []
+                    if "names" in doc_data and "authors" in doc_data.get("names", {}):
+                        author_list = doc_data.get("names", {}).get("authors", [])
+                        for author in author_list:
+                            display_name = author.get("displayName")
+                            if display_name:
+                                authors.append(display_name)
+                    elif "authors" in doc_data:
+                        author_obj = doc_data.get("authors", {})
+                        if "authors" in author_obj:
+                            for author in author_obj.get("authors", []):
+                                name_parts = []
+                                if author.get("lastName"):
+                                    name_parts.append(author.get("lastName"))
+                                if author.get("firstName"):
+                                    name_parts.append(author.get("firstName"))
+                                if name_parts:
+                                    authors.append(" ".join(name_parts))
+                    
+                    # Get year - try different possible locations
                     year = None
-                    source = doc_data.get("source", {})
-                    pub_year = source.get("publishYear")
-                    if pub_year:
-                        try:
-                            year = int(pub_year)
-                        except (ValueError, TypeError):
-                            year = None
+                    if "source" in doc_data and "publishYear" in doc_data.get("source", {}):
+                        year_str = doc_data.get("source", {}).get("publishYear")
+                        if year_str:
+                            try:
+                                year = int(year_str)
+                            except (ValueError, TypeError):
+                                year = None
                     
-                    # Extract citation count
-                    citation_count = None
-                    metrics = doc_data.get("metrics", {})
-                    if metrics:
-                        citation_count = metrics.get("citationCount", 0)
+                    # Get citation count
+                    citation_count = 0
+                    if "metrics" in doc_data and "citationCount" in doc_data.get("metrics", {}):
+                        citation_count = doc_data.get("metrics", {}).get("citationCount", 0)
                     
-                    # Create URL
+                    # Create URL - use DOI or WoS ID
+                    url = None
                     uid = doc_data.get('uid')
-                    url = f"https://www.webofscience.com/wos/woscc/full-record/{uid}" if uid else None
-                    if doi and not url:
+                    if uid:
+                        url = f"https://www.webofscience.com/wos/woscc/full-record/{uid}"
+                    elif doi:
                         url = f"https://doi.org/{doi}"
+                    
+                    # Create abstract
+                    abstract = ""
+                    if "abstract" in doc_data:
+                        abstract_obj = doc_data.get("abstract", {})
+                        if isinstance(abstract_obj, dict) and "abstract" in abstract_obj:
+                            for item in abstract_obj.get("abstract", []):
+                                if "value" in item:
+                                    abstract = item.get("value", "")
+                                    break
                     
                     # Create result object
                     result = SearchResult(
@@ -208,6 +274,7 @@ async def get_web_of_science_results(
                         citation_count=citation_count
                     )
                     results.append(result)
+                    logger.debug(f"Processed WoS result {i}: {title}")
                 except Exception as e:
                     logger.error(f"Error processing WoS result {i}: {str(e)}")
                     continue
@@ -217,7 +284,20 @@ async def get_web_of_science_results(
             
     except Exception as e:
         logger.error(f"Error in WoS API request: {str(e)}")
-        return []
+        # Create a placeholder result for exception case
+        no_results_msg = f"Error accessing Web of Science API: {str(e)}"
+        placeholder = SearchResult(
+            title="[Web of Science API Error]",
+            authors=[],
+            abstract=no_results_msg,
+            doi=None,
+            year=None,
+            url="https://webofknowledge.com",
+            source="webOfScience",
+            rank=1,
+            citation_count=0
+        )
+        return [placeholder]
 
 
 async def get_wos_paper_details(doi: str) -> Optional[Dict[str, Any]]:

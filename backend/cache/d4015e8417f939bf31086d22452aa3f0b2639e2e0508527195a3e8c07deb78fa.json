@@ -1,5 +1,5 @@
 {
-  "timestamp": 1742996103.076624,
+  "timestamp": 1743000031.04203,
   "expiry": 86400,
   "results": [
     {
@@ -7,17 +7,7 @@
       "authors": [
         "S. Jarmak",
         "T. M. Becker",
-        "Charles E. Woodward",
-        "C. Honniball",
-        "A. Rivkin",
-        "Margaret M. McAdam",
-        "Zoe Landsman",
-        "S. Cambioni",
-        "T. Müller",
-        "D. Takir",
-        "K. Retherford",
-        "Anicia Arredondo",
-        "L. Elkins‐Tanton"
+        "Charles E. Woodward"
       ],
       "abstract": "\n Our understanding of solar system evolution is closely tied to interpretations of asteroid composition, particularly the M-class asteroids. These asteroids were initially thought to be the exposed cores of differentiated planetesimals, a hypothesis based on their spectral similarity to iron meteorites. However, recent astronomical observations have revealed hydration on their surface through the detection of 3 μm absorption features associated with OH and potentially H2O. We present evidence of hydration due mainly to OH on asteroid (16) Psyche, the largest M-class asteroid, using data from the James Webb Space Telescope (JWST) spanning 1.1–6.63 μm. Our observations include two detections of the full 3 μm feature associated with OH and H2O resembling those found in CY-, CH-, and CB-type carbonaceous chondrites, and no 6 μm feature uniquely associated with H2O across two observations. We observe 3 μm depths of between 4.3% and 6% across two observations, values consistent with hydrogen abundance estimates on other airless bodies of 250–400 ppm. We place an upper limit of 39 ppm on the water abundance from the standard deviation around the 6 μm feature region. The presence of hydrated minerals suggests a complex history for Psyche. Exogenous sources of OH-bearing minerals could come from hydrated impactors. Endogenous OH-bearing minerals would indicate a composition more similar to E- or P-class asteroids. If the hydration is endogenous, it supports the theory that Psyche originated beyond the snow line and later migrated to the outer main belt.",
       "doi": "10.3847/psj/ad66b9",
@@ -59,26 +49,7 @@
       "authors": [
         "Sergi Blanco-Cuaresma",
         "I. Ciucă",
-        "A. Accomazzi",
-        "Michael J. Kurtz",
-        "E. Henneken",
-        "Kelly E. Lockhart",
-        "Félix Grèzes",
-        "Thomas Allen",
-        "Golnaz Shapurian",
-        "Carolyn Stern-Grant",
-        "Donna M. Thompson",
-        "Timothy W. Hostetler",
-        "Matthew R. Templeton",
-        "Shinyi Chen",
-        "Jennifer Koch",
-        "Taylor Jacovich",
-        "Daniel Chivvis",
-        "Fernanda de Macedo Alves",
-        "Jean-Claude Paquin",
-        "Jennifer Bartlett",
-        "M. Polimera",
-        "S. Jarmak"
+        "A. Accomazzi"
       ],
       "abstract": "Open-source Large Language Models enable projects such as NASA SciX (i.e., NASA ADS) to think out of the box and try alternative approaches for information retrieval and data augmentation, while respecting data copyright and users' privacy. However, when large language models are directly prompted with questions without any context, they are prone to hallucination. At NASA SciX we have developed an experiment where we created semantic vectors for our large collection of abstracts and full-text content, and we designed a prompt system to ask questions using contextual chunks from our system. Based on a non-systematic human evaluation, the experiment shows a lower degree of hallucination and better responses when using Retrieval Augmented Generation. Further exploration is required to design new features and data augmentation processes at NASA SciX that leverages this technology while respecting the high level of trust and quality that the project holds.",
       "doi": "10.48550/arXiv.2312.14211",
@@ -100,26 +71,7 @@
       "authors": [
         "S. Jarmak",
         "E. Leonard",
-        "A. Akins",
-        "E. Dahl",
-        "D. Cremons",
-        "S. Cofield",
-        "A. Curtis",
-        "C. Dong",
-        "E. Dunham",
-        "B. Journaux",
-        "D. Murakami",
-        "W. Ng",
-        "M. Piquette",
-        "A. Girija",
-        "K. Rink",
-        "L. Schurmeier",
-        "N. Stein",
-        "N. Tallarida",
-        "M. Telus",
-        "L. Lowes",
-        "C. Budney",
-        "K. Mitchell"
+        "A. Akins"
       ],
       "abstract": null,
       "doi": "10.1016/j.actaastro.2020.01.030",
@@ -141,9 +93,7 @@
       "authors": [
         "S. Jarmak",
         "T. Becker",
-        "J. Colwell",
-        "R. Jerousek",
-        "L. Esposito"
+        "J. Colwell"
       ],
       "abstract": null,
       "doi": "10.1016/j.icarus.2022.115237",
@@ -165,12 +115,7 @@
       "authors": [
         "A. Radwan",
         "Kyle A Bigney",
-        "Haily N Buonomo",
-        "Michael W Jarmak",
-        "Shannon M Moats",
-        "Jaimie K Ross",
-        "Enida Tatarevic",
-        "M. Tomko"
+        "Haily N Buonomo"
       ],
       "abstract": "PURPOSE\nTo evaluate the extent of intra-subject difference in hamstring flexibility and its possible relationship to the severity of Low Back Pain (LBP). A secondary purpose was to evaluate the extent of intra-rater reliability using both electrogoniometer and conventional goniometer for measuring hamstring tightness.\n\n\nIMPORTANCE\nPotential correlations between muscle impairments and LBP may lead to more effective treatments and prevention strategies.\n\n\nMETHODS\nSeventy two participants with mechanical LBP were recruited for this study. The sample included; 41 females, 31 males with a mean age of 33.69 ± (11.04) years, height of 170 ± (9) cm, and weight of 79.5 ± (1.6) kg. Hamstring length was detected indirectly using the Active Knee Extension method in the 90/90 position from supine. The amount of extension was measured using both electro-goniometer (EG)and a standard goniometer (SG).\n\n\nRESULTS\nRight lower extremities of these patients were significantly more flexible than left ones at α = 0.025 (t_{72}= 3.14, p=0.002). Similarly, dominant lower extremities of these patients were significantly more flexible than the non dominant ones at α=0.025 (t _{72}=2.56, p=0.013). Additionally, Oswestry scores of the patients were significantly and positively correlated with the amount of hamstring tightness of the right lower extremities (r=0.244, p=0.039), left lower extremities (r=0.225, p=0.048) and the average of both sides (r=0.24, p=0.039). However, the Oswestry scores were negatively, but insignificantly correlated to the absolute difference between right and left extremities at (r=-0.156, p=0.091). Finally, the extent of intrasubject reliability in measuring hamstring tightness using EG and SG was found to be high (ICC=0.93).CONCLUSION: There is a possible relation between mild mechanical LBP and hamstrings tightness. It was found that the more the tightness, the higher the severity of LBP that patient experienced. Also, these patients had one of their lower extremities significantly tighter than the other. Such tightness was successfully detected utilizing both EG and SG. These findings and their possible pathomechanical consequences should be considered while constructing effective rehabilitation protocols for patients with mechanical LBP.",
       "doi": "10.3233/BMR-140490",
@@ -192,8 +137,7 @@
       "authors": [
         "S. Jarmak",
         "J. Colwell",
-        "A. Dove",
-        "J. Brisset"
+        "A. Dove"
       ],
       "abstract": "Abstract Small, airless bodies are covered by a layer of regolith composed of particles ranging from μm-size dust to cm-size pebbles that evolve under conditions very different than those on Earth. Flight-based microgravity experiments investigating low-velocity collisions of cm-size projectiles into regolith have revealed that certain impact events result in a mass transfer from the target regolith onto the surface of the projectile. The key parameters that produce these events need to be characterized to understand the mechanical behavior of granular media, which is composed of the surfaces of small bodies. We carried out flight and ground-based research campaigns designed to investigate these mass transfer events. The goals of our experimental campaigns were (1) to identify projectile energy thresholds that influence mass transfer outcomes in low-energy collision events between cm-size projectiles and μm-size regolith, (2) to determine whether these mass transfer events required a microgravity environment to be observed, and (3) to determine whether the rebound portion of these collision events could be replicated in a laboratory drop tower environment. We found that (1) mass transfer events occurred for projectile rebound accelerations <7.8 m/s2 and we were unable to identify a corresponding impact velocity threshold, (2) mass transfer events require a microgravity environment, and (3) ourdrop tower experiments were able to produce mass transfer events. However, drop tower experiments do not exactly reproduce the free-particle impacts and rebound of the long-duration microgravity experiments and yielded systematically lower amounts of the overall mass transferred.",
       "doi": "10.2478/gsr-2021-0001",
@@ -215,12 +159,7 @@
       "authors": [
         "S. Jarmak",
         "J. Brisset",
-        "J. Colwell",
-        "A. Dove",
-        "D. Maukonen",
-        "S. Rawashdeh",
-        "J. Blum",
-        "L. Roe"
+        "J. Colwell"
       ],
       "abstract": null,
       "doi": "10.1016/J.ACTAASTRO.2018.11.029",
@@ -242,26 +181,7 @@
       "authors": [
         "S. Jarmak",
         "E. Leonard",
-        "L. Schurmeier",
-        "A. Akins",
-        "S. Cofield",
-        "D. Cremons",
-        "A. Curtis",
-        "E. Dahl",
-        "C. Dong",
-        "E. Dunham",
-        "B. Journaux",
-        "D. Murakami",
-        "W. Ng",
-        "M. Piquette",
-        "A. Girija",
-        "K. Rink",
-        "N. Stein",
-        "N. Tallarida",
-        "M. Telus",
-        "L. Lowes",
-        "C. Budney",
-        "K. Mitchell"
+        "L. Schurmeier"
       ],
       "abstract": null,
       "doi": null,
@@ -283,8 +203,7 @@
       "authors": [
         "S. Jarmak",
         "J. Colwell",
-        "J. Brisset",
-        "A. Dove"
+        "J. Brisset"
       ],
       "abstract": null,
       "doi": null,
@@ -326,8 +245,7 @@
       "authors": [
         "S. Jarmak",
         "J. Colwell",
-        "J. Brisset",
-        "A. Dove"
+        "J. Brisset"
       ],
       "abstract": null,
       "doi": null,
@@ -370,9 +288,7 @@
       "authors": [
         "S. Jarmak",
         "J. Colwell",
-        "J. Brisset",
-        "A. Dove",
-        "A. Brown"
+        "J. Brisset"
       ],
       "abstract": null,
       "doi": null,
@@ -380,26 +296,6 @@
       "url": "https://www.semanticscholar.org/paper/884b5128dce92cda0e0aa6b2ab6779c91b2283b1",
       "source": "semanticScholar",
       "rank": 14,
-      "citation_count": 0,
-      "doctype": null,
-      "property": null,
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Transformations in Serbian Translations of Poems by T.H. Shevchenko",
-      "authors": [
-        "Weronika Jarmak"
-      ],
-      "abstract": null,
-      "doi": "10.16926/j.2015.11.05",
-      "year": 2015,
-      "url": "https://www.semanticscholar.org/paper/94ea293ed7cfbc94fdc3b9e8f87eb84919c5d9cc",
-      "source": "semanticScholar",
-      "rank": 15,
       "citation_count": 0,
       "doctype": null,
       "property": null,
@@ -419,6 +315,26 @@
       "year": 2015,
       "url": "https://www.semanticscholar.org/paper/458cdec09d3f0440157b2350310b1d6ecbb316ea",
       "source": "semanticScholar",
+      "rank": 15,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Transformations in Serbian Translations of Poems by T.H. Shevchenko",
+      "authors": [
+        "Weronika Jarmak"
+      ],
+      "abstract": null,
+      "doi": "10.16926/j.2015.11.05",
+      "year": 2015,
+      "url": "https://www.semanticscholar.org/paper/94ea293ed7cfbc94fdc3b9e8f87eb84919c5d9cc",
+      "source": "semanticScholar",
       "rank": 16,
       "citation_count": 0,
       "doctype": null,
@@ -434,8 +350,7 @@
       "authors": [
         "Katarzyna Jończyk-Skórka",
         "Dorota Śliwczyńska-Rodziewicz",
-        "A. Jarmak",
-        "J. Kowalski"
+        "A. Jarmak"
       ],
       "abstract": null,
       "doi": null,
@@ -457,8 +372,7 @@
       "authors": [
         "J. Zawilska",
         "Adam Jarmak",
-        "A. Woldan‐Tambor",
-        "J. Nowak"
+        "A. Woldan‐Tambor"
       ],
       "abstract": "Abstract: Effects of white and monochromatic (blue—434 nm, green—548 nm, and red—614 nm) lights on the nighttime retinal and pineal NAT activity were examined in chicks. The potency of the tested lights to suppress NAT activity was similar for the retina and pineal gland, with a following rank order: white > green > blue > red. The studied tissues of chick were far less sensitive to pulses of monochromatic light than the rat pineal gland. The potency of light to decrease pineal NAT activity of rat was: white > green >> blue > red. In chicks, the suppression of the nocturnal NAT activity produced by a short 5‐min pulse of monochromatic light was completely reversible in the pineal gland, and partially reversible in the retina. Our data suggest the existence of some differences between birds and mammals in terms of sensitivity and mechanisms involved in the light‐induced suppression of melatonin biosynthesis.",
       "doi": "10.1111/j.1600-079X.1995.tb00175.x",
@@ -480,9 +394,7 @@
       "authors": [
         "J. Brisset",
         "J. Colwell",
-        "A. Dove",
-        "S. Jarmak",
-        "S. Anderson"
+        "A. Dove"
       ],
       "abstract": null,
       "doi": null,
