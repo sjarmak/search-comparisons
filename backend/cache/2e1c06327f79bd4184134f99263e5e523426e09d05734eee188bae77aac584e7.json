@@ -1,0 +1,24 @@
+{
+  "timestamp": 1743020091.544132,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "[No results found in Semantic Scholar]",
+      "authors": [],
+      "abstract": "The term 'title:\"katabatic wind\"^7.0 OR abstract:\"katabatic wind\"^8.5 OR author:\"katabatic wind\"^4.5 OR year:\"katabatic wind\"^0.5' did not match any documents in Semantic Scholar, or the API rate limit was exceeded.",
+      "doi": null,
+      "year": null,
+      "url": "https://www.semanticscholar.org/",
+      "source": "semanticScholar",
+      "rank": 1,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    }
+  ]
+}

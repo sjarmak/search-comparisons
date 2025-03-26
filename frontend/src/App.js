@@ -6,7 +6,7 @@ import {
   IconButton, AppBar, Toolbar, TableContainer, Table,
   TableHead, TableBody, TableRow, TableCell, Chip,
   List, ListItem, ListItemAvatar, ListItemText, ListItemSecondaryAction,
-  Avatar, Tooltip
+  Avatar, Tooltip, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import BugReportIcon from '@mui/icons-material/BugReport';
@@ -18,9 +18,7 @@ import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
 import CheckIcon from '@mui/icons-material/Check';
 
 import { searchService, experimentService, debugService } from './services/api';
-
-// Import components as needed
-// These will be created in separate files
+import BoostExperiment from './components/BoostExperiment';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const APP_VERSION = "1.0.0";
@@ -41,7 +39,7 @@ function App() {
   const [sources, setSources] = useState({
     ads: true,
     scholar: true,
-    semanticScholar: false,
+    semanticScholar: true,
     webOfScience: true
   });
   
@@ -85,6 +83,9 @@ function App() {
   // Result tab state
   const [resultTab, setResultTab] = useState(0);
   const [filterText, setFilterText] = useState('');
+
+  // Active source for detailed results
+  const [activeSource, setActiveSource] = useState(null);
 
   // Load environment info on startup
   useEffect(() => {
@@ -409,6 +410,62 @@ function App() {
     }
   };
 
+  // Add a new function to handle running a new search with custom weights
+  const handleRunNewSearchWithWeights = async (transformedQuery, boostConfig) => {
+    if (!transformedQuery.trim()) {
+      setError("Please enter a search query");
+      return Promise.reject(new Error("Empty query"));
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const selectedSources = Object.keys(sources).filter(key => sources[key]);
+      const selectedMetrics = Object.keys(metrics).filter(key => metrics[key]);
+      
+      // Always include these fields for proper display
+      const selectedFields = [
+        ...Object.keys(fields).filter(key => fields[key]),
+        'abstract',  // Always include abstract
+        'citation_count'  // Always include citation_count
+      ];
+      
+      // Remove duplicates
+      const uniqueFields = Array.from(new Set(selectedFields));
+      
+      const requestBody = {
+        query: transformedQuery, // Use the transformed query with field weights
+        sources: selectedSources,
+        metrics: selectedMetrics,
+        fields: uniqueFields,
+        originalQuery: query, // Include the original query for reference
+        useTransformedQuery: true // Flag to indicate this is a transformed query
+      };
+
+      if (DEBUG) {
+        console.log('Making search request with transformed query:', requestBody);
+      }
+      
+      const response = await searchService.compareSearchResults(requestBody);
+      
+      if (response.error) {
+        setError(response.message);
+        return Promise.reject(new Error(response.message));
+      } else {
+        setResults(response);
+        return Promise.resolve(response);
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+      const errorMessage = `Failed to fetch results: ${err.message}`;
+      setError(errorMessage);
+      return Promise.reject(new Error(errorMessage));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
@@ -573,6 +630,7 @@ function App() {
                         <Tab label="Results Table" />
                         <Tab label="Comparison" />
                         <Tab label="Visualization" />
+                        <Tab label="Boost Experiments" />
                       </Tabs>
                       
                       <Box sx={{ p: 3 }}>
@@ -593,88 +651,254 @@ function App() {
                               />
                             </Box>
                             
-                            {Object.keys(results.results).map(source => {
-                              const sourceResults = results.results[source];
-                              const filteredResults = filterText
-                                ? sourceResults.filter(result => 
-                                    result.title.toLowerCase().includes(filterText.toLowerCase()) ||
-                                    (result.abstract && result.abstract.toLowerCase().includes(filterText.toLowerCase())) ||
-                                    (result.authors && result.authors.some(author => 
-                                      author && author.toLowerCase().includes(filterText.toLowerCase())
-                                    ))
-                                  )
-                                : sourceResults;
-                                
-                              return (
-                                <Box key={source} sx={{ mb: 3 }}>
-                                  <Typography variant="h6" color="primary" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-                                    <Chip 
-                                      label={formatSourceName(source)} 
-                                      color={
-                                        source === 'ads' ? 'primary' :
-                                        source === 'scholar' ? 'error' :
-                                        source === 'semanticScholar' ? 'warning' : 'success'
-                                      }
-                                      sx={{ mr: 1 }} 
-                                    />
-                                    <span>{filteredResults.length} results</span>
-                                  </Typography>
+                            {/* Side by Side Grid Layout */}
+                            <Grid container spacing={2}>
+                              {Object.keys(results.results).map(source => {
+                                const sourceResults = results.results[source];
+                                const filteredResults = filterText
+                                  ? sourceResults.filter(result => 
+                                      result.title.toLowerCase().includes(filterText.toLowerCase()) ||
+                                      (result.abstract && result.abstract.toLowerCase().includes(filterText.toLowerCase())) ||
+                                      (result.authors && result.authors.some(author => 
+                                        author && author.toLowerCase().includes(filterText.toLowerCase())
+                                      ))
+                                    )
+                                  : sourceResults;
                                   
-                                  <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
-                                    <Table size="small" stickyHeader>
-                                      <TableHead>
-                                        <TableRow>
-                                          <TableCell>Rank</TableCell>
-                                          <TableCell>Title</TableCell>
-                                          <TableCell>Authors</TableCell>
-                                          <TableCell>Year</TableCell>
-                                          <TableCell>Citations</TableCell>
-                                          <TableCell>Actions</TableCell>
-                                        </TableRow>
-                                      </TableHead>
-                                      <TableBody>
-                                        {filteredResults.map((result, idx) => (
-                                          <TableRow key={idx} hover>
-                                            <TableCell>{result.rank}</TableCell>
-                                            <TableCell>
-                                              <Typography variant="body2">
-                                                {result.title}
-                                              </Typography>
-                                              {result.abstract && (
-                                                <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 0.5 }}>
-                                                  {result.abstract.length > 150 
-                                                    ? `${result.abstract.slice(0, 150)}...` 
-                                                    : result.abstract}
-                                                </Typography>
-                                              )}
-                                            </TableCell>
-                                            <TableCell>
-                                              {Array.isArray(result.authors) 
-                                                ? result.authors.slice(0, 3).join(', ') + (result.authors.length > 3 ? ', et al.' : '') 
-                                                : result.authors}
-                                            </TableCell>
-                                            <TableCell>{result.year}</TableCell>
-                                            <TableCell>{result.citation_count}</TableCell>
-                                            <TableCell>
-                                              {result.url && (
-                                                <IconButton 
-                                                  size="small" 
-                                                  href={result.url} 
-                                                  target="_blank" 
-                                                  aria-label="View source"
-                                                >
-                                                  <LaunchIcon fontSize="small" />
-                                                </IconButton>
-                                              )}
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
-                                  </TableContainer>
-                                </Box>
-                              );
-                            })}
+                                return (
+                                  <Grid item xs={12} md={6} xl={3} key={source}>
+                                    <Paper 
+                                      elevation={3} 
+                                      sx={{ 
+                                        height: { xs: 400, md: 600 }, 
+                                        display: 'flex', 
+                                        flexDirection: 'column' 
+                                      }}
+                                    >
+                                      <Box sx={{ 
+                                        p: 1, 
+                                        bgcolor: 
+                                          source === 'ads' ? 'primary.main' :
+                                          source === 'scholar' ? 'error.main' :
+                                          source === 'semanticScholar' ? 'warning.main' : 'success.main',
+                                        color: 'white',
+                                        borderTopLeftRadius: 4,
+                                        borderTopRightRadius: 4,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        position: 'sticky',
+                                        top: 0,
+                                        zIndex: 1
+                                      }}>
+                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                          {formatSourceName(source)}
+                                        </Typography>
+                                        <Chip 
+                                          label={`${filteredResults.length} results`}
+                                          size="small"
+                                          sx={{ 
+                                            bgcolor: 'rgba(255,255,255,0.2)', 
+                                            color: 'white',
+                                            '& .MuiChip-label': { fontWeight: 'bold' }
+                                          }} 
+                                        />
+                                      </Box>
+                                      
+                                      <Box sx={{ 
+                                        flexGrow: 1, 
+                                        overflow: 'auto', 
+                                        maxHeight: { xs: 'calc(400px - 48px)', md: 'calc(600px - 48px)' }
+                                      }}>
+                                        <List disablePadding>
+                                          {filteredResults.map((result, idx) => (
+                                            <Tooltip
+                                              key={idx}
+                                              title={
+                                                <Box sx={{ p: 1, maxWidth: 400 }}>
+                                                  {/* Title */}
+                                                  <Typography variant="subtitle2" gutterBottom>
+                                                    {result.title}
+                                                  </Typography>
+                                                  
+                                                  <Divider sx={{ my: 1 }} />
+                                                  
+                                                  {/* Key metadata in a single line */}
+                                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                                                    {result.year && (
+                                                      <Chip 
+                                                        size="small" 
+                                                        label={`Year: ${result.year}`} 
+                                                        sx={{ fontSize: '0.7rem' }}
+                                                      />
+                                                    )}
+                                                    {(result.citation_count !== undefined && result.citation_count !== null) && (
+                                                      <Chip 
+                                                        size="small" 
+                                                        label={`Citations: ${result.citation_count}`} 
+                                                        sx={{ fontSize: '0.7rem' }}
+                                                      />
+                                                    )}
+                                                    {result.doi && (
+                                                      <Chip 
+                                                        size="small" 
+                                                        label={`DOI: ${result.doi.substring(0, 15)}...`} 
+                                                        sx={{ fontSize: '0.7rem' }}
+                                                      />
+                                                    )}
+                                                  </Box>
+                                                  
+                                                  {/* Authors - condensed */}
+                                                  {result.authors && result.authors.length > 0 && (
+                                                    <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
+                                                      <strong>Authors:</strong> {Array.isArray(result.authors) 
+                                                        ? result.authors.slice(0, 3).join(', ') + (result.authors.length > 3 ? ', et al.' : '')
+                                                        : result.authors}
+                                                    </Typography>
+                                                  )}
+                                                  
+                                                  {/* Abstract snippet */}
+                                                  {result.abstract && (
+                                                    <Typography variant="caption" sx={{ display: 'block' }}>
+                                                      <strong>Abstract:</strong> {result.abstract.length > 300 
+                                                        ? `${result.abstract.substring(0, 300)}...` 
+                                                        : result.abstract}
+                                                    </Typography>
+                                                  )}
+                                                </Box>
+                                              }
+                                              arrow
+                                              placement="right"
+                                              componentsProps={{
+                                                tooltip: {
+                                                  sx: { bgcolor: 'background.paper', color: 'text.primary', boxShadow: 3 }
+                                                }
+                                              }}
+                                            >
+                                              <ListItem 
+                                                divider 
+                                                sx={{ 
+                                                  '&:hover': { bgcolor: 'action.hover' },
+                                                  px: 2, 
+                                                  py: 1,
+                                                  minHeight: 80,
+                                                  maxHeight: 110
+                                                }}
+                                                secondaryAction={
+                                                  result.url && (
+                                                    <IconButton 
+                                                      size="small" 
+                                                      href={result.url} 
+                                                      target="_blank" 
+                                                      aria-label="View source"
+                                                      sx={{ ml: 1 }}
+                                                    >
+                                                      <LaunchIcon fontSize="small" />
+                                                    </IconButton>
+                                                  )
+                                                }
+                                              >
+                                                <ListItemText
+                                                  disableTypography
+                                                  primary={
+                                                    <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                                      <Chip 
+                                                        label={result.rank} 
+                                                        size="small" 
+                                                        sx={{ 
+                                                          mr: 1, 
+                                                          minWidth: 28,
+                                                          height: 20,
+                                                          bgcolor: 
+                                                            source === 'ads' ? 'primary.light' :
+                                                            source === 'scholar' ? 'error.light' :
+                                                            source === 'semanticScholar' ? 'warning.light' : 'success.light',
+                                                        }} 
+                                                      />
+                                                      <Typography 
+                                                        variant="body2" 
+                                                        sx={{ 
+                                                          fontWeight: 'medium',
+                                                          display: '-webkit-box',
+                                                          WebkitLineClamp: 2,
+                                                          WebkitBoxOrient: 'vertical',
+                                                          overflow: 'hidden',
+                                                          lineHeight: 1.2,
+                                                          mb: 0.5
+                                                        }}
+                                                      >
+                                                        {result.title}
+                                                      </Typography>
+                                                    </Box>
+                                                  }
+                                                  secondary={
+                                                    <Box sx={{ mt: 0.5 }}>
+                                                      {/* Authors + Year */}
+                                                      <Typography 
+                                                        variant="caption" 
+                                                        sx={{ 
+                                                          display: 'block',
+                                                          color: 'text.secondary',
+                                                          whiteSpace: 'nowrap',
+                                                          overflow: 'hidden',
+                                                          textOverflow: 'ellipsis'
+                                                        }}
+                                                      >
+                                                        {Array.isArray(result.authors) 
+                                                          ? result.authors.slice(0, 2).join(', ') + (result.authors.length > 2 ? ', et al.' : '') 
+                                                          : result.authors}
+                                                        {result.year ? ` (${result.year})` : ''}
+                                                      </Typography>
+                                                      
+                                                      {/* Abstract preview */}
+                                                      {result.abstract && (
+                                                        <Typography 
+                                                          variant="caption" 
+                                                          sx={{ 
+                                                            display: '-webkit-box',
+                                                            WebkitLineClamp: 1,
+                                                            WebkitBoxOrient: 'vertical',
+                                                            overflow: 'hidden',
+                                                            color: 'text.secondary',
+                                                            lineHeight: 1.2,
+                                                            mt: 0.5
+                                                          }}
+                                                        >
+                                                          {result.abstract}
+                                                        </Typography>
+                                                      )}
+                                                      
+                                                      {/* Citations as a small indicator in bottom right */}
+                                                      {(result.citation_count !== undefined && result.citation_count !== null) && (
+                                                        <Box sx={{ 
+                                                          display: 'flex', 
+                                                          justifyContent: 'flex-end',
+                                                          mt: 0.5  
+                                                        }}>
+                                                          <Chip
+                                                            size="small"
+                                                            label={`Cited: ${result.citation_count}`}
+                                                            sx={{ 
+                                                              height: 16,
+                                                              fontSize: '0.6rem',
+                                                              '& .MuiChip-label': { px: 0.8 }
+                                                            }}
+                                                          />
+                                                        </Box>
+                                                      )}
+                                                    </Box>
+                                                  }
+                                                />
+                                              </ListItem>
+                                            </Tooltip>
+                                          ))}
+                                        </List>
+                                      </Box>
+                                    </Paper>
+                                  </Grid>
+                                );
+                              })}
+                            </Grid>
                           </Box>
                         )}
                         
@@ -825,359 +1049,301 @@ function App() {
                             </Grid>
                           </Box>
                         )}
+
+                        {/* Visualization Tab */}
+                        {resultTab === 2 && (
+                          <Box sx={{ p: 2 }}>
+                            {results && results.comparison && results.comparison.similarity && (
+                              <Box>
+                                <Typography variant="h6" gutterBottom>
+                                  Similarity Metrics Visualization
+                                </Typography>
+                                
+                                <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+                                  <Typography variant="subtitle2" gutterBottom>
+                                    About this visualization:
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    These bar charts show the Jaccard similarity and Rank-Biased Overlap (RBO) metrics between ADS/SciX and other search engines.
+                                    Higher values indicate greater similarity between result sets.
+                                  </Typography>
+                                  <Alert severity="info" sx={{ mt: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                      Current Query: <strong>{results.query}</strong>
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic' }}>
+                                      In future versions, multiple queries will be displayed with different patterns to identify trends in search engine behavior across query types.
+                                    </Typography>
+                                  </Alert>
+                                </Paper>
+
+                                {/* Jaccard Similarity Bar Chart */}
+                                <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
+                                  <Typography variant="subtitle1" gutterBottom color="primary">
+                                    Jaccard Similarity
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ mb: 2 }}>
+                                    Jaccard similarity measures the proportion of shared results regardless of ranking position.
+                                  </Typography>
+                                  
+                                  <Box sx={{ height: 300, position: 'relative', border: '1px solid #eee', borderRadius: 1, p: 2, mb: 2 }}>
+                                    {/* Y-axis */}
+                                    <Box sx={{ 
+                                      position: 'absolute', 
+                                      left: 0, 
+                                      top: 0, 
+                                      bottom: 0, 
+                                      width: 50, 
+                                      display: 'flex', 
+                                      flexDirection: 'column', 
+                                      justifyContent: 'space-between', 
+                                      alignItems: 'flex-end', 
+                                      pr: 1,
+                                      borderRight: '1px solid #eee' 
+                                    }}>
+                                      <Typography variant="caption">1.0</Typography>
+                                      <Typography variant="caption">0.8</Typography>
+                                      <Typography variant="caption">0.6</Typography>
+                                      <Typography variant="caption">0.4</Typography>
+                                      <Typography variant="caption">0.2</Typography>
+                                      <Typography variant="caption">0.0</Typography>
+                                    </Box>
+                                    
+                                    {/* X-axis labels */}
+                                    <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                                    </Box>
+                                    
+                                    {/* Grid lines */}
+                                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                      {[0, 0.2, 0.4, 0.6, 0.8, 1].map((line) => (
+                                        <Box key={line} sx={{ borderBottom: line < 1 ? '1px dashed #ddd' : 'none', width: '100%', height: 0 }} />
+                                      ))}
+                                    </Box>
+                                    
+                                    {/* Bar Chart area */}
+                                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around' }}>
+                                      {/* Process data for bar chart */}
+                                      {(() => {
+                                        // Define the comparison pairs we want to show
+                                        const comparisonPairs = [
+                                          { key: 'ads_vs_scholar', label: 'ADS vs Google Scholar', color: 'error.main' },
+                                          { key: 'ads_vs_semanticScholar', label: 'ADS vs Semantic Scholar', color: 'warning.main' },
+                                          { key: 'ads_vs_webOfScience', label: 'ADS vs Web of Science', color: 'success.main' }
+                                        ];
+                                        
+                                        return comparisonPairs.map(pair => {
+                                          // Handle both directions (ads_vs_x or x_vs_ads)
+                                          const alt1 = pair.key;
+                                          const alt2 = pair.key.split('_vs_').reverse().join('_vs_');
+                                          
+                                          // Get value from either direction
+                                          const value = results.comparison.similarity.jaccard?.[alt1] || 
+                                                       results.comparison.similarity.jaccard?.[alt2] || 
+                                                       0;
+                                          
+                                          // Calculate bar height based on value
+                                          const barHeight = `${value * 100}%`;
+                                          
+                                          return (
+                                            <Tooltip
+                                              key={pair.key}
+                                              title={`${pair.label}: ${value.toFixed(4)} (Query: "${results.query}")`}
+                                              placement="top"
+                                            >
+                                              <Box
+                                                sx={{
+                                                  width: '20%',
+                                                  height: barHeight,
+                                                  bgcolor: pair.color,
+                                                  borderRadius: '4px 4px 0 0',
+                                                  transition: 'transform 0.2s',
+                                                  cursor: 'pointer',
+                                                  '&:hover': {
+                                                    transform: 'scaleY(1.05)',
+                                                    filter: 'brightness(1.1)'
+                                                  }
+                                                }}
+                                              />
+                                            </Tooltip>
+                                          );
+                                        });
+                                      })()}
+                                    </Box>
+                                  </Box>
+                                  
+                                  {/* Legend */}
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Box sx={{ width: 16, height: 10, bgcolor: 'error.main', mr: 1 }} />
+                                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Box sx={{ width: 16, height: 10, bgcolor: 'warning.main', mr: 1 }} />
+                                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Box sx={{ width: 16, height: 10, bgcolor: 'success.main', mr: 1 }} />
+                                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                                    </Box>
+                                  </Box>
+                                </Paper>
+                                
+                                {/* Rank-Biased Overlap Bar Chart */}
+                                <Paper elevation={2} sx={{ p: 2 }}>
+                                  <Typography variant="subtitle1" gutterBottom color="primary">
+                                    Rank-Biased Overlap
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ mb: 2 }}>
+                                    Rank-Biased Overlap considers the order of results, giving higher weight to matches at the top of result lists.
+                                  </Typography>
+                                  
+                                  <Box sx={{ height: 300, position: 'relative', border: '1px solid #eee', borderRadius: 1, p: 2, mb: 2 }}>
+                                    {/* Y-axis */}
+                                    <Box sx={{ 
+                                      position: 'absolute', 
+                                      left: 0, 
+                                      top: 0, 
+                                      bottom: 0, 
+                                      width: 50, 
+                                      display: 'flex', 
+                                      flexDirection: 'column', 
+                                      justifyContent: 'space-between', 
+                                      alignItems: 'flex-end', 
+                                      pr: 1,
+                                      borderRight: '1px solid #eee' 
+                                    }}>
+                                      <Typography variant="caption">1.0</Typography>
+                                      <Typography variant="caption">0.8</Typography>
+                                      <Typography variant="caption">0.6</Typography>
+                                      <Typography variant="caption">0.4</Typography>
+                                      <Typography variant="caption">0.2</Typography>
+                                      <Typography variant="caption">0.0</Typography>
+                                    </Box>
+                                    
+                                    {/* X-axis labels */}
+                                    <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
+                                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                                    </Box>
+                                    
+                                    {/* Grid lines */}
+                                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                                      {[0, 0.2, 0.4, 0.6, 0.8, 1].map((line) => (
+                                        <Box key={line} sx={{ borderBottom: line < 1 ? '1px dashed #ddd' : 'none', width: '100%', height: 0 }} />
+                                      ))}
+                                    </Box>
+                                    
+                                    {/* Bar Chart area */}
+                                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around' }}>
+                                      {/* Process data for bar chart */}
+                                      {(() => {
+                                        // Define the comparison pairs we want to show
+                                        const comparisonPairs = [
+                                          { key: 'ads_vs_scholar', label: 'ADS vs Google Scholar', color: 'error.main' },
+                                          { key: 'ads_vs_semanticScholar', label: 'ADS vs Semantic Scholar', color: 'warning.main' },
+                                          { key: 'ads_vs_webOfScience', label: 'ADS vs Web of Science', color: 'success.main' }
+                                        ];
+                                        
+                                        return comparisonPairs.map(pair => {
+                                          // Handle both directions (ads_vs_x or x_vs_ads)
+                                          const alt1 = pair.key;
+                                          const alt2 = pair.key.split('_vs_').reverse().join('_vs_');
+                                          
+                                          // Get value from either direction
+                                          const value = results.comparison.similarity.rankBiased?.[alt1] || 
+                                                       results.comparison.similarity.rankBiased?.[alt2] || 
+                                                       0;
+                                          
+                                          // Calculate bar height based on value
+                                          const barHeight = `${value * 100}%`;
+                                          
+                                          return (
+                                            <Tooltip
+                                              key={pair.key}
+                                              title={`${pair.label}: ${value.toFixed(4)} (Query: "${results.query}")`}
+                                              placement="top"
+                                            >
+                                              <Box
+                                                sx={{
+                                                  width: '20%',
+                                                  height: barHeight,
+                                                  bgcolor: pair.color,
+                                                  borderRadius: '4px 4px 0 0',
+                                                  transition: 'transform 0.2s',
+                                                  cursor: 'pointer',
+                                                  '&:hover': {
+                                                    transform: 'scaleY(1.05)',
+                                                    filter: 'brightness(1.1)'
+                                                  }
+                                                }}
+                                              />
+                                            </Tooltip>
+                                          );
+                                        });
+                                      })()}
+                                    </Box>
+                                  </Box>
+                                  
+                                  {/* Legend */}
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Box sx={{ width: 16, height: 10, bgcolor: 'error.main', mr: 1 }} />
+                                      <Typography variant="caption">ADS vs Google Scholar</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Box sx={{ width: 16, height: 10, bgcolor: 'warning.main', mr: 1 }} />
+                                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Box sx={{ width: 16, height: 10, bgcolor: 'success.main', mr: 1 }} />
+                                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                                    </Box>
+                                  </Box>
+                                </Paper>
+                              </Box>
+                            )}
+                            
+                            {(!results || !results.comparison || !results.comparison.similarity) && (
+                              <Box sx={{ height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
+                                <Typography variant="h6" color="text.secondary" gutterBottom>
+                                  No data to visualize
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Run a search across multiple sources to see similarity metrics visualized here.
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        )}
+
+                        {/* Boost Experiments Tab */}
+                        {resultTab === 3 && (
+                          <Box>
+                            <Typography variant="h6" gutterBottom>
+                              Boost Experiment
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 2 }}>
+                              Apply configurable boost factors to search results based on citation count, publication year, document type, and more.
+                              See how different boost configurations affect the ranking of results.
+                            </Typography>
+                            <BoostExperiment 
+                              originalResults={Object.values(results.results)[0] || []} 
+                              query={results.query} 
+                              API_URL={API_URL}
+                              onRunNewSearch={handleRunNewSearchWithWeights}  // Pass the new function
+                            />
+                          </Box>
+                        )}
                       </Box>
                     </Paper>
                   </Box>
                 ) : (
                   <Alert severity="info">No results found for the given query and sources.</Alert>
                 )}
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* Visualization Tab */}
-        {resultTab === 2 && (
-          <Box sx={{ p: 2 }}>
-            {results && results.comparison && results.comparison.similarity && (
-              <Box>
-                <Typography variant="h6" gutterBottom>
-                  Similarity Metrics Visualization
-                </Typography>
-                
-                <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    About this visualization:
-                  </Typography>
-                  <Typography variant="body2">
-                    These scatter plots show the Jaccard similarity and Rank-Biased Overlap (RBO) metrics between ADS/SciX and other search engines.
-                    Higher values indicate greater similarity between result sets.
-                  </Typography>
-                  <Alert severity="info" sx={{ mt: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                      Current Query: <strong>{results.query}</strong>
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 0.5, fontStyle: 'italic' }}>
-                      In future versions, multiple queries will be displayed with different shapes/colors to identify patterns in search engine behavior across query types.
-                    </Typography>
-                  </Alert>
-                </Paper>
-
-                {/* Jaccard Similarity Scatter Plot */}
-                <Paper elevation={2} sx={{ p: 2, mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom color="primary">
-                    Jaccard Similarity
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    Jaccard similarity measures the proportion of shared results regardless of ranking position.
-                  </Typography>
-                  
-                  <Box sx={{ height: 300, position: 'relative', border: '1px solid #eee', borderRadius: 1, p: 2, mb: 2 }}>
-                    {/* Y-axis */}
-                    <Box sx={{ 
-                      position: 'absolute', 
-                      left: 0, 
-                      top: 0, 
-                      bottom: 0, 
-                      width: 50, 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'flex-end', 
-                      pr: 1,
-                      borderRight: '1px solid #eee' 
-                    }}>
-                      <Typography variant="caption">1.0</Typography>
-                      <Typography variant="caption">0.8</Typography>
-                      <Typography variant="caption">0.6</Typography>
-                      <Typography variant="caption">0.4</Typography>
-                      <Typography variant="caption">0.2</Typography>
-                      <Typography variant="caption">0.0</Typography>
-                    </Box>
-                    
-                    {/* X-axis labels */}
-                    <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                      <Typography variant="caption">ADS vs Google Scholar</Typography>
-                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
-                      <Typography variant="caption">ADS vs Web of Science</Typography>
-                    </Box>
-                    
-                    {/* Grid lines */}
-                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      {[0, 0.2, 0.4, 0.6, 0.8, 1].map((line) => (
-                        <Box key={line} sx={{ borderBottom: line < 1 ? '1px dashed #ddd' : 'none', width: '100%', height: 0 }} />
-                      ))}
-                    </Box>
-                    
-                    {/* Plot area */}
-                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20 }}>
-                      {/* Data points */}
-                      {Object.entries(results.comparison.similarity.jaccard || {}).map(([key, value], index) => {
-                        const [source1, source2] = key.split('_vs_');
-                        const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
-                        
-                        // Only show comparisons with ADS
-                        if (!(source1 === 'ads' || source2 === 'ads')) {
-                          return null;
-                        }
-                        
-                        // Determine X position based on the comparison 
-                        let xPosition;
-                        let color;
-                        
-                        if ((source1 === 'ads' && source2 === 'scholar') || 
-                            (source2 === 'ads' && source1 === 'scholar')) {
-                          xPosition = '25%';
-                          color = 'error.main';
-                        } else if ((source1 === 'ads' && source2 === 'semanticScholar') || 
-                                   (source2 === 'ads' && source1 === 'semanticScholar')) {
-                          xPosition = '50%';
-                          color = 'warning.main';
-                        } else if ((source1 === 'ads' && source2 === 'webOfScience') || 
-                                   (source2 === 'ads' && source1 === 'webOfScience')) {
-                          xPosition = '75%';
-                          color = 'success.main';
-                        } else {
-                          return null; // Skip other comparisons
-                        }
-                        
-                        // Y position is based on the value (1.0 at top, 0.0 at bottom)
-                        const yPosition = `${(1 - value) * 100}%`;
-                        
-                        return (
-                          <Tooltip
-                            key={key}
-                            title={`${sourceNames[0]} vs ${sourceNames[1]}: ${value.toFixed(4)} (Query: "${results.query}")`}
-                            placement="top"
-                          >
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                left: xPosition,
-                                top: yPosition,
-                                width: 12,
-                                height: 12,
-                                bgcolor: color,
-                                borderRadius: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s',
-                                '&:hover': {
-                                  transform: 'translate(-50%, -50%) scale(1.5)',
-                                  zIndex: 10
-                                }
-                              }}
-                            />
-                          </Tooltip>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                  
-                  {/* Legend */}
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main', mr: 1 }} />
-                      <Typography variant="caption">ADS vs Google Scholar</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'warning.main', mr: 1 }} />
-                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main', mr: 1 }} />
-                      <Typography variant="caption">ADS vs Web of Science</Typography>
-                    </Box>
-                  </Box>
-                </Paper>
-                
-                {/* Rank-Biased Overlap Scatter Plot */}
-                <Paper elevation={2} sx={{ p: 2 }}>
-                  <Typography variant="subtitle1" gutterBottom color="primary">
-                    Rank-Biased Overlap
-                  </Typography>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                    Rank-Biased Overlap considers the order of results, giving higher weight to matches at the top of result lists.
-                  </Typography>
-                  
-                  <Box sx={{ height: 300, position: 'relative', border: '1px solid #eee', borderRadius: 1, p: 2, mb: 2 }}>
-                    {/* Y-axis */}
-                    <Box sx={{ 
-                      position: 'absolute', 
-                      left: 0, 
-                      top: 0, 
-                      bottom: 0, 
-                      width: 50, 
-                      display: 'flex', 
-                      flexDirection: 'column', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'flex-end', 
-                      pr: 1,
-                      borderRight: '1px solid #eee' 
-                    }}>
-                      <Typography variant="caption">1.0</Typography>
-                      <Typography variant="caption">0.8</Typography>
-                      <Typography variant="caption">0.6</Typography>
-                      <Typography variant="caption">0.4</Typography>
-                      <Typography variant="caption">0.2</Typography>
-                      <Typography variant="caption">0.0</Typography>
-                    </Box>
-                    
-                    {/* X-axis labels */}
-                    <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                      <Typography variant="caption">ADS vs Google Scholar</Typography>
-                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
-                      <Typography variant="caption">ADS vs Web of Science</Typography>
-                    </Box>
-                    
-                    {/* Grid lines */}
-                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      {[0, 0.2, 0.4, 0.6, 0.8, 1].map((line) => (
-                        <Box key={line} sx={{ borderBottom: line < 1 ? '1px dashed #ddd' : 'none', width: '100%', height: 0 }} />
-                      ))}
-                    </Box>
-                    
-                    {/* Plot area */}
-                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20 }}>
-                      {/* Data points */}
-                      {Object.entries(results.comparison.similarity.rankBiased || {}).map(([key, value], index) => {
-                        const [source1, source2] = key.split('_vs_');
-                        const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
-                        
-                        // Only show comparisons with ADS
-                        if (!(source1 === 'ads' || source2 === 'ads')) {
-                          return null;
-                        }
-                        
-                        // Determine X position based on the comparison 
-                        let xPosition;
-                        let color;
-                        
-                        if ((source1 === 'ads' && source2 === 'scholar') || 
-                            (source2 === 'ads' && source1 === 'scholar')) {
-                          xPosition = '25%';
-                          color = 'error.main';
-                        } else if ((source1 === 'ads' && source2 === 'semanticScholar') || 
-                                   (source2 === 'ads' && source1 === 'semanticScholar')) {
-                          xPosition = '50%';
-                          color = 'warning.main';
-                        } else if ((source1 === 'ads' && source2 === 'webOfScience') || 
-                                   (source2 === 'ads' && source1 === 'webOfScience')) {
-                          xPosition = '75%';
-                          color = 'success.main';
-                        } else {
-                          return null; // Skip other comparisons
-                        }
-                        
-                        // Y position is based on the value (1.0 at top, 0.0 at bottom)
-                        const yPosition = `${(1 - value) * 100}%`;
-                        
-                        return (
-                          <Tooltip
-                            key={key}
-                            title={`${sourceNames[0]} vs ${sourceNames[1]}: ${value.toFixed(4)} (Query: "${results.query}")`}
-                            placement="top"
-                          >
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                left: xPosition,
-                                top: yPosition,
-                                width: 12,
-                                height: 12,
-                                bgcolor: color,
-                                borderRadius: '50%',
-                                transform: 'translate(-50%, -50%)',
-                                border: '2px solid #fff',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s',
-                                '&:hover': {
-                                  transform: 'translate(-50%, -50%) scale(1.5)',
-                                  zIndex: 10
-                                }
-                              }}
-                            />
-                          </Tooltip>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-                  
-                  {/* Legend */}
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main', mr: 1, border: '2px solid #fff' }} />
-                      <Typography variant="caption">ADS vs Google Scholar</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'warning.main', mr: 1, border: '2px solid #fff' }} />
-                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main', mr: 1, border: '2px solid #fff' }} />
-                      <Typography variant="caption">ADS vs Web of Science</Typography>
-                    </Box>
-                  </Box>
-                  
-                  {/* Overlap Stats Summary Table - ADS focused */}
-                  <Box sx={{ mt: 4 }}>
-                    <Typography variant="subtitle1" gutterBottom color="primary">
-                      ADS Comparison Statistics for "{results.query}"
-                    </Typography>
-                    <TableContainer>
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Comparison</TableCell>
-                            <TableCell align="center">Total Overlap</TableCell>
-                            <TableCell align="center">Same Rank</TableCell>
-                            <TableCell align="right">Jaccard</TableCell>
-                            <TableCell align="right">RBO</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {Object.entries(results.comparison.overlap || {}).map(([key, stats]) => {
-                            const [source1, source2] = key.split('_vs_');
-                            
-                            // Only show ADS comparisons
-                            if (!(source1 === 'ads' || source2 === 'ads')) {
-                              return null;
-                            }
-                            
-                            const sourceNames = [formatSourceName(source1), formatSourceName(source2)];
-                            const comparisonLabel = `${sourceNames[0]} vs ${sourceNames[1]}`;
-                            
-                            // Get metrics
-                            const jaccardValue = results.comparison.similarity?.jaccard?.[key];
-                            const rankBiasedValue = results.comparison.similarity?.rankBiased?.[key];
-                            const sameRankCount = stats.same_rank_count || 0;
-                            
-                            return (
-                              <TableRow key={key}>
-                                <TableCell>{comparisonLabel}</TableCell>
-                                <TableCell align="center">{stats.overlap}</TableCell>
-                                <TableCell align="center">{sameRankCount}</TableCell>
-                                <TableCell align="right">{jaccardValue !== undefined ? jaccardValue.toFixed(4) : '0.0000'}</TableCell>
-                                <TableCell align="right">{rankBiasedValue !== undefined ? rankBiasedValue.toFixed(4) : '0.0000'}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                </Paper>
-              </Box>
-            )}
-            
-            {(!results || !results.comparison || !results.comparison.similarity) && (
-              <Box sx={{ height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column' }}>
-                <Typography variant="h6" color="text.secondary" gutterBottom>
-                  No data to visualize
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Run a search across multiple sources to see similarity metrics visualized here.
-                </Typography>
               </Box>
             )}
           </Box>
@@ -1397,7 +1563,200 @@ function App() {
                         A/B Test Results (Variation {results.variation})
                       </Typography>
                       <Paper elevation={2} sx={{ p: 2 }}>
-                        <pre>{JSON.stringify(results, null, 2)}</pre>
+                        <Grid container spacing={2}>
+                          {/* Test Information */}
+                          <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>Test Information</Typography>
+                            <Grid container spacing={2}>
+                              <Grid item xs={12} sm={6} md={3}>
+                                <Typography variant="subtitle2">Test ID</Typography>
+                                <Typography variant="body2">{results.test_id}</Typography>
+                              </Grid>
+                              <Grid item xs={12} sm={6} md={3}>
+                                <Typography variant="subtitle2">Query</Typography>
+                                <Typography variant="body2">{results.query}</Typography>
+                              </Grid>
+                              <Grid item xs={12} sm={6} md={3}>
+                                <Typography variant="subtitle2">Metrics</Typography>
+                                <Box>
+                                  {results.metrics?.map((metric) => (
+                                    <Chip 
+                                      key={metric} 
+                                      label={metric === 'jaccard' ? 'Jaccard Similarity' : 'Rank-Biased Overlap'} 
+                                      size="small" 
+                                      sx={{ mr: 0.5, mb: 0.5 }}
+                                    />
+                                  ))}
+                                </Box>
+                              </Grid>
+                              <Grid item xs={12} sm={6} md={3}>
+                                <Typography variant="subtitle2">Fields</Typography>
+                                <Box>
+                                  {results.fields?.map((field) => (
+                                    <Chip 
+                                      key={field} 
+                                      label={field} 
+                                      size="small" 
+                                      sx={{ mr: 0.5, mb: 0.5 }}
+                                    />
+                                  ))}
+                                </Box>
+                              </Grid>
+                            </Grid>
+                          </Grid>
+                          
+                          {/* Search Results */}
+                          <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>Search Results by Source</Typography>
+                            <Box sx={{ mb: 2 }}>
+                              {results.sources?.map((source) => (
+                                <Chip 
+                                  key={source} 
+                                  label={formatSourceName(source)} 
+                                  color={
+                                    source === 'ads' ? 'primary' :
+                                    source === 'scholar' ? 'error' :
+                                    source === 'semanticScholar' ? 'warning' : 'success'
+                                  }
+                                  sx={{ mr: 1, mb: 1 }}
+                                />
+                              ))}
+                            </Box>
+                            
+                            <TableContainer component={Paper} variant="outlined">
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Source</TableCell>
+                                    <TableCell>Result Count</TableCell>
+                                    <TableCell>Top Result</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  {Object.keys(results.results || {}).map((source) => (
+                                    <TableRow key={source}>
+                                      <TableCell>
+                                        <Typography variant="body2">
+                                          {formatSourceName(source)}
+                                        </Typography>
+                                      </TableCell>
+                                      <TableCell>
+                                        {results.results[source]?.length || 0}
+                                      </TableCell>
+                                      <TableCell>
+                                        {results.results[source]?.[0]?.title || 'No results'}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          </Grid>
+
+                          {/* Detailed Results (First 5 from each source) */}
+                          <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>
+                              Detailed Results
+                              <Tooltip title="Showing first 5 results from each source">
+                                <IconButton size="small">
+                                  <InfoIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Typography>
+                            
+                            {(() => {
+                              // Initialize activeSource if it's null or not in results
+                              const resultSources = Object.keys(results.results || {});
+                              if (!activeSource || !resultSources.includes(activeSource)) {
+                                // Set to first source in results if available
+                                if (resultSources.length > 0 && activeSource !== resultSources[0]) {
+                                  setTimeout(() => setActiveSource(resultSources[0]), 0);
+                                }
+                              }
+                              
+                              return (
+                                <>
+                                  <Tabs
+                                    value={resultSources.indexOf(activeSource) !== -1 
+                                      ? resultSources.indexOf(activeSource) 
+                                      : 0}
+                                    onChange={(e, newValue) => {
+                                      setActiveSource(resultSources[newValue]);
+                                    }}
+                                    variant="scrollable"
+                                    scrollButtons="auto"
+                                  >
+                                    {resultSources.map((source) => (
+                                      <Tab 
+                                        key={source} 
+                                        label={formatSourceName(source)} 
+                                        id={`source-tab-${source}`}
+                                      />
+                                    ))}
+                                  </Tabs>
+                                  
+                                  {resultSources.map((source) => (
+                                    <div
+                                      key={source}
+                                      role="tabpanel"
+                                      hidden={activeSource !== source}
+                                      id={`source-tabpanel-${source}`}
+                                      aria-labelledby={`source-tab-${source}`}
+                                    >
+                                      {activeSource === source && (
+                                        <Box sx={{ pt: 2 }}>
+                                          <TableContainer>
+                                            <Table size="small">
+                                              <TableHead>
+                                                <TableRow>
+                                                  <TableCell>Rank</TableCell>
+                                                  <TableCell>Title</TableCell>
+                                                  <TableCell>Authors</TableCell>
+                                                  <TableCell>Year</TableCell>
+                                                  <TableCell>DOI</TableCell>
+                                                  <TableCell>Citations</TableCell>
+                                                </TableRow>
+                                              </TableHead>
+                                              <TableBody>
+                                                {(results.results[source] || []).slice(0, 5).map((result, idx) => (
+                                                  <TableRow key={idx}>
+                                                    <TableCell>{result.rank}</TableCell>
+                                                    <TableCell>
+                                                      <Tooltip title={result.abstract || 'No abstract available'}>
+                                                        <Typography variant="body2">
+                                                          {result.title}
+                                                        </Typography>
+                                                      </Tooltip>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                      {Array.isArray(result.authors) 
+                                                        ? result.authors.slice(0, 2).join(', ') + 
+                                                          (result.authors.length > 2 ? ', et al.' : '')
+                                                        : 'N/A'}
+                                                    </TableCell>
+                                                    <TableCell>{result.year || 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                      {result.doi ? (
+                                                        <a href={`https://doi.org/${result.doi}`} target="_blank" rel="noopener noreferrer">
+                                                          {result.doi.substring(0, 15)}...
+                                                        </a>
+                                                      ) : 'N/A'}
+                                                    </TableCell>
+                                                    <TableCell>{result.citation_count ?? 'N/A'}</TableCell>
+                                                  </TableRow>
+                                                ))}
+                                              </TableBody>
+                                            </Table>
+                                          </TableContainer>
+                                        </Box>
+                                      )}
+                                    </div>
+                                  ))}
+                                </>
+                              );
+                            })()}
+                          </Grid>
+                        </Grid>
                       </Paper>
                     </Box>
                   )}
@@ -1451,7 +1810,143 @@ function App() {
                         Log Analysis Results
                       </Typography>
                       <Paper elevation={2} sx={{ p: 2 }}>
-                        <pre>{JSON.stringify(results, null, 2)}</pre>
+                        <Grid container spacing={3}>
+                          {/* Summary Statistics */}
+                          <Grid item xs={12}>
+                            <Typography variant="h6" gutterBottom>Summary Statistics</Typography>
+                            <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                              <Table size="small">
+                                <TableHead>
+                                  <TableRow>
+                                    <TableCell>Metric</TableCell>
+                                    <TableCell>Value</TableCell>
+                                  </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                  <TableRow>
+                                    <TableCell>Total Queries</TableCell>
+                                    <TableCell>{results.summary?.total_queries || 0}</TableCell>
+                                  </TableRow>
+                                  <TableRow>
+                                    <TableCell>Unique Users</TableCell>
+                                    <TableCell>{results.summary?.unique_users || 0}</TableCell>
+                                  </TableRow>
+                                  <TableRow>
+                                    <TableCell>Average Results</TableCell>
+                                    <TableCell>{results.summary?.avg_results?.toFixed(2) || 0}</TableCell>
+                                  </TableRow>
+                                  <TableRow>
+                                    <TableCell>Time Period</TableCell>
+                                    <TableCell>
+                                      {results.summary?.start_date && results.summary?.end_date
+                                        ? `${new Date(results.summary.start_date).toLocaleDateString()} to ${new Date(results.summary.end_date).toLocaleDateString()}`
+                                        : 'N/A'}
+                                    </TableCell>
+                                  </TableRow>
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          </Grid>
+                          
+                          {/* Popular Queries */}
+                          {results.popular_queries && results.popular_queries.length > 0 && (
+                            <Grid item xs={12} md={6}>
+                              <Typography variant="h6" gutterBottom>Popular Queries</Typography>
+                              <TableContainer component={Paper} variant="outlined">
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Query</TableCell>
+                                      <TableCell align="right">Count</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {results.popular_queries.map((item, index) => (
+                                      <TableRow key={index}>
+                                        <TableCell>{item.query}</TableCell>
+                                        <TableCell align="right">{item.count}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Grid>
+                          )}
+                          
+                          {/* Source Performance */}
+                          {results.source_performance && Object.keys(results.source_performance).length > 0 && (
+                            <Grid item xs={12} md={6}>
+                              <Typography variant="h6" gutterBottom>Source Performance</Typography>
+                              <TableContainer component={Paper} variant="outlined">
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Source</TableCell>
+                                      <TableCell align="right">Avg. Results</TableCell>
+                                      <TableCell align="right">Avg. Response Time (ms)</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {Object.entries(results.source_performance).map(([source, data]) => (
+                                      <TableRow key={source}>
+                                        <TableCell>{formatSourceName(source)}</TableCell>
+                                        <TableCell align="right">{data.avg_results?.toFixed(2) || 0}</TableCell>
+                                        <TableCell align="right">{data.avg_response_time?.toFixed(0) || 0}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Grid>
+                          )}
+                          
+                          {/* Error Distribution */}
+                          {results.errors && results.errors.length > 0 && (
+                            <Grid item xs={12}>
+                              <Typography variant="h6" gutterBottom>Error Distribution</Typography>
+                              <TableContainer component={Paper} variant="outlined">
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Error Type</TableCell>
+                                      <TableCell>Source</TableCell>
+                                      <TableCell align="right">Count</TableCell>
+                                      <TableCell>Sample Message</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {results.errors.map((error, index) => (
+                                      <TableRow key={index}>
+                                        <TableCell>{error.type}</TableCell>
+                                        <TableCell>{error.source ? formatSourceName(error.source) : 'N/A'}</TableCell>
+                                        <TableCell align="right">{error.count}</TableCell>
+                                        <TableCell>
+                                          <Tooltip title={error.message || 'No details available'}>
+                                            <Typography variant="body2" noWrap sx={{ maxWidth: 250 }}>
+                                              {error.message || 'N/A'}
+                                            </Typography>
+                                          </Tooltip>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Grid>
+                          )}
+                          
+                          {/* If no structured data is available, show raw JSON as fallback */}
+                          {(!results.summary && !results.popular_queries && !results.source_performance && !results.errors) && (
+                            <Grid item xs={12}>
+                              <Typography variant="subtitle1" color="text.secondary" align="center" gutterBottom>
+                                No structured analysis data available. Showing raw data:
+                              </Typography>
+                              <Paper sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+                                <pre>{JSON.stringify(results, null, 2)}</pre>
+                              </Paper>
+                            </Grid>
+                          )}
+                        </Grid>
                       </Paper>
                     </Box>
                   )}
@@ -1509,7 +2004,108 @@ function App() {
                       <Typography variant="h6" gutterBottom>
                         Environment Information
                       </Typography>
-                      <pre>{JSON.stringify(environmentInfo, null, 2)}</pre>
+                      <Grid container spacing={2}>
+                        {/* System Info */}
+                        <Grid item xs={12} md={6}>
+                          <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Typography variant="subtitle1" gutterBottom>System</Typography>
+                            <TableContainer>
+                              <Table size="small">
+                                <TableBody>
+                                  <TableRow>
+                                    <TableCell><strong>Python Version</strong></TableCell>
+                                    <TableCell>{environmentInfo.python_version || 'N/A'}</TableCell>
+                                  </TableRow>
+                                  <TableRow>
+                                    <TableCell><strong>OS Platform</strong></TableCell>
+                                    <TableCell>{environmentInfo.platform || 'N/A'}</TableCell>
+                                  </TableRow>
+                                  <TableRow>
+                                    <TableCell><strong>Environment</strong></TableCell>
+                                    <TableCell>{environmentInfo.environment || 'development'}</TableCell>
+                                  </TableRow>
+                                  <TableRow>
+                                    <TableCell><strong>Debug Mode</strong></TableCell>
+                                    <TableCell>
+                                      <Chip 
+                                        label={environmentInfo.debug ? 'Enabled' : 'Disabled'} 
+                                        color={environmentInfo.debug ? 'warning' : 'default'}
+                                        size="small"
+                                      />
+                                    </TableCell>
+                                  </TableRow>
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          </Paper>
+                        </Grid>
+                        
+                        {/* API Keys */}
+                        <Grid item xs={12} md={6}>
+                          <Paper variant="outlined" sx={{ p: 2 }}>
+                            <Typography variant="subtitle1" gutterBottom>API Configuration</Typography>
+                            <TableContainer>
+                              <Table size="small">
+                                <TableBody>
+                                  {Object.entries(environmentInfo.api_keys || {}).map(([key, value]) => (
+                                    <TableRow key={key}>
+                                      <TableCell><strong>{key}</strong></TableCell>
+                                      <TableCell>
+                                        <Chip 
+                                          label={value ? 'Configured' : 'Missing'} 
+                                          color={value ? 'success' : 'error'}
+                                          size="small"
+                                        />
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </TableContainer>
+                          </Paper>
+                        </Grid>
+                        
+                        {/* Dependencies */}
+                        {environmentInfo.dependencies && Object.keys(environmentInfo.dependencies).length > 0 && (
+                          <Grid item xs={12}>
+                            <Paper variant="outlined" sx={{ p: 2 }}>
+                              <Typography variant="subtitle1" gutterBottom>Dependencies</Typography>
+                              <TableContainer sx={{ maxHeight: 300 }}>
+                                <Table size="small" stickyHeader>
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell>Package</TableCell>
+                                      <TableCell>Version</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {Object.entries(environmentInfo.dependencies).map(([pkg, version]) => (
+                                      <TableRow key={pkg}>
+                                        <TableCell>{pkg}</TableCell>
+                                        <TableCell>{version}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            </Paper>
+                          </Grid>
+                        )}
+                        
+                        {/* Raw Data (Collapsed) */}
+                        <Grid item xs={12}>
+                          <Accordion>
+                            <AccordionSummary expandIcon={<InfoIcon />}>
+                              <Typography>View Raw Environment Data</Typography>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                              <pre style={{ maxHeight: '300px', overflow: 'auto' }}>
+                                {JSON.stringify(environmentInfo, null, 2)}
+                              </pre>
+                            </AccordionDetails>
+                          </Accordion>
+                        </Grid>
+                      </Grid>
                     </Paper>
                   )}
                 </Box>

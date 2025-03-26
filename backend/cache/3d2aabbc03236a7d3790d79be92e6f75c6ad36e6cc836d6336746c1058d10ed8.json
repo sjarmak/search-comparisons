@@ -1,0 +1,424 @@
+{
+  "timestamp": 1743015685.012634,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "The theory of strong katabatic winds",
+      "authors": [
+        "FK Ball"
+      ],
+      "abstract": "to the meteorological glossary katabatic winds blow down slopes that  Winds of this type  are best developed on the large ice caps of Greenland and Antarctica where the surface winds,",
+      "doi": null,
+      "year": 1956,
+      "url": "https://www.publish.csiro.au/ph/PH560373",
+      "source": "scholar",
+      "rank": 1,
+      "citation_count": 271,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "A model of katabatic winds",
+      "authors": [
+        "PC Manins",
+        "BL Sawford"
+      ],
+      "abstract": "Katabatic winds are local winds due to downslope flow of air which is continuously cooled   An understanding is required of the development of katabatic flow with distance and time, the",
+      "doi": null,
+      "year": 1979,
+      "url": "https://journals.ametsoc.org/view/journals/atsc/36/4/1520-0469_1979_036_0619_amokw_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 2,
+      "citation_count": 255,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Katabatic winds: A field case study",
+      "authors": [
+        "PC Manins",
+        "BL Sawford"
+      ],
+      "abstract": "(Defant 1951) such as sea and lake breezes, katabatic and anabatic flows. Such local winds   This paper discusses the results of a field investigation of katabatic winds. ‘?n calm clear",
+      "doi": null,
+      "year": 1979,
+      "url": "https://rmets.onlinelibrary.wiley.com/doi/abs/10.1002/qj.49710544618",
+      "source": "scholar",
+      "rank": 3,
+      "citation_count": 146,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Satellite analyses of Antarctic katabatic wind behavior",
+      "authors": [
+        "DH Bromwich"
+      ],
+      "abstract": "katabatic winds in the Ross Sea sector of the Antarctic. The satellite features are compared  with surfacebased observations whenever possible. Converging surface-wind  the katabatic",
+      "doi": null,
+      "year": 1989,
+      "url": "https://journals.ametsoc.org/view/journals/bams/70/7/1520-0477_1989_070_0738_saoakw_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 4,
+      "citation_count": 206,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "The role of katabatic winds on the Antarctic surface wind regime",
+      "authors": [
+        "TR Parish",
+        "JJ Cassano"
+      ],
+      "abstract": "Wind vectors at lowest sigma level (11 m above ground) for MM5 katabatic wind control  simulation CR at (a) 0, (b) 3, (c) 6, and (d) 12 h. Terrain contours (m) denoted by dashed lines;",
+      "doi": null,
+      "year": 2003,
+      "url": "https://journals.ametsoc.org/view/journals/mwre/131/2/1520-0493_2003_131_0317_trokwo_2.0.co_2.xml",
+      "source": "scholar",
+      "rank": 5,
+      "citation_count": 175,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Continental-scale simulation of the Antarctic katabatic wind regime",
+      "authors": [
+        "TR Parish",
+        "DH Bromwich"
+      ],
+      "abstract": "Results of the simulation enable a mapping of katabatic wind potential  katabatic winds. A  large upper-level cyclonic circulation forms rapidly in response to the evolving katabatic wind",
+      "doi": null,
+      "year": 1991,
+      "url": "https://journals.ametsoc.org/view/journals/clim/4/2/1520-0442_1991_004_0135_cssota_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 6,
+      "citation_count": 247,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "An observational history of small‐scale katabatic winds in mid‐latitudes",
+      "authors": [
+        "G Poulos",
+        "S Zhong"
+      ],
+      "abstract": "Although katabatic winds have been observed  katabatic winds that occur in mountainous  regions in mid-latitudes. There is a large amount of literatures on large-scale katabatic winds",
+      "doi": null,
+      "year": 2008,
+      "url": "https://compass.onlinelibrary.wiley.com/doi/abs/10.1111/j.1749-8198.2008.00166.x",
+      "source": "scholar",
+      "rank": 7,
+      "citation_count": 44,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Katabatic wind forcing of the Terra Nova Bay polynya",
+      "authors": [
+        "DH Bromwich",
+        "DD Kurtz"
+      ],
+      "abstract": "evidence supporting the existence of strong katabatic winds blowing across the Nansen Ice   The Terra Nova Bay polynya is formed and maintained through the action of katabatic winds",
+      "doi": null,
+      "year": 1984,
+      "url": "https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/jc089ic03p03561",
+      "source": "scholar",
+      "rank": 8,
+      "citation_count": 268,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "A case study of Antarctic katabatic wind interaction with large-scale forcing",
+      "authors": [
+        "TR Parish",
+        "DH Bromwich"
+      ],
+      "abstract": "Katabatic winds are prominent climatological features of the Antarctic boundary layer.   the katabatic wind regime and the Antarctic orography. The strength of the katabatic wind is",
+      "doi": null,
+      "year": 1998,
+      "url": "https://journals.ametsoc.org/view/journals/mwre/126/1/1520-0493_1998_126_0199_acsoak_2.0.co_2.xml",
+      "source": "scholar",
+      "rank": 9,
+      "citation_count": 107,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "An extraordinary katabatic wind regime at Terra Nova Bay, Antarctica",
+      "authors": [
+        "DH Bromwich"
+      ],
+      "abstract": "intense katabatic winds persistently blow across the western shore of Terra Nova Bay. The  data demonstrate that the anomalously strong katabatic winds  prove that katabatic winds can",
+      "doi": null,
+      "year": 1989,
+      "url": "https://journals.ametsoc.org/view/journals/mwre/117/3/1520-0493_1989_117_0688_aekwra_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 10,
+      "citation_count": 153,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "The forcing of Antarctic katabatic winds",
+      "authors": [
+        "TR Parish",
+        "KT Waight III"
+      ],
+      "abstract": "The temporal and spatial development of katabatic winds  A detailed diagnosis is made  of a simulation in which katabatic  the net cooling of the katabatic layer and magnitude of the",
+      "doi": null,
+      "year": 1987,
+      "url": "https://journals.ametsoc.org/view/journals/mwre/115/10/1520-0493_1987_115_2214_tfoakw_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 11,
+      "citation_count": 148,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "A numerical study of strong katabatic winds over Antarctica",
+      "authors": [
+        "TR Parish"
+      ],
+      "abstract": "intense, persistent katabatic winds. The forcing of such katabatic outflow is believed to originate   Katabatic wind speeds as depicted by the model are greatly enhanced downslope of the",
+      "doi": null,
+      "year": 1984,
+      "url": "https://journals.ametsoc.org/view/journals/mwre/112/3/1520-0493_1984_112_0545_ansosk_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 12,
+      "citation_count": 108,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Interaction of katabatic winds and near‐surface temperatures in the Antarctic",
+      "authors": [
+        "T Vihma",
+        "E Tuovinen",
+        "H Savijärvi"
+      ],
+      "abstract": "[2] A katabatic wind is a downslope flow driven by gravity and pressure gradient forces on   katabatic winds [eg, Kottmeier, 1986]. Here we define the katabatic wind as a downslope wind",
+      "doi": null,
+      "year": 2011,
+      "url": "https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2010JD014917",
+      "source": "scholar",
+      "rank": 13,
+      "citation_count": 60,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "On the extraordinary katabatic winds of Adélie Land",
+      "authors": [
+        "G Wendler",
+        "C Stearns",
+        "G Weidner"
+      ],
+      "abstract": "It should be pointed out that our measurements of the katabatic winds are not the only ones  carried out with AWS. Bromwich [1989a] and Bromwich et al. [1993] made extensive studies",
+      "doi": null,
+      "year": 1997,
+      "url": "https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/96JD03438",
+      "source": "scholar",
+      "rank": 14,
+      "citation_count": 90,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Momentum, heat, and moisture budgets of the katabatic wind layer over a midlatitude glacier in summer",
+      "authors": [
+        "MR Van Den Broeke"
+      ],
+      "abstract": "Part C: On the katabatic winds on the NW slope of the ice cap, variation of the surface   for the katabatic wind, with an average cross-slope geostrophic wind speed v g = −0.9 ms −1 .",
+      "doi": null,
+      "year": 1997,
+      "url": "https://journals.ametsoc.org/view/journals/apme/36/6/1520-0450_1997_036_0763_mhambo_2.0.co_2.xml",
+      "source": "scholar",
+      "rank": 15,
+      "citation_count": 93,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "The surface climatology of an ordinary katabatic wind regime in Coats Land, Antarctica",
+      "authors": [
+        "IA Renfrew",
+        "PS Anderson"
+      ],
+      "abstract": "katabatic wind is 7.5 ms−1 and from 153◦ at C2, and is 5.1 ms−1 and from 139◦ at C3. These  wind  The bimodal wind speed distribution at C4 means the wind constancy is lower (0.73)",
+      "doi": null,
+      "year": 2002,
+      "url": "https://www.tandfonline.com/doi/abs/10.3402/tellusa.v54i5.12162",
+      "source": "scholar",
+      "rank": 16,
+      "citation_count": 62,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Satellite observations of katabatic-wind propagation for great distances across the Ross Ice Shelf",
+      "authors": [
+        "DH Bromwich",
+        "JF Carrasco"
+      ],
+      "abstract": "by katabatic winds that  by katabatic winds blowing from the major glaciers that flow through  the Transantarctic Mountains from East Antarctica. These negatively buoyant katabatic winds",
+      "doi": null,
+      "year": 1992,
+      "url": "https://journals.ametsoc.org/view/journals/mwre/120/9/1520-0493_1992_120_1940_sookwp_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 17,
+      "citation_count": 115,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Instrumented aircraft observations of the katabatic wind regime near Terra Nova Bay",
+      "authors": [
+        "TR Parish",
+        "DH Bromwich"
+      ],
+      "abstract": "vigorous vertical mixing within the katabatic layer which makes the  katabatic jet much  warmer than that for adjacent light-wind areas. Thermal images often suggest that katabatic winds",
+      "doi": null,
+      "year": 1989,
+      "url": "https://journals.ametsoc.org/view/journals/mwre/117/7/1520-0493_1989_117_1570_iaootk_2_0_co_2.xml",
+      "source": "scholar",
+      "rank": 18,
+      "citation_count": 93,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Katabatic wind‐driven exchange in fjords",
+      "authors": [
+        "MA Spall",
+        "RH Jackson",
+        "F Straneo"
+      ],
+      "abstract": "of katabatic winds, events characterized by strong winds directed  katabatic wind events  can result in an exchange of approximately 10% of the fjord water mass. The multiple katabatic",
+      "doi": null,
+      "year": 2017,
+      "url": "https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1002/2017JC013026",
+      "source": "scholar",
+      "rank": 19,
+      "citation_count": 57,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Climatology of katabatic winds in the McMurdo dry valleys, southern Victoria Land, Antarctica",
+      "authors": [
+        "TH Nylen",
+        "AG Fountain"
+      ],
+      "abstract": "To differentiate between katabatic winds from the plateau and local drainage winds, we  selected a minimum wind speed of 5 ms −1 . The search criteria did not include the rise (or drop)",
+      "doi": null,
+      "year": 2004,
+      "url": "https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/2003JD003937",
+      "source": "scholar",
+      "rank": 20,
+      "citation_count": 227,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    }
+  ]
+}

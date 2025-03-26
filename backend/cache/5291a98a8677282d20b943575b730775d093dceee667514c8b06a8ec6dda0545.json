@@ -1,0 +1,24 @@
+{
+  "timestamp": 1743019106.278025,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "[No results found in Web of Science database]",
+      "authors": [],
+      "abstract": "The term '(title:katabatic)^2.0 (abstract:katabatic)^3.0 (author:katabatic)^1.5 (year:katabatic)^0.5 (title:wind)^2.0 (abstract:wind)^3.0 (author:wind)^1.5 (year:wind)^0.5 (title:\"katabatic wind\")^2.0 (abstract:\"katabatic wind\")^3.0 (author:\"katabatic wind\")^1.5 (year:\"katabatic wind\")^0.5' did not match any documents in the Web of Science Core Collection.",
+      "doi": null,
+      "year": null,
+      "url": "https://webofknowledge.com",
+      "source": "webOfScience",
+      "rank": 1,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    }
+  ]
+}
