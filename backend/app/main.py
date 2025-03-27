@@ -108,7 +108,9 @@ app.add_middleware(
         "https://search-engine-comparator-1.onrender.com",
         "https://search-engine-comparator-web.onrender.com",
         "https://search-engine-comparator-api.onrender.com",
-        "https://search.sjarmak.ai"
+        "https://search.sjarmak.ai",
+        "https://search-tool-web.onrender.com",  # New Render deployment URL
+        "https://search-tool-api.onrender.com"   # Backend URL (for internal requests)
     ],
     allow_credentials=True,
     allow_methods=["*"],
