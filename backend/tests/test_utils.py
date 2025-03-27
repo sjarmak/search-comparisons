@@ -176,13 +176,26 @@ def test_get_cache_key() -> None:
     fields_reordered = ["abstract", "title"]
     assert get_cache_key(source, query, fields) == get_cache_key(source, query, fields_reordered)
     
+    # Test with num_results parameter
+    num_results = 50
+    hash_input_with_results = f"{source}:{query}:{':'.join(sorted(fields))}:{num_results}"
+    expected_with_results = hashlib.sha256(hash_input_with_results.encode('utf-8')).hexdigest()
+    
+    assert get_cache_key(source, query, fields, num_results) == expected_with_results
+    
+    # Test that different num_results produces different keys
+    key_with_results_10 = get_cache_key(source, query, fields, 10)
+    key_with_results_20 = get_cache_key(source, query, fields, 20)
+    assert key_with_results_10 != key_with_results_20
+    
     # Test different inputs produce different keys
     key1 = get_cache_key("ads", "query1", ["title"])
     key2 = get_cache_key("scholar", "query1", ["title"])
     key3 = get_cache_key("ads", "query2", ["title"])
     key4 = get_cache_key("ads", "query1", ["abstract"])
+    key5 = get_cache_key("ads", "query1", ["title"], 50)
     
-    assert len({key1, key2, key3, key4}) == 4  # All keys should be different
+    assert len({key1, key2, key3, key4, key5}) == 5  # All keys should be different
 
 
 @patch('os.makedirs')

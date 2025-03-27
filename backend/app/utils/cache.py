@@ -23,23 +23,25 @@ CACHE_DIR = os.environ.get('CACHE_DIR', os.path.join(os.path.dirname(os.path.dir
 CACHE_EXPIRY = int(os.environ.get('CACHE_EXPIRY', 86400))  # Default: 1 day in seconds
 
 
-def get_cache_key(source: str, query: str, fields: List[str]) -> str:
+def get_cache_key(source: str, query: str, fields: List[str], num_results: Optional[int] = None) -> str:
     """
     Generate a cache key for storing search results.
     
-    Creates a unique key based on the source, query, and requested fields.
+    Creates a unique key based on the source, query, requested fields, and number of results.
     This allows for caching based on the specific search parameters.
     
     Args:
         source: The search engine source (e.g., 'ads', 'scholar')
         query: The search query string
         fields: List of requested fields
+        num_results: Maximum number of results to return (optional)
     
     Returns:
         str: A unique cache key as a hex string
     """
-    # Create a string to hash
-    hash_input = f"{source}:{query}:{':'.join(sorted(fields))}"
+    # Create a string to hash, include num_results if provided
+    results_str = f":{num_results}" if num_results is not None else ""
+    hash_input = f"{source}:{query}:{':'.join(sorted(fields))}{results_str}"
     
     # Create SHA-256 hash
     return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()

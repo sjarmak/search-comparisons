@@ -69,7 +69,7 @@ async def get_semantic_scholar_results(
         List[SearchResult]: List of search results from Semantic Scholar
     """
     # Check cache first - now using the shared cache mechanism
-    cache_key = get_cache_key("semanticScholar", query, fields)
+    cache_key = get_cache_key("semanticScholar", query, fields, num_results)
     cached_results = load_from_cache(cache_key)
     
     if cached_results is not None:

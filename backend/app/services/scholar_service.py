@@ -25,6 +25,7 @@ except ImportError:
 
 from ..api.models import SearchResult
 from ..utils.http import safe_api_request, timeout
+from ..utils.cache import get_cache_key, save_to_cache, load_from_cache
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -346,10 +347,10 @@ async def get_scholar_results(
     num_results: int = NUM_RESULTS
 ) -> List[SearchResult]:
     """
-    Get search results from Google Scholar with fallback methods.
+    Get search results from Google Scholar.
     
-    First tries to use the Scholarly library if available, and falls back to
-    direct HTML scraping if Scholarly is unavailable or fails.
+    Attempts to retrieve results from Google Scholar using direct HTML scraping
+    with fallback to the Scholarly library if needed.
     
     Args:
         query: Search query string
@@ -359,6 +360,14 @@ async def get_scholar_results(
     Returns:
         List[SearchResult]: List of search results from Google Scholar
     """
+    # Check cache first
+    cache_key = get_cache_key("scholar", query, fields, num_results)
+    cached_results = load_from_cache(cache_key)
+    
+    if cached_results is not None:
+        logger.info(f"Retrieved {len(cached_results)} Google Scholar results from cache")
+        return cached_results
+    
     # First try with Scholarly if available
     if SCHOLARLY_AVAILABLE:
         try:
@@ -396,6 +405,15 @@ async def get_scholar_results_fallback(
     """
     logger.info(f"Using fallback method for Google Scholar: {query}")
     
+    # Check cache first with minimal default fields for fallback method
+    minimal_fields = ["title", "authors", "year"]
+    cache_key = get_cache_key("scholar_fallback", query, minimal_fields, num_results)
+    cached_results = load_from_cache(cache_key)
+    
+    if cached_results is not None:
+        logger.info(f"Retrieved {len(cached_results)} Google Scholar fallback results from cache")
+        return cached_results
+    
     # Simplify the query to improve chances of success
     simple_query = query.split(" ")[:6]  # Take just the first few terms
     simplified_query = " ".join(simple_query)
@@ -408,9 +426,10 @@ async def get_scholar_results_fallback(
     # Parse HTML
     results = await parse_scholar_html(html_content)
     
-    # Log success/failure
+    # Cache the results if successful
     if results:
         logger.info(f"Fallback method successfully retrieved {len(results)} results from Google Scholar")
+        save_to_cache(cache_key, results)
     else:
         logger.warning("Fallback method failed to retrieve any results from Google Scholar")
     
