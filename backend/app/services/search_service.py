@@ -51,14 +51,15 @@ SERVICE_CONFIG = {
     }
 }
 
-# Constants
-NUM_RESULTS = 20
+# Default number of results if not specified
+DEFAULT_NUM_RESULTS = 20
 
 
 async def get_results_with_fallback(
     query: str, 
     sources: List[str], 
     fields: List[str], 
+    max_results: Optional[int] = None,
     attempts: int = 2
 ) -> Dict[str, List[SearchResult]]:
     """
@@ -72,12 +73,17 @@ async def get_results_with_fallback(
         query: Search query string
         sources: List of search engine sources to query
         fields: List of fields to retrieve
+        max_results: Maximum number of results to return per source
         attempts: Maximum number of retry attempts per source
     
     Returns:
         Dict[str, List[SearchResult]]: Dictionary mapping source names to result lists
     """
     results: Dict[str, List[SearchResult]] = {}
+    
+    # Use default if max_results is not specified
+    num_results = max_results if max_results is not None else DEFAULT_NUM_RESULTS
+    logger.info(f"Fetching up to {num_results} results per source")
     
     # Check if sources is empty or invalid
     if not sources:
@@ -94,7 +100,7 @@ async def get_results_with_fallback(
             continue
         
         # Try to get from cache first
-        cache_key = get_cache_key(source, query, fields)
+        cache_key = get_cache_key(source, query, fields, num_results)
         cached_results = load_from_cache(cache_key)
         
         if cached_results:
@@ -115,17 +121,17 @@ async def get_results_with_fallback(
             
             try:
                 if source == "ads":
-                    source_results = await get_ads_results(query, fields)
+                    source_results = await get_ads_results(query, fields, num_results)
                 elif source == "scholar":
                     if attempt_count == 1:
-                        source_results = await get_scholar_results(query, fields)
+                        source_results = await get_scholar_results(query, fields, num_results)
                     else:
                         # Fallback method for scholar
-                        source_results = await get_scholar_results_fallback(query)
+                        source_results = await get_scholar_results_fallback(query, num_results)
                 elif source == "semanticScholar":
-                    source_results = await get_semantic_scholar_results(query, fields)
+                    source_results = await get_semantic_scholar_results(query, fields, num_results)
                 elif source == "webOfScience":
-                    source_results = await get_web_of_science_results(query, fields)
+                    source_results = await get_web_of_science_results(query, fields, num_results)
                 else:
                     logger.warning(f"Unknown source: {source}")
                     break
@@ -139,7 +145,7 @@ async def get_results_with_fallback(
                     logger.warning(f"Insufficient results from {source}: got {len(source_results)}, need {min_results}")
                     
             except Exception as e:
-                logger.error(f"Error getting results from {source} (attempt {attempt_count}): {str(e)}")
+                logger.error(f"Error getting results from {source} (attempt {attempt_count}): {str(e)}", exc_info=True)
                 # Wait before retry
                 await asyncio.sleep(1.0)
         

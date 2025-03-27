@@ -6,7 +6,7 @@ These models define the structure of incoming requests and outgoing responses
 for the API endpoints.
 """
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SearchRequest(BaseModel):
@@ -18,11 +18,17 @@ class SearchRequest(BaseModel):
         sources: List of search engines to query
         metrics: List of metrics to use for result comparison
         fields: List of fields to include in the search
+        max_results: Maximum number of results to return (optional)
+        originalQuery: Original query before transformation (optional)
+        useTransformedQuery: Flag indicating if the query is transformed (optional)
     """
     query: str
     sources: List[str]
     metrics: List[str]
     fields: List[str]
+    max_results: Optional[int] = Field(default=20, ge=1, le=1000)
+    originalQuery: Optional[str] = None
+    useTransformedQuery: Optional[bool] = False
 
 
 class SearchResult(BaseModel):

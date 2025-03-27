@@ -94,25 +94,11 @@ app = FastAPI(
     debug=os.getenv("DEBUG", "True").lower() in ("true", "1", "t", "yes")
 )
 
-# Configure CORS with hardcoded values
+# Configure CORS with wildcard for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173", 
-        "http://127.0.0.1:5173",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "https://search-engine-comparator.onrender.com", 
-        "https://search-engine-comparator-1.onrender.com",
-        "https://search-engine-comparator-web.onrender.com",
-        "https://search-engine-comparator-api.onrender.com",
-        "https://search.sjarmak.ai",
-        "https://search-tool-web.onrender.com",  # New Render deployment URL
-        "https://search-tool-api.onrender.com"   # Backend URL (for internal requests)
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for development/testing
+    allow_credentials=False,  # Must be False when using wildcard origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
