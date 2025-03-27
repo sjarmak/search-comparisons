@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # API Constants
 ADS_API_URL = "https://api.adsabs.harvard.edu/v1/search/query"
-ADS_SOLR_PROXY_URL = os.environ.get("ADS_SOLR_PROXY_URL", "https://scix-solr-proxy.onrender.com/solr/select")
+ADS_SOLR_PROXY_URL = os.environ.get("ADS_SOLR_PROXY_URL", "https://playground.adsabs.harvard.edu/dev/solr/collection1/select")
 ADS_QUERY_METHOD = os.environ.get("ADS_QUERY_METHOD", "solr_first").lower()  # Options: solr_only, api_only, solr_first (default)
 NUM_RESULTS = 20
 TIMEOUT_SECONDS = 15
@@ -72,6 +72,23 @@ def get_ads_api_key() -> str:
         
     return api_key
 
+def get_ads_solr_password() -> str:
+    """
+    Get the ADS Solr password from environment variables.
+    
+    Returns:
+        str: The password if found, empty string otherwise
+    """
+    solr_password = os.environ.get("ADS_SOLR_PASSWORD", "")
+        
+    if not solr_password:
+        logger.error("ADS_SOLR_PASSWORD not found in environment")
+    else:
+        # Log masked key for debugging
+        masked_key = f"{solr_password[:4]}...{solr_password[-4:]}" if len(solr_password) > 8 else "[KEY]"
+        logger.debug(f"Using ADS API key: {masked_key}")
+        
+    return solr_password
 
 async def get_bibcode_from_doi(doi: str) -> Optional[str]:
     """
@@ -149,11 +166,10 @@ async def query_ads_solr(
     num_results: int = NUM_RESULTS
 ) -> List[SearchResult]:
     """
-    Query the ADS Solr instance directly via proxy.
+    Query the dev instance of ADS Solr. 
     
-    Uses the Solr proxy to directly query the ADS Solr database without
-    requiring an API key. This provides faster access but may not have
-    all the features of the official API.
+    Uses the dev credentials to access Solr instance directly 
+    with a GET request and BasicAuth 
     
     Args:
         query: Search query string
@@ -196,11 +212,15 @@ async def query_ads_solr(
                 "wt": "json"  # Ensure JSON response format
             }
             
+            # Get password
+            ads_solr_password = get_ads_solr_password
+
             # Make request
             logger.info(f"Querying ADS Solr proxy with: {query}")
             response = await client.get(
                 ADS_SOLR_PROXY_URL,
                 params=params,
+                auth=httpx.BasicAuth('ads', ads_solr_password),
                 timeout=TIMEOUT_SECONDS
             )
             
