@@ -489,35 +489,6 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
     return value.toFixed(2);
   };
   
-  // Reset to default boost configuration
-  const resetDefaults = () => {
-    setBoostConfig({
-      enableCiteBoost: true,
-      citeBoostWeight: 1.0,
-      enableRecencyBoost: true,
-      recencyBoostWeight: 1.0,
-      recencyFunction: "exponential", 
-      recencyMultiplier: 0.01, 
-      recencyMidpoint: 36,
-      enableDoctypeBoost: true,
-      doctypeBoostWeight: 1.0,
-      enableRefereedBoost: true,
-      refereedBoostWeight: 1.0,
-      combinationMethod: "sum",
-      enableFieldBoosts: true,
-      fieldBoosts: {
-        title: 2.0,
-        abstract: 3.0,
-        author: 1.5,
-        year: 0.5,
-      },
-      queryTransformation: {
-        enableTermSplitting: true,
-        enablePhrasePreservation: true,
-      }
-    });
-  };
-  
   // Apply boosts whenever configuration changes
   useEffect(() => {
     if (originalResults && originalResults.length > 0) {
@@ -737,451 +708,95 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
     }
   };
   
+  // Render the boost controls section
   const renderBoostControls = () => (
     <Paper sx={{ p: 2, mb: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">Boost Configuration</Typography>
         <Box>
           <Button
-            startIcon={<ReplayIcon />}
-            variant="outlined"
-            size="small"
-            onClick={resetDefaults}
-            sx={{ mr: 1 }}
-          >
-            Reset Defaults
-          </Button>
-          <Button
-            startIcon={<SearchIcon />}
             variant="contained"
             color="primary"
             size="small"
             onClick={runNewSearch}
             disabled={searchLoading}
+            sx={{ ml: 1 }}
           >
             {searchLoading ? <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" /> : null}
-            Run New Search
+            Apply Changes
           </Button>
         </Box>
       </Box>
       
-      {/* New section: explain the difference between changing weights and running a new search */}
-      <Alert severity="info" sx={{ mb: 2 }}>
-        <Typography variant="body2">
-          <strong>Understanding the two ways weights work:</strong>
-        </Typography>
-        <Typography variant="body2" component="div" sx={{ mt: 1 }}>
-          • <strong>Field weights (title, abstract, etc.):</strong> Adjust these and click "Run New Search" to get completely different results from ADS.
-        </Typography>
-        <Typography variant="body2" component="div">
-          • <strong>Boost factors (citations, recency, etc.):</strong> These weights re-rank the existing results and update automatically.
-        </Typography>
-      </Alert>
-      
-      {/* New section: Field-specific Query Boosts */}
-      <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-        Field-Specific Query Boosts
-      </Typography>
-      <FormControlLabel
-        control={
-          <Switch
-            checked={boostConfig.enableFieldBoosts}
-            onChange={(e) => handleConfigChange('enableFieldBoosts', e.target.checked)}
-          />
-        }
-        label={
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography>Enable Field Boosts</Typography>
-            <Tooltip title="Transform query to include field-specific boosts">
-              <IconButton size="small">
-                <HelpOutlineIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-        }
-      />
-      
-      {boostConfig.enableFieldBoosts && (
-        <Box sx={{ mt: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
-            Adjust how much weight each field has in the search:
-          </Typography>
-          
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="caption" gutterBottom>Title Boost</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Slider
-                  value={boostConfig.fieldBoosts.title}
-                  onChange={(_, value) => handleFieldBoostChange('title', value)}
-                  min={0}
-                  max={20}
-                  step={0.5}
-                  valueLabelDisplay="auto"
-                  aria-label="Title Boost Weight"
-                  sx={{ flex: 1, mr: 2 }}
-                />
-                <input
-                  type="number"
-                  value={boostConfig.fieldBoosts.title}
-                  onChange={(e) => handleFieldBoostTextInputChange('title', e)}
-                  min={0}
-                  max={1000}
-                  step={0.5}
-                  style={{ width: '60px' }}
-                />
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="caption" gutterBottom>Abstract Boost</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Slider
-                  value={boostConfig.fieldBoosts.abstract}
-                  onChange={(_, value) => handleFieldBoostChange('abstract', value)}
-                  min={0}
-                  max={20}
-                  step={0.5}
-                  valueLabelDisplay="auto"
-                  aria-label="Abstract Boost Weight"
-                  sx={{ flex: 1, mr: 2 }}
-                />
-                <input
-                  type="number"
-                  value={boostConfig.fieldBoosts.abstract}
-                  onChange={(e) => handleFieldBoostTextInputChange('abstract', e)}
-                  min={0}
-                  max={1000}
-                  step={0.5}
-                  style={{ width: '60px' }}
-                />
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="caption" gutterBottom>Author Boost</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Slider
-                  value={boostConfig.fieldBoosts.author}
-                  onChange={(_, value) => handleFieldBoostChange('author', value)}
-                  min={0}
-                  max={20}
-                  step={0.5}
-                  valueLabelDisplay="auto"
-                  aria-label="Author Boost Weight"
-                  sx={{ flex: 1, mr: 2 }}
-                />
-                <input
-                  type="number"
-                  value={boostConfig.fieldBoosts.author}
-                  onChange={(e) => handleFieldBoostTextInputChange('author', e)}
-                  min={0}
-                  max={1000}
-                  step={0.5}
-                  style={{ width: '60px' }}
-                />
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <Typography variant="caption" gutterBottom>Year Boost</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Slider
-                  value={boostConfig.fieldBoosts.year}
-                  onChange={(_, value) => handleFieldBoostChange('year', value)}
-                  min={0}
-                  max={20}
-                  step={0.5}
-                  valueLabelDisplay="auto"
-                  aria-label="Year Boost Weight"
-                  sx={{ flex: 1, mr: 2 }}
-                />
-                <input
-                  type="number"
-                  value={boostConfig.fieldBoosts.year}
-                  onChange={(e) => handleFieldBoostTextInputChange('year', e)}
-                  min={0}
-                  max={1000}
-                  step={0.5}
-                  style={{ width: '60px' }}
-                />
-              </Box>
-            </Grid>
-          </Grid>
-          
-          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={boostConfig.queryTransformation.enableTermSplitting}
-                  onChange={(e) => handleQueryTransformationChange('enableTermSplitting', e.target.checked)}
-                  size="small"
-                />
-              }
-              label="Split query into individual terms"
-            />
-            
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={boostConfig.queryTransformation.enablePhrasePreservation}
-                  onChange={(e) => handleQueryTransformationChange('enablePhrasePreservation', e.target.checked)}
-                  size="small"
-                />
-              }
-              label="Preserve phrases in quotes"
-            />
-          </Box>
-          
-          {query && (
-            <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-              <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                Transformed Query:
-              </Typography>
-              <Typography variant="caption" component="pre" sx={{ 
-                whiteSpace: 'pre-wrap', 
-                wordBreak: 'break-all',
-                mt: 0.5,
-                fontSize: '0.7rem'
-              }}>
-                {transformQuery(query)}
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      )}
-      
-      <Divider sx={{ my: 2 }} />
-      
-      {/* Existing boost controls with added input fields */}
       <Grid container spacing={2}>
-        {/* Citation Boost */}
-        <Grid item xs={12}>
+        {/* Field Boost Controls */}
+        <Grid item xs={12} md={6}>
+          <Typography variant="subtitle1" gutterBottom>Field Boost Weights</Typography>
+          
           <Box sx={{ mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={boostConfig.enableCiteBoost}
-                  onChange={(e) => handleConfigChange('enableCiteBoost', e.target.checked)}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography>Citation Boost</Typography>
-                  <Tooltip title="Boost based on number of citations">
-                    <IconButton size="small">
-                      <HelpOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              }
+            <Typography variant="body2" gutterBottom>Title Weight: {boostConfig.fieldBoosts.title.toFixed(1)}</Typography>
+            <Slider
+              value={boostConfig.fieldBoosts.title}
+              onChange={(e, value) => handleFieldBoostChange('title', value)}
+              min={0}
+              max={20}
+              step={0.1}
+              valueLabelDisplay="auto"
             />
-            {boostConfig.enableCiteBoost && (
-              <Box sx={{ px: 2, mt: 1 }}>
-                <Typography variant="caption" gutterBottom>Weight</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Slider
-                    value={boostConfig.citeBoostWeight}
-                    onChange={(_, value) => handleConfigChange('citeBoostWeight', value)}
-                    min={0}
-                    max={50}
-                    step={1}
-                    valueLabelDisplay="auto"
-                    aria-label="Citation Boost Weight"
-                    sx={{ flex: 1, mr: 2 }}
-                  />
-                  <input
-                    type="number"
-                    value={boostConfig.citeBoostWeight}
-                    onChange={(e) => handleTextInputChange('citeBoostWeight', e)}
-                    min={0}
-                    max={1000}
-                    step={1}
-                    style={{ width: '60px' }}
-                  />
-                </Box>
-              </Box>
-            )}
+          </Box>
+          
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" gutterBottom>Abstract Weight: {boostConfig.fieldBoosts.abstract.toFixed(1)}</Typography>
+            <Slider
+              value={boostConfig.fieldBoosts.abstract}
+              onChange={(e, value) => handleFieldBoostChange('abstract', value)}
+              min={0}
+              max={20}
+              step={0.1}
+              valueLabelDisplay="auto"
+            />
+          </Box>
+          
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body2" gutterBottom>Author Weight: {boostConfig.fieldBoosts.author.toFixed(1)}</Typography>
+            <Slider
+              value={boostConfig.fieldBoosts.author}
+              onChange={(e, value) => handleFieldBoostChange('author', value)}
+              min={0}
+              max={20}
+              step={0.1}
+              valueLabelDisplay="auto"
+            />
           </Box>
         </Grid>
-
-        {/* Recency Boost */}
-        <Grid item xs={12}>
+        
+        {/* Other Boost Controls */}
+        <Grid item xs={12} md={6}>
+          <Typography variant="subtitle1" gutterBottom>Citation & Recency Boost</Typography>
+          
           <Box sx={{ mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={boostConfig.enableRecencyBoost}
-                  onChange={(e) => handleConfigChange('enableRecencyBoost', e.target.checked)}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography>Recency Boost</Typography>
-                  <Tooltip title="Boost based on publication year">
-                    <IconButton size="small">
-                      <HelpOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              }
+            <Typography variant="body2" gutterBottom>Citation Boost: {boostConfig.citeBoostWeight.toFixed(1)}</Typography>
+            <Slider
+              value={boostConfig.citeBoostWeight}
+              onChange={(e, value) => handleTextInputChange('citeBoostWeight', e)}
+              min={0}
+              max={5}
+              step={0.1}
+              valueLabelDisplay="auto"
             />
-            {boostConfig.enableRecencyBoost && (
-              <Box sx={{ px: 2, mt: 1 }}>
-                <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-                  <InputLabel>Decay Function</InputLabel>
-                  <Select
-                    value={boostConfig.recencyFunction}
-                    onChange={(e) => handleConfigChange('recencyFunction', e.target.value)}
-                    label="Decay Function"
-                  >
-                    <MenuItem value="exponential">Exponential</MenuItem>
-                    <MenuItem value="inverse">Inverse</MenuItem>
-                    <MenuItem value="linear">Linear</MenuItem>
-                    <MenuItem value="sigmoid">Sigmoid</MenuItem>
-                  </Select>
-                </FormControl>
-                <Typography variant="caption" gutterBottom>Weight</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Slider
-                    value={boostConfig.recencyBoostWeight}
-                    onChange={(_, value) => handleConfigChange('recencyBoostWeight', value)}
-                    min={0}
-                    max={50}
-                    step={1}
-                    valueLabelDisplay="auto"
-                    aria-label="Recency Boost Weight"
-                    sx={{ flex: 1, mr: 2 }}
-                  />
-                  <input
-                    type="number"
-                    value={boostConfig.recencyBoostWeight}
-                    onChange={(e) => handleTextInputChange('recencyBoostWeight', e)}
-                    min={0}
-                    max={1000}
-                    step={1}
-                    style={{ width: '60px' }}
-                  />
-                </Box>
-              </Box>
-            )}
           </Box>
-        </Grid>
-
-        {/* Document Type Boost */}
-        <Grid item xs={12}>
+          
           <Box sx={{ mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={boostConfig.enableDoctypeBoost}
-                  onChange={(e) => handleConfigChange('enableDoctypeBoost', e.target.checked)}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography>Document Type Boost</Typography>
-                  <Tooltip title="Boost based on document type (article, review, etc.)">
-                    <IconButton size="small">
-                      <HelpOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              }
+            <Typography variant="body2" gutterBottom>Recency Boost: {boostConfig.recencyBoostWeight.toFixed(1)}</Typography>
+            <Slider
+              value={boostConfig.recencyBoostWeight}
+              onChange={(e, value) => handleTextInputChange('recencyBoostWeight', e)}
+              min={0}
+              max={5}
+              step={0.1}
+              valueLabelDisplay="auto"
             />
-            {boostConfig.enableDoctypeBoost && (
-              <Box sx={{ px: 2, mt: 1 }}>
-                <Typography variant="caption" gutterBottom>Weight</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Slider
-                    value={boostConfig.doctypeBoostWeight}
-                    onChange={(_, value) => handleConfigChange('doctypeBoostWeight', value)}
-                    min={0}
-                    max={50}
-                    step={1}
-                    valueLabelDisplay="auto"
-                    aria-label="Document Type Boost Weight"
-                    sx={{ flex: 1, mr: 2 }}
-                  />
-                  <input
-                    type="number"
-                    value={boostConfig.doctypeBoostWeight}
-                    onChange={(e) => handleTextInputChange('doctypeBoostWeight', e)}
-                    min={0}
-                    max={1000}
-                    step={1}
-                    style={{ width: '60px' }}
-                  />
-                </Box>
-              </Box>
-            )}
           </Box>
-        </Grid>
-
-        {/* Refereed Boost */}
-        <Grid item xs={12}>
-          <Box sx={{ mb: 2 }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={boostConfig.enableRefereedBoost}
-                  onChange={(e) => handleConfigChange('enableRefereedBoost', e.target.checked)}
-                />
-              }
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography>Refereed Boost</Typography>
-                  <Tooltip title="Boost for peer-reviewed papers">
-                    <IconButton size="small">
-                      <HelpOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              }
-            />
-            {boostConfig.enableRefereedBoost && (
-              <Box sx={{ px: 2, mt: 1 }}>
-                <Typography variant="caption" gutterBottom>Weight</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Slider
-                    value={boostConfig.refereedBoostWeight}
-                    onChange={(_, value) => handleConfigChange('refereedBoostWeight', value)}
-                    min={0}
-                    max={50}
-                    step={1}
-                    valueLabelDisplay="auto"
-                    aria-label="Refereed Boost Weight"
-                    sx={{ flex: 1, mr: 2 }}
-                  />
-                  <input
-                    type="number"
-                    value={boostConfig.refereedBoostWeight}
-                    onChange={(e) => handleTextInputChange('refereedBoostWeight', e)}
-                    min={0}
-                    max={1000}
-                    step={1}
-                    style={{ width: '60px' }}
-                  />
-                </Box>
-              </Box>
-            )}
-          </Box>
-        </Grid>
-
-        {/* Combination Method */}
-        <Grid item xs={12}>
-          <FormControl fullWidth size="small">
-            <InputLabel>Combination Method</InputLabel>
-            <Select
-              value={boostConfig.combinationMethod}
-              onChange={(e) => handleConfigChange('combinationMethod', e.target.value)}
-              label="Combination Method"
-            >
-              <MenuItem value="sum">Sum</MenuItem>
-              <MenuItem value="product">Product</MenuItem>
-              <MenuItem value="max">Maximum</MenuItem>
-            </Select>
-          </FormControl>
         </Grid>
       </Grid>
     </Paper>
