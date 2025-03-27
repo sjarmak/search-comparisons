@@ -14,6 +14,9 @@ import BugReportIcon from '@mui/icons-material/BugReport';
 import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import SearchIcon from '@mui/icons-material/Search';
+import { experimentService, API_URL as DEFAULT_API_URL } from '../services/api';
+import { List as ListIcon } from '@mui/icons-material';
+import LaunchIcon from '@mui/icons-material/Launch';
 
 /**
  * Component for experimenting with different boost factors and their impact on ranking
@@ -22,8 +25,9 @@ import SearchIcon from '@mui/icons-material/Search';
  * @param {Array} props.originalResults - The original search results to re-rank
  * @param {string} props.query - The search query used to retrieve results
  * @param {function} props.onRunNewSearch - Callback function when user wants to run a new search
+ * @param {Object} props.results - Full search results including Google Scholar for comparison
  */
-const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8000', onRunNewSearch }) => {
+const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, onRunNewSearch, results }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [boostedResults, setBoostedResults] = useState(null);
@@ -35,22 +39,22 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
   const [boostConfig, setBoostConfig] = useState({
     // Citation boost
     enableCiteBoost: true,
-    citeBoostWeight: 1.0,
+    citeBoostWeight: 0.0,
     
     // Recency boost
     enableRecencyBoost: true,
-    recencyBoostWeight: 1.0,
+    recencyBoostWeight: 0.0,
     recencyFunction: "exponential", // Changed to match backend default
     recencyMultiplier: 0.01, // Changed to match backend default
     recencyMidpoint: 36,
     
     // Document type boost
     enableDoctypeBoost: true,
-    doctypeBoostWeight: 1.0,
+    doctypeBoostWeight: 0.0,
     
     // Refereed boost
     enableRefereedBoost: true,
-    refereedBoostWeight: 1.0,
+    refereedBoostWeight: 0.0,
     
     // Combination method
     combinationMethod: "sum",
@@ -58,10 +62,10 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
     // Field-specific query boosts (new addition)
     enableFieldBoosts: true,
     fieldBoosts: {
-      title: 2.0,
-      abstract: 3.0,
-      author: 1.5,
-      year: 0.5,
+      title: 0.0,
+      abstract: 0.0,
+      author: 0.0,
+      year: 0.0,
     },
     
     // Query transformation options (new addition)
@@ -77,86 +81,60 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
       return originalQuery;
     }
     
-    // Clean the original query
-    const cleanQuery = originalQuery.trim();
+    // Clean the original query - important to strip any existing field boosts
+    let cleanQuery = originalQuery.trim();
+    
+    // If the query already has field boosts, extract the base query
+    // This prevents nesting of field boosts when applying changes multiple times
+    if (cleanQuery.includes("^") || cleanQuery.includes(":")) {
+      // Try to extract the original search term
+      const originalTermMatch = cleanQuery.match(/^[^:]*:([^"]*)["\^]/) || 
+                               cleanQuery.match(/^[^:]*:"([^"]*)"/) ||
+                               cleanQuery.match(/^([^:]+)$/);
+      
+      if (originalTermMatch && originalTermMatch[1]) {
+        cleanQuery = originalTermMatch[1].trim();
+        console.log("Extracted original query term:", cleanQuery);
+      } else {
+        // If we can't extract the original term, use the original query from props
+        // This should be the very basic query that was first used
+        cleanQuery = query;
+        console.log("Using original prop query:", cleanQuery);
+      }
+    }
+    
     if (!cleanQuery) return "";
     
     console.log("Transforming query:", cleanQuery, "with config:", boostConfig.queryTransformation);
     
-    // Extract terms and phrases based on configuration
-    let terms = [];
-    let phrases = [];
+    // Create a simpler query format with field boosts - greatly simplified!
+    const parts = [];
     
-    // First, extract any quoted phrases from the query
-    if (boostConfig.queryTransformation.enablePhrasePreservation) {
-      const phraseRegex = /"([^"]+)"/g;
-      let match;
-      let remainingText = cleanQuery;
-      
-      // Extract explicitly quoted phrases
-      while ((match = phraseRegex.exec(cleanQuery)) !== null) {
-        phrases.push(match[1]);
-        remainingText = remainingText.replace(match[0], ' ');
+    // For each field, add a boosted term
+    Object.entries(boostConfig.fieldBoosts).forEach(([field, boost]) => {
+      if (boost > 0) {
+        // Format the boost with one decimal place
+        const formattedBoost = parseFloat(boost).toFixed(1);
+        
+        // Handle phrase queries (if the original query contains spaces)
+        if (cleanQuery.includes(' ')) {
+          parts.push(`${field}:"${cleanQuery}"^${formattedBoost}`);
+        } else {
+          parts.push(`${field}:${cleanQuery}^${formattedBoost}`);
+        }
       }
-      
-      console.log("Extracted explicit phrases:", phrases);
-      
-      // If no explicit phrases but the query has multiple words,
-      // treat the whole query as an implicit phrase
-      if (phrases.length === 0 && remainingText.includes(' ')) {
-        phrases.push(remainingText.trim());
-        console.log("Added implicit phrase:", remainingText.trim());
-      }
-      
-      // If term splitting is enabled, also add individual terms
-      if (boostConfig.queryTransformation.enableTermSplitting) {
-        // Split the remaining text into individual terms
-        const individualTerms = remainingText.split(/\s+/).filter(term => term.length > 0);
-        terms.push(...individualTerms);
-        console.log("Added individual terms:", terms);
-      }
-    } else if (boostConfig.queryTransformation.enableTermSplitting) {
-      // If phrase preservation is disabled but term splitting is enabled,
-      // just split the query into individual terms
-      terms = cleanQuery.split(/\s+/).filter(term => term.length > 0);
-      console.log("Split query into terms only:", terms);
-    } else {
-      // If both phrase preservation and term splitting are disabled,
-      // use the entire query as a single term
-      terms.push(cleanQuery);
-      console.log("Using entire query as a single term:", cleanQuery);
+    });
+    
+    // If no field boosts are applied, use the original query
+    if (parts.length === 0) {
+      return cleanQuery;
     }
-    
-    // Create a simplified query structure that works better with search APIs
-    let parts = [];
-    
-    // Add field-specific boosts for individual terms
-    terms.forEach(term => {
-      if (term && term.trim()) {
-        Object.entries(boostConfig.fieldBoosts).forEach(([field, boost]) => {
-          // Format the boost with one decimal place for readability
-          const formattedBoost = parseFloat(boost).toFixed(1);
-          parts.push(`(${field}:${term})^${formattedBoost}`);
-        });
-      }
-    });
-    
-    // Add field-specific boosts for phrases
-    phrases.forEach(phrase => {
-      if (phrase && phrase.trim()) {
-        Object.entries(boostConfig.fieldBoosts).forEach(([field, boost]) => {
-          // Format the boost with one decimal place for readability
-          const formattedBoost = parseFloat(boost).toFixed(1);
-          parts.push(`(${field}:"${phrase}")^${formattedBoost}`);
-        });
-      }
-    });
     
     // Join all parts with OR operators
     const result = parts.join(" OR ");
     console.log("Final transformed query:", result);
     return result;
-  }, [boostConfig]);
+  }, [boostConfig, query]);
   
   // Debug logging
   useEffect(() => {
@@ -215,13 +193,135 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
     }
   }, [originalResults, query, boostConfig]);
   
+  // Helper functions for title comparison
+  const normalizeTitle = (title) => {
+    if (!title) return '';
+    // Remove special characters, extra spaces, lowercase everything
+    return title.toLowerCase()
+      .replace(/[^\w\s]/g, '') // Remove special chars
+      .replace(/\s+/g, ' ')    // Replace multiple spaces with single space
+      .trim();
+  };
+  
+  const calculateTitleSimilarity = (title1, title2) => {
+    if (!title1 || !title2) return 0;
+    
+    const t1 = normalizeTitle(title1);
+    const t2 = normalizeTitle(title2);
+    
+    // Simple Jaccard similarity for words
+    const words1 = t1.split(' ');
+    const words2 = t2.split(' ');
+    
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+    
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    
+    return intersection.size / union.size;
+  };
+  
+  // Helper function to calculate rank changes with improved title matching
+  const calculateRankChanges = useCallback((originalResults, boostedResults) => {
+    console.log("Calculating rank changes with improved matching...");
+    
+    if (!originalResults || !boostedResults || 
+        originalResults.length === 0 || boostedResults.length === 0) {
+      console.warn("Missing results for comparison");
+      return boostedResults;
+    }
+    
+    // Create a map of original results for quick lookup
+    const originalResultsMap = {};
+    originalResults.forEach((result, index) => {
+      if (result.title) {
+        // Store by normalized title
+        const normalizedTitle = normalizeTitle(result.title);
+        originalResultsMap[normalizedTitle] = { result, index };
+      }
+      
+      // Also store by bibcode if available
+      if (result.bibcode) {
+        originalResultsMap[result.bibcode] = { result, index };
+      }
+    });
+    
+    console.log(`Created mapping for ${Object.keys(originalResultsMap).length} original results`);
+    
+    // Process boosted results to add rank change information
+    return boostedResults.map((result, newIndex) => {
+      let originalData = null;
+      
+      // Try matching by bibcode first
+      if (result.bibcode && originalResultsMap[result.bibcode]) {
+        originalData = originalResultsMap[result.bibcode];
+        console.log(`Match by bibcode for "${truncateText(result.title, 30)}"`);
+      }
+      
+      // Then try normalized title
+      if (!originalData && result.title) {
+        const normalizedTitle = normalizeTitle(result.title);
+        if (originalResultsMap[normalizedTitle]) {
+          originalData = originalResultsMap[normalizedTitle];
+          console.log(`Match by normalized title for "${truncateText(result.title, 30)}"`);
+        }
+      }
+      
+      // If still no match, try fuzzy title matching
+      if (!originalData && result.title) {
+        let bestMatchKey = null;
+        let bestMatchScore = 0;
+        
+        // Check similarity with all original results
+        Object.keys(originalResultsMap).forEach(key => {
+          const original = originalResultsMap[key].result;
+          if (original.title) {
+            const score = calculateTitleSimilarity(result.title, original.title);
+            if (score > 0.8 && score > bestMatchScore) {
+              bestMatchScore = score;
+              bestMatchKey = key;
+            }
+          }
+        });
+        
+        if (bestMatchKey) {
+          originalData = originalResultsMap[bestMatchKey];
+          console.log(`Fuzzy match (${bestMatchScore.toFixed(2)}) for "${truncateText(result.title, 30)}"`);
+        }
+      }
+      
+      if (originalData) {
+        const originalIndex = originalData.index;
+        const rankChange = originalIndex - newIndex;
+        
+        return {
+          ...result,
+          originalRank: originalIndex + 1,
+          rankChange: rankChange
+        };
+      } else {
+        console.warn(`No match found for "${truncateText(result.title, 30)}"`);
+        return {
+          ...result,
+          originalRank: null,
+          rankChange: 0
+        };
+      }
+    });
+  }, []);
+  
   // Apply the boost experiment
   const applyBoosts = useCallback(async () => {
+    console.log("🚀 applyBoosts called with originalResults length:", originalResults?.length);
+    
     if (!originalResults || originalResults.length === 0) {
+      console.log("❌ No original results to modify");
       setError('No original results to modify');
       return;
     }
     
+    console.log("✅ Starting boost process with config:", boostConfig);
     setLoading(true);
     setError(null);
     setDebugInfo(null);
@@ -237,9 +337,10 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
         has_null_years: originalResults.some(r => r.year === null),
       });
       
-      // Generate the transformed query
+      // Generate the transformed query - but don't use it for the boost experiment
+      // We'll just log it for reference
       const transformedQuery = transformQuery(query);
-      console.log("Using transformed query:", transformedQuery);
+      console.log("Transformed query (for reference only):", transformedQuery);
       
       // Log boost configuration values to verify they're being sent correctly
       console.log("CRITICAL DEBUG - Sending boost config:", {
@@ -272,21 +373,6 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
       
       console.log("Normalized boost config with number values:", normalizedBoostConfig);
       
-      // Extensive logging to debug the metadata fields
-      if (originalResults.length > 0) {
-        console.log("DEBUGGING METADATA FIELDS - First 3 results:", originalResults.slice(0, 3).map(result => ({
-          title: truncateText(result.title, 30),
-          year_type: typeof result.year,
-          year_value: result.year,
-          year_stringified: JSON.stringify(result.year),
-          doctype_type: typeof result.doctype,
-          doctype_value: result.doctype,
-          property_type: typeof result.property,
-          property_value: result.property,
-          property_is_array: Array.isArray(result.property),
-        })));
-      }
-      
       // CRITICAL FIX: Extract year from bibcode if available and year is null
       const processedResults = originalResults.map(result => {
         // For debugging, log the first few results
@@ -301,7 +387,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
           const yearMatch = result.bibcode.match(/^(\d{4})/);
           if (yearMatch && yearMatch[1]) {
             extractedYear = parseInt(yearMatch[1], 10);
-            console.log(`Successfully extracted year ${extractedYear} from bibcode ${result.bibcode} for "${truncateText(result.title, 30)}"`);
+            console.log(`Extracted year ${extractedYear} from bibcode ${result.bibcode} for "${truncateText(result.title, 30)}"`);
           }
         }
         
@@ -310,7 +396,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
           const urlYearMatch = result.url.match(/\/abs\/(\d{4})/);
           if (urlYearMatch && urlYearMatch[1]) {
             extractedYear = parseInt(urlYearMatch[1], 10);
-            console.log(`Successfully extracted year ${extractedYear} from URL ${result.url} for "${truncateText(result.title, 30)}"`);
+            console.log(`Extracted year ${extractedYear} from URL ${result.url} for "${truncateText(result.title, 30)}"`);
           }
         }
         
@@ -319,7 +405,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
           const titleYearMatch = result.title.match(/\((\d{4})\)/);
           if (titleYearMatch && titleYearMatch[1]) {
             extractedYear = parseInt(titleYearMatch[1], 10);
-            console.log(`Successfully extracted year ${extractedYear} from title for "${truncateText(result.title, 30)}"`);
+            console.log(`Extracted year ${extractedYear} from title for "${truncateText(result.title, 30)}"`);
           }
         }
         
@@ -349,29 +435,38 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
         }))
       });
       
+      // Make a direct API call to match the endpoint in the running backend
+      console.log(`📡 Sending request to: ${API_URL}/api/boost-experiment`);
       const response = await fetch(`${API_URL}/api/boost-experiment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query,
-          transformedQuery,
+          query, // Use the original query, not the transformed one
+          // Only include transformedQuery if needed for debugging
+          // transformedQuery,
           results: processedResults,
           boostConfig: normalizedBoostConfig
         })
       });
       
-      console.log('Boost experiment response status:', response.status);
+      console.log('📡 Boost experiment response status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Boost experiment error:', errorText);
+        console.error('❌ Boost experiment error:', errorText);
         throw new Error(`Failed to apply boosts: ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Received boosted results:', data);
+      console.log('📡 Received boosted results data:', data);
+      
+      // Calculate rank changes directly with our helper function
+      if (data.results && data.results.length > 0) {
+        data.results = calculateRankChanges(originalResults, data.results);
+      }
+      
       setBoostedResults(data);
       
       // Store debug info about the first result for debugging panel
@@ -403,44 +498,110 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
       
     } catch (err) {
       console.error('Error in boost experiment:', err);
-      setError(err.message);
+      setError(err.message || "Failed to apply boosts. Please check the console for details.");
     } finally {
       setLoading(false);
     }
-  }, [API_URL, boostConfig, originalResults, query]);
+  }, [API_URL, boostConfig, originalResults, query, transformQuery, calculateRankChanges]);
   
   // Function to run a completely new search with current field weights
   const runNewSearch = useCallback(() => {
+    console.log("🚀 Apply Changes button clicked!");
+    
     if (!query) {
+      console.log("❌ No query to search with");
       setError('No query to search with');
       return;
     }
     
-    // Show loading indicator
-    setSearchLoading(true);
+    // Store the current Google Scholar results and original results for preservation
+    const currentScholarResults = results?.results?.scholar;
+    const cachedOriginalResults = originalResults;
     
-    // Generate the transformed query with current field weights
-    const transformedQuery = transformQuery(query);
-    console.log("Running new search with transformed query:", transformedQuery);
+    // Check if any field boosts are active - if so, we need to rerun the search
+    const anyFieldBoostsActive = Object.values(boostConfig.fieldBoosts).some(val => val > 0);
+    const anyOtherBoostsActive = boostConfig.citeBoostWeight > 0 || 
+                                boostConfig.recencyBoostWeight > 0 || 
+                                boostConfig.doctypeBoostWeight > 0 ||
+                                boostConfig.refereedBoostWeight > 0;
     
-    // Call the parent component's onRunNewSearch function if provided
-    if (onRunNewSearch && typeof onRunNewSearch === 'function') {
-      // Pass the transformed query and current boost configuration to the parent
-      onRunNewSearch(transformedQuery, boostConfig)
-        .then(() => {
-          setSearchLoading(false);
-        })
-        .catch(err => {
-          console.error("Error running new search:", err);
-          setError("Failed to run new search: " + (err.message || 'Unknown error'));
-          setSearchLoading(false);
-        });
-    } else {
-      console.error("No onRunNewSearch function provided");
-      setError("Cannot run new search - feature not implemented by parent component");
-      setSearchLoading(false);
+    // Only for citation and recency boosts, we can apply them locally
+    if (!anyFieldBoostsActive && anyOtherBoostsActive) {
+      console.log("✅ Only applying local boosts (citation/recency/doctype/refereed)");
+      applyBoosts();
+      return;
     }
-  }, [query, transformQuery, boostConfig, onRunNewSearch]);
+    
+    // For field boosts, we need to run a new search
+    if (anyFieldBoostsActive && typeof onRunNewSearch === 'function') {
+      console.log("🔄 Field boosts active, rerunning search with new weights");
+      
+      // Show loading indicator
+      setSearchLoading(true);
+      
+      try {
+        const transformedQuery = transformQuery(query);
+        console.log("Running search with transformed query:", transformedQuery);
+        
+        // Pass the transformed query and boost configuration to the parent
+        onRunNewSearch(transformedQuery, boostConfig)
+          .then((newResults) => {
+            setSearchLoading(false);
+            console.log("New search completed successfully", newResults);
+            
+            // If the search response includes both original and boosted results,
+            // we need to calculate the rank changes
+            if (newResults.originalResults && newResults.results && newResults.results.origin) {
+              console.log("Calculating rank changes between original and boosted results");
+              
+              // Create a local copy of the boosted results to add rank changes
+              const boostedWithRankChanges = {
+                results: calculateRankChanges(
+                  newResults.originalResults, 
+                  newResults.results.origin
+                )
+              };
+              
+              setBoostedResults(boostedWithRankChanges);
+            }
+            
+            // If we had Google Scholar results before and they're not in the new results,
+            // manually add them back to preserve them
+            if (currentScholarResults && !newResults.results.scholar) {
+              console.log("Manually restoring Google Scholar results in component state");
+              if (!newResults.results) newResults.results = {};
+              newResults.results.scholar = currentScholarResults;
+            }
+          })
+          .catch(err => {
+            console.error("Error running new search:", err);
+            setError("Failed to run new search: " + (err.message || 'Unknown error'));
+            setSearchLoading(false);
+          });
+      } catch (error) {
+        console.error("Error in runNewSearch:", error);
+        setError("Failed to transform query: " + (error.message || 'Unknown error'));
+        setSearchLoading(false);
+      }
+    } else {
+      // If no boosts are active, still show something
+      console.log("✅ No active boosts, still applying empty boost configuration");
+      applyBoosts();
+    }
+    
+  }, [query, transformQuery, boostConfig, onRunNewSearch, applyBoosts, results, originalResults, calculateRankChanges]);
+  
+  // Apply boosts whenever configuration changes
+  useEffect(() => {
+    console.log("🔄 Initial useEffect to apply boosts on component mount");
+    
+    // Apply boosts on initial component mount to ensure results are shown
+    if (originalResults && originalResults.length > 0 && !boostedResults) {
+      console.log("✅ Applying initial boosts on mount");
+      applyBoosts();
+    }
+    
+  }, [originalResults, applyBoosts, boostedResults]);
   
   // Helper functions
   const truncateText = (text, maxLength) => {
@@ -488,15 +649,6 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
     if (value === undefined || value === null) return '—';
     return value.toFixed(2);
   };
-  
-  // Apply boosts whenever configuration changes
-  useEffect(() => {
-    if (originalResults && originalResults.length > 0) {
-      applyBoosts();
-    } else {
-      console.log('No original results to boost');
-    }
-  }, [boostConfig, originalResults, applyBoosts]);
   
   // Enhanced debug component to inspect fields and values
   const renderDebugPanel = () => {
@@ -718,11 +870,14 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
             variant="contained"
             color="primary"
             size="small"
-            onClick={runNewSearch}
-            disabled={searchLoading}
+            onClick={() => {
+              console.log("🔘 Apply Changes button clicked directly");
+              runNewSearch();
+            }}
+            disabled={searchLoading || loading}
             sx={{ ml: 1 }}
           >
-            {searchLoading ? <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" /> : null}
+            {(searchLoading || loading) ? <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" /> : null}
             Apply Changes
           </Button>
         </Box>
@@ -778,7 +933,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
             <Typography variant="body2" gutterBottom>Citation Boost: {boostConfig.citeBoostWeight.toFixed(1)}</Typography>
             <Slider
               value={boostConfig.citeBoostWeight}
-              onChange={(e, value) => handleTextInputChange('citeBoostWeight', e)}
+              onChange={(e, value) => handleConfigChange('citeBoostWeight', value)}
               min={0}
               max={5}
               step={0.1}
@@ -790,7 +945,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
             <Typography variant="body2" gutterBottom>Recency Boost: {boostConfig.recencyBoostWeight.toFixed(1)}</Typography>
             <Slider
               value={boostConfig.recencyBoostWeight}
-              onChange={(e, value) => handleTextInputChange('recencyBoostWeight', e)}
+              onChange={(e, value) => handleConfigChange('recencyBoostWeight', value)}
               min={0}
               max={5}
               step={0.1}
@@ -855,7 +1010,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                 <>
                   <Box sx={{ display: 'flex', mb: 2 }}>
                     {/* Title Headers */}
-                    <Box sx={{ width: '50%', pr: 1 }}>
+                    <Box sx={{ width: '33%', pr: 1 }}>
                       <Paper sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
                         <Typography variant="subtitle1" align="center" fontWeight="bold">
                           Original Results
@@ -865,7 +1020,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                         </Typography>
                       </Paper>
                     </Box>
-                    <Box sx={{ width: '50%', pl: 1 }}>
+                    <Box sx={{ width: '33%', px: 1 }}>
                       <Paper sx={{ p: 1, bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 1 }}>
                         <Typography variant="subtitle1" align="center" fontWeight="bold">
                           Boosted Results
@@ -875,27 +1030,38 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                         </Typography>
                       </Paper>
                     </Box>
-                  </Box>
-                  
-                  <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', px: 1 }}>
-                      <Typography variant="caption" fontStyle="italic">
-                        <strong>Note:</strong> Items with significant rank changes have colored borders and indicators.
-                      </Typography>
+                    <Box sx={{ width: '33%', pl: 1 }}>
+                      <Paper sx={{ p: 1, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
+                        <Typography variant="subtitle1" align="center" fontWeight="bold">
+                          Google Scholar Results
+                        </Typography>
+                        <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                          For comparison
+                        </Typography>
+                      </Paper>
                     </Box>
                   </Box>
                   
-                  <Box sx={{ display: 'flex' }}>
+                  <Box sx={{ display: 'flex', position: 'relative' }}>
                     {/* Original Results */}
-                    <Box sx={{ width: '50%', pr: 1, height: '65vh', overflow: 'auto' }}>
-                      <List sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                    <Box sx={{ 
+                      width: '33%', 
+                      pr: 1, 
+                      height: '65vh', 
+                      overflow: 'hidden',  // Change from 'auto' to 'hidden'
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }} id="original-results-container">
+                      <List sx={{ 
+                        bgcolor: 'background.paper', 
+                        border: '1px solid', 
+                        borderColor: 'divider', 
+                        borderRadius: 1,
+                        overflow: 'auto',  // Allow only vertical scrolling inside the list
+                        overflowX: 'hidden',  // Hide horizontal scrolling
+                        flexGrow: 1
+                      }}>
                         {originalResults.map((result, index) => {
-                          // Find matching boosted result to determine rank change
-                          const boostedIndex = boostedResults.results.findIndex(
-                            r => r.bibcode === result.bibcode || r.title === result.title
-                          );
-                          const rankChange = boostedIndex !== -1 ? index - boostedIndex : 0;
-                          
                           return (
                             <Tooltip
                               key={result.bibcode || index}
@@ -915,12 +1081,15 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                               placement="left"
                             >
                               <ListItem 
+                                id={`original-item-${index}`}
                                 key={result.bibcode || result.title} 
                                 divider
                                 sx={{ 
                                   px: 2, 
                                   py: 1,
-                                  position: 'relative'
+                                  position: 'relative',
+                                  transition: 'background-color 0.3s ease',
+                                  whiteSpace: 'normal'  // Allow text to wrap
                                 }}
                               >
                                 <ListItemText
@@ -937,7 +1106,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                                       >
                                         {index + 1}
                                       </Typography>
-                                      <Box>
+                                      <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
                                         <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                                           {truncateText(result.title, 60)}
                                         </Typography>
@@ -963,6 +1132,20 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                                     </Box>
                                   }
                                 />
+                                {boostedResults && boostedResults.results && (
+                                  <Box 
+                                    className="connector-point"
+                                    data-target={`boosted-item-${boostedResults.results.findIndex(
+                                      r => r.bibcode === result.bibcode || r.title === result.title
+                                    )}`}
+                                    sx={{ 
+                                      position: 'absolute', 
+                                      right: 0, 
+                                      height: '100%', 
+                                      width: 4
+                                    }} 
+                                  />
+                                )}
                               </ListItem>
                             </Tooltip>
                           );
@@ -971,14 +1154,43 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                     </Box>
                     
                     {/* Boosted Results */}
-                    <Box sx={{ width: '50%', pl: 1, height: '65vh', overflow: 'auto' }}>
-                      <List sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'primary.light', borderRadius: 1 }}>
+                    <Box sx={{ 
+                      width: '33%', 
+                      px: 1, 
+                      height: '65vh', 
+                      overflow: 'hidden',  // Change from 'auto' to 'hidden'
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }} id="boosted-results-container">
+                      <List sx={{ 
+                        bgcolor: 'background.paper', 
+                        border: '1px solid', 
+                        borderColor: 'primary.light', 
+                        borderRadius: 1,
+                        overflow: 'auto',  // Allow only vertical scrolling inside the list
+                        overflowX: 'hidden',  // Hide horizontal scrolling
+                        flexGrow: 1
+                      }}>
                         {boostedResults.results.map((result, index) => {
-                          // Find matching original result to determine rank change
-                          const originalIndex = originalResults.findIndex(
-                            r => r.bibcode === result.bibcode || r.title === result.title
-                          );
-                          const rankChange = originalIndex !== -1 ? originalIndex - index : 0;
+                          // Get the rankChange directly from the result
+                          const rankChange = result.rankChange || 0;
+                          
+                          // Determine border style based on magnitude of change
+                          let borderStyle = {};
+                          if (Math.abs(rankChange) >= 5) {
+                            // Major change - thicker border
+                            borderStyle = {
+                              borderLeft: rankChange !== 0 ? '6px solid' : 'none',
+                              borderLeftColor: rankChange > 0 ? 'success.main' : rankChange < 0 ? 'error.main' : 'transparent',
+                              bgcolor: rankChange !== 0 ? (rankChange > 0 ? 'success.50' : 'error.50') : 'transparent'
+                            };
+                          } else if (rankChange !== 0) {
+                            // Minor change - standard border
+                            borderStyle = {
+                              borderLeft: '4px solid',
+                              borderLeftColor: rankChange > 0 ? 'success.main' : 'error.main',
+                            };
+                          }
                           
                           // Get boost factors for this result
                           const boostFactors = {};
@@ -1004,7 +1216,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                                   )}
                                   <Divider sx={{ my: 1 }} />
                                   <Typography variant="body2">
-                                    <strong>Original Rank:</strong> {originalIndex + 1}
+                                    <strong>Original Rank:</strong> {result.originalRank || 'N/A'}
                                   </Typography>
                                   <Typography variant="body2">
                                     <strong>Rank Change:</strong> {rankChange > 0 ? '+' : ''}{rankChange}
@@ -1027,14 +1239,16 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                               placement="right"
                             >
                               <ListItem 
+                                id={`boosted-item-${index}`}
                                 key={result.bibcode || result.title} 
                                 divider
                                 sx={{ 
                                   px: 2, 
                                   py: 1,
                                   position: 'relative',
-                                  borderLeft: rankChange !== 0 ? '4px solid' : 'none',
-                                  borderLeftColor: rankChange > 0 ? 'success.main' : rankChange < 0 ? 'error.main' : 'transparent'
+                                  ...borderStyle,
+                                  transition: 'background-color 0.3s ease',
+                                  whiteSpace: 'normal'  // Allow text to wrap
                                 }}
                               >
                                 <ListItemText
@@ -1051,7 +1265,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                                       >
                                         {index + 1}
                                       </Typography>
-                                      <Box>
+                                      <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
                                         <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                                           {truncateText(result.title, 60)}
                                         </Typography>
@@ -1078,7 +1292,11 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                                               label={`${rankChange > 0 ? '+' : ''}${rankChange}`}
                                               size="small"
                                               color={rankChange > 0 ? 'success' : 'error'}
-                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                              sx={{ 
+                                                height: 20, 
+                                                '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                                                fontWeight: Math.abs(rankChange) >= 5 ? 'bold' : 'normal'
+                                              }}
                                             />
                                           )}
                                           {result.finalBoost !== undefined && (
@@ -1099,13 +1317,205 @@ const BoostExperiment = ({ originalResults, query, API_URL = 'http://localhost:8
                                     </Box>
                                   }
                                 />
+                                {result.originalRank && (
+                                  <Box 
+                                    className="connector-point"
+                                    data-target={`original-item-${result.originalRank - 1}`}
+                                    data-change={rankChange}
+                                    sx={{ 
+                                      position: 'absolute', 
+                                      left: 0, 
+                                      height: '100%', 
+                                      width: 4
+                                    }} 
+                                  />
+                                )}
                               </ListItem>
                             </Tooltip>
                           );
                         })}
                       </List>
                     </Box>
+
+                    {/* Google Scholar Results */}
+                    <Box sx={{ 
+                      width: '33%', 
+                      pl: 1, 
+                      height: '65vh', 
+                      overflow: 'hidden',  // Change from 'auto' to 'hidden'
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }} id="google-scholar-container">
+                      <List sx={{ 
+                        bgcolor: 'background.paper', 
+                        border: '1px solid', 
+                        borderColor: 'error.light', 
+                        borderRadius: 1,
+                        overflow: 'auto',  // Allow vertical scrolling inside the list
+                        overflowX: 'hidden',  // Hide horizontal scrolling
+                        flexGrow: 1
+                      }}>
+                        {results && results.results && results.results.scholar ? (
+                          results.results.scholar.map((result, index) => (
+                            <Tooltip
+                              key={`scholar-${index}`}
+                              title={
+                                <Box>
+                                  <Typography variant="subtitle2">{result.title}</Typography>
+                                  <Typography variant="body2">
+                                    <strong>Authors:</strong> {formatAuthors(result.authors)}
+                                  </Typography>
+                                  {result.abstract && (
+                                    <Typography variant="body2">
+                                      <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              }
+                              placement="left"
+                            >
+                              <ListItem 
+                                divider
+                                sx={{ 
+                                  px: 2, 
+                                  py: 1,
+                                  position: 'relative',
+                                  transition: 'background-color 0.3s ease',
+                                  whiteSpace: 'normal'  // Allow text to wrap
+                                }}
+                              >
+                                <ListItemText
+                                  primary={
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                      <Typography 
+                                        variant="body2" 
+                                        component="span"
+                                        sx={{ 
+                                          minWidth: '24px',
+                                          fontWeight: 'bold',
+                                          mr: 1
+                                        }}
+                                      >
+                                        {index + 1}
+                                      </Typography>
+                                      <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                          {truncateText(result.title, 60)}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                          {result.year && (
+                                            <Chip 
+                                              label={`${result.year}`} 
+                                              size="small" 
+                                              variant="outlined"
+                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                            />
+                                          )}
+                                          {result.citation_count !== undefined && (
+                                            <Chip 
+                                              label={`Citations: ${result.citation_count}`} 
+                                              size="small"
+                                              variant="outlined"
+                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                            />
+                                          )}
+                                        </Box>
+                                      </Box>
+                                    </Box>
+                                  }
+                                />
+                                {result.url && (
+                                  <IconButton 
+                                    size="small" 
+                                    href={result.url} 
+                                    target="_blank"
+                                    aria-label="Open in Google Scholar"
+                                  >
+                                    <LaunchIcon fontSize="small" />
+                                  </IconButton>
+                                )}
+                              </ListItem>
+                            </Tooltip>
+                          ))
+                        ) : (
+                          <ListItem>
+                            <ListItemText
+                              primary="No Google Scholar results available"
+                              secondary="Please run a search with Google Scholar enabled to see comparison results"
+                            />
+                          </ListItem>
+                        )}
+                      </List>
+                    </Box>
                   </Box>
+                  
+                  {/* Add useEffect to draw connecting lines between matching items */}
+                  <Box component="script" dangerouslySetInnerHTML={{ __html: `
+                    // Draw connecting lines between matching items when the component mounts
+                    setTimeout(function() {
+                      // Remove any existing connectors
+                      document.querySelectorAll('.result-connector').forEach(el => el.remove());
+                      
+                      // For each boosted result, find its original position and draw a line
+                      document.querySelectorAll('#boosted-results-container .connector-point').forEach(point => {
+                        const targetId = point.getAttribute('data-target');
+                        const rankChange = parseInt(point.getAttribute('data-change') || '0');
+                        
+                        if (!targetId) return;
+                        
+                        const targetEl = document.getElementById(targetId);
+                        if (!targetEl) return;
+                        
+                        // Get positions
+                        const boostedRect = point.getBoundingClientRect();
+                        const originalRect = targetEl.getBoundingClientRect();
+                        
+                        // Create connector
+                        const connector = document.createElement('div');
+                        connector.className = 'result-connector';
+                        
+                        // Set style
+                        connector.style.position = 'absolute';
+                        connector.style.zIndex = '10';
+                        connector.style.height = '2px';
+                        connector.style.opacity = '0.7';
+                        connector.style.pointerEvents = 'none';
+                        
+                        // Set color based on rank change
+                        if (rankChange > 0) {
+                          connector.style.backgroundColor = '#4caf50'; // success.main
+                        } else if (rankChange < 0) {
+                          connector.style.backgroundColor = '#f44336'; // error.main
+                        } else {
+                          connector.style.backgroundColor = '#9e9e9e'; // grey.500
+                        }
+                        
+                        // Get parent container
+                        const container = document.querySelector('.MuiGrid-container');
+                        
+                        // Calculate positions relative to the container
+                        const rect = container.getBoundingClientRect();
+                        
+                        const fromX = boostedRect.left - rect.left;
+                        const fromY = boostedRect.top - rect.top + boostedRect.height / 2;
+                        const toX = originalRect.right - rect.left;
+                        const toY = originalRect.top - rect.top + originalRect.height / 2;
+                        
+                        const length = Math.sqrt(Math.pow(toX - fromX, 2) + Math.pow(toY - fromY, 2));
+                        const angle = Math.atan2(toY - fromY, toX - fromX) * 180 / Math.PI;
+                        
+                        // Apply styles
+                        connector.style.width = length + 'px';
+                        connector.style.left = fromX + 'px';
+                        connector.style.top = fromY + 'px';
+                        connector.style.transform = 'rotate(' + angle + 'deg)';
+                        connector.style.transformOrigin = '0 0';
+                        
+                        // Add to document
+                        container.appendChild(connector);
+                      });
+                    }, 500);
+                  `}} />
                 </>
               ) : (
                 <Alert severity="info">

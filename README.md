@@ -11,6 +11,75 @@ A web application for comparing search results across multiple academic search e
 - Debug tools for API testing and diagnostics
 - Direct Solr proxy for ADS/SciX queries (no API key required)
 
+## New Features
+
+### Quepid Integration
+
+The application now includes integration with [Quepid](https://quepid.com/), a search relevance testing platform. This integration allows you to:
+
+1. Connect to your Quepid cases containing relevance judgments
+2. Evaluate search results using industry-standard metrics like nDCG@10
+3. Compare performance across different search engines
+4. Test how changes to search algorithms affect relevance scores
+
+#### Configuration
+
+To use the Quepid integration, you'll need to set the following environment variables:
+
+```
+QUEPID_API_URL=https://app.quepid.com/api/
+QUEPID_API_KEY=your_api_key_here
+```
+
+#### API Endpoints
+
+The following endpoint has been added:
+
+- `POST /experiments/quepid-evaluation`: Evaluate search results against Quepid judgments
+
+Example request:
+
+```json
+{
+  "query": "katabatic wind",
+  "sources": ["ads", "scholar", "semantic_scholar"],
+  "case_id": 123,
+  "max_results": 20
+}
+```
+
+Example response:
+
+```json
+{
+  "query": "katabatic wind",
+  "case_id": 123,
+  "case_name": "Atmospheric Sciences",
+  "source_results": [
+    {
+      "source": "ads",
+      "metrics": [
+        {
+          "name": "ndcg@10",
+          "value": 0.85,
+          "description": "Normalized Discounted Cumulative Gain at 10"
+        },
+        {
+          "name": "p@10",
+          "value": 0.7,
+          "description": "Precision at 10"
+        }
+      ],
+      "judged_retrieved": 15,
+      "relevant_retrieved": 12,
+      "results_count": 20
+    }
+  ],
+  "total_judged": 25,
+  "total_relevant": 18
+}
+```
+
 ## Project Structure
 
 The project is structured as follows:

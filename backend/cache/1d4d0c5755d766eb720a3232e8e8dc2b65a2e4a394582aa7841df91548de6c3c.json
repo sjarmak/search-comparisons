@@ -1,0 +1,24 @@
+{
+  "timestamp": 1743107325.712131,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "[No results found in Semantic Scholar]",
+      "authors": [],
+      "abstract": "The term 'title:Jarmak^9.1 OR abstract:Jarmak^3.0 OR author:Jarmak^1.5 OR year:Jarmak^0.5' did not match any documents in Semantic Scholar, or the API rate limit was exceeded.",
+      "doi": null,
+      "year": null,
+      "url": "https://www.semanticscholar.org/",
+      "source": "semanticScholar",
+      "rank": 1,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    }
+  ]
+}

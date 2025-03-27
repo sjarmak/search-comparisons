@@ -153,6 +153,30 @@ const experimentService = {
     } catch (error) {
       return handleApiError(error);
     }
+  },
+  
+  /**
+   * Evaluate search results against Quepid judgments
+   */
+  evaluateWithQuepid: async (evaluationRequest) => {
+    try {
+      const response = await apiClient.post('/api/experiments/quepid-evaluation', evaluationRequest);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+  
+  /**
+   * Get available Quepid cases
+   */
+  getQuepidCases: async () => {
+    try {
+      const response = await apiClient.get('/api/experiments/quepid-cases');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
   }
 };
 

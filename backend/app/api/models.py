@@ -84,4 +84,90 @@ class ErrorResponse(BaseModel):
     """
     status_code: int
     message: str
-    details: Optional[Any] = None 
+    details: Optional[Any] = None
+
+
+class QuepidJudgmentEntry(BaseModel):
+    """
+    Model representing a single judgment entry from Quepid.
+    
+    Attributes:
+        doc_id: Document identifier (DOI, bibcode, etc.)
+        rating: Relevance rating (typically 0-3)
+        metadata: Additional metadata about the judgment (optional)
+    """
+    doc_id: str
+    rating: int = Field(ge=0)
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class QuepidEvaluationRequest(BaseModel):
+    """
+    Model representing a request to evaluate search results against Quepid judgments.
+    
+    Attributes:
+        query: The search query string
+        sources: List of search engines to query
+        case_id: The Quepid case ID containing judgments
+        fields: List of fields to include in the search (optional)
+        max_results: Maximum number of results to return (optional)
+    """
+    query: str
+    sources: List[str]
+    case_id: int = Field(gt=0)
+    fields: Optional[List[str]] = None
+    max_results: Optional[int] = Field(default=20, ge=1, le=1000)
+
+
+class MetricResult(BaseModel):
+    """
+    Model representing a single metric result.
+    
+    Attributes:
+        name: The name of the metric (e.g., ndcg@10)
+        value: The metric value
+        description: A brief description of the metric (optional)
+    """
+    name: str
+    value: float
+    description: Optional[str] = None
+
+
+class QuepidEvaluationSourceResult(BaseModel):
+    """
+    Model representing evaluation results for a single source.
+    
+    Attributes:
+        source: The search engine source name
+        metrics: List of metric results
+        judged_retrieved: Number of judged documents retrieved
+        relevant_retrieved: Number of relevant documents retrieved
+        results_count: Total number of results returned
+    """
+    source: str
+    metrics: List[MetricResult]
+    judged_retrieved: int
+    relevant_retrieved: int
+    results_count: int
+
+
+class QuepidEvaluationResponse(BaseModel):
+    """
+    Model representing the complete evaluation response.
+    
+    Attributes:
+        query: The search query string
+        case_id: The Quepid case ID
+        case_name: The name of the Quepid case
+        source_results: Results for each source
+        total_judged: Total number of judged documents for the query
+        total_relevant: Total number of relevant documents for the query
+        available_queries: Other queries available in the case (optional)
+    """
+    query: str
+    case_id: int
+    case_name: str
+    source_results: List[QuepidEvaluationSourceResult]
+    total_judged: int
+    total_relevant: int
+    available_queries: Optional[List[str]] = None 

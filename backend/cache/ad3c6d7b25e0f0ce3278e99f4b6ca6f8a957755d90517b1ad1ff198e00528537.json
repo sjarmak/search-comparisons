@@ -1,0 +1,26 @@
+{
+  "timestamp": 1743109255.745376,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "Modelování tvaru planetek",
+      "authors": [
+        "J Hanuš"
+      ],
+      "abstract": "Jedna z moznostı jak odvodit fyzikálnı vlastnosti astreroidu je metoda inverze svetelných \nkrivek. V textu je popsána a aplikována na planetky 24 Themis, 51 Nemausa, 276 Adelheid a …",
+      "doi": null,
+      "year": 2008,
+      "url": "https://dspace.cuni.cz/bitstream/handle/20.500.11956/16504/DPTX_2006_1_11320_NSZZ016_231426_0_45732.pdf?sequence=1",
+      "source": "scholar",
+      "rank": 1,
+      "citation_count": null,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    }
+  ]
+}
