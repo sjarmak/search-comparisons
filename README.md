@@ -9,6 +9,7 @@ A web application for comparing search results across multiple academic search e
 - Experiment with boosting factors to improve search rankings
 - Perform A/B testing of different search algorithms
 - Debug tools for API testing and diagnostics
+- Direct Solr proxy for ADS/SciX queries (no API key required)
 
 ## Project Structure
 
@@ -60,6 +61,21 @@ The project is structured as follows:
    SEMANTIC_SCHOLAR_API_KEY=your_ss_key
    WEB_OF_SCIENCE_API_KEY=your_wos_key
    ```
+
+### ADS/SciX Solr Proxy Configuration
+
+The application supports querying ADS/SciX directly through a Solr proxy, which offers faster results and doesn't require an API key. Configure this in your environment file:
+
+```
+# Solr proxy URL (default: https://scix-solr-proxy.onrender.com/solr/select)
+ADS_SOLR_PROXY_URL=https://scix-solr-proxy.onrender.com/solr/select
+
+# Query method (options: solr_only, api_only, solr_first)
+# - solr_only: Only use Solr proxy
+# - api_only: Only use ADS API
+# - solr_first: Try Solr first, fall back to API if needed (default)
+ADS_QUERY_METHOD=solr_first
+```
 
 ### Frontend Setup
 
