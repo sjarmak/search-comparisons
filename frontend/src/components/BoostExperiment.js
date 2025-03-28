@@ -327,174 +327,58 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     setDebugInfo(null);
     
     try {
-      // CRITICAL DEBUG: Log what we're actually receiving
-      console.log("CRITICAL DEBUG - Starting boost process with:", {
-        result_count: originalResults.length,
-        all_years: originalResults.slice(0, 5).map(r => r.year),
-        all_year_types: originalResults.slice(0, 5).map(r => typeof r.year),
-        sample_full_results: originalResults.slice(0, 3),
-        has_undefined_years: originalResults.some(r => r.year === undefined),
-        has_null_years: originalResults.some(r => r.year === null),
-      });
+      // Choose the appropriate endpoint based on whether we're using weighted queries
+      const endpoint = `${API_URL}/api/experiments/boost`;
       
-      // Generate the transformed query - but don't use it for the boost experiment
-      // We'll just log it for reference
-      const transformedQuery = transformQuery(query);
-      console.log("Transformed query (for reference only):", transformedQuery);
-      
-      // Log boost configuration values to verify they're being sent correctly
-      console.log("CRITICAL DEBUG - Sending boost config:", {
-        enableCiteBoost: boostConfig.enableCiteBoost,
-        citeBoostWeight: boostConfig.citeBoostWeight,
-        enableRecencyBoost: boostConfig.enableRecencyBoost,
-        recencyBoostWeight: boostConfig.recencyBoostWeight,
-        enableDoctypeBoost: boostConfig.enableDoctypeBoost,
-        doctypeBoostWeight: boostConfig.doctypeBoostWeight,
-        enableRefereedBoost: boostConfig.enableRefereedBoost,
-        refereedBoostWeight: boostConfig.refereedBoostWeight,
-        combinationMethod: boostConfig.combinationMethod,
-        fieldBoosts: boostConfig.fieldBoosts
-      });
-      
-      // Ensure all weight values are properly converted to numbers
-      const normalizedBoostConfig = {
-        ...boostConfig,
-        citeBoostWeight: Number(boostConfig.citeBoostWeight),
-        recencyBoostWeight: Number(boostConfig.recencyBoostWeight),
-        doctypeBoostWeight: Number(boostConfig.doctypeBoostWeight),
-        refereedBoostWeight: Number(boostConfig.refereedBoostWeight),
-        fieldBoosts: {
-          title: Number(boostConfig.fieldBoosts.title),
-          abstract: Number(boostConfig.fieldBoosts.abstract),
-          author: Number(boostConfig.fieldBoosts.author),
-          year: Number(boostConfig.fieldBoosts.year)
+      // Always include the current boostConfig - this ensures we preserve the values
+      const requestBody = {
+        query,
+        results: originalResults,
+        boostConfig: {
+          ...boostConfig,
+          // Make sure we're using the current values from state, not defaults
+          citeBoostWeight: boostConfig.citeBoostWeight,
+          recencyBoostWeight: boostConfig.recencyBoostWeight,
+          doctypeBoostWeight: boostConfig.doctypeBoostWeight,
+          refereedBoostWeight: boostConfig.refereedBoostWeight,
+          fieldBoosts: { ...boostConfig.fieldBoosts }
         }
       };
       
-      console.log("Normalized boost config with number values:", normalizedBoostConfig);
+      console.log(`Sending request to ${endpoint}:`, requestBody);
       
-      // CRITICAL FIX: Extract year from bibcode if available and year is null
-      const processedResults = originalResults.map(result => {
-        // For debugging, log the first few results
-        if (result.rank && result.rank <= 5) {
-          console.log(`Processing result rank ${result.rank} - RAW DATA:`, result);
-        }
-        
-        // Extract year from bibcode if possible and year is missing
-        let extractedYear = null;
-        if ((result.year === null || result.year === undefined) && result.bibcode) {
-          // ADS bibcodes typically have year as the first 4 digits
-          const yearMatch = result.bibcode.match(/^(\d{4})/);
-          if (yearMatch && yearMatch[1]) {
-            extractedYear = parseInt(yearMatch[1], 10);
-            console.log(`Extracted year ${extractedYear} from bibcode ${result.bibcode} for "${truncateText(result.title, 30)}"`);
-          }
-        }
-        
-        // Extract year from the URL if we still don't have a year
-        if (extractedYear === null && result.url) {
-          const urlYearMatch = result.url.match(/\/abs\/(\d{4})/);
-          if (urlYearMatch && urlYearMatch[1]) {
-            extractedYear = parseInt(urlYearMatch[1], 10);
-            console.log(`Extracted year ${extractedYear} from URL ${result.url} for "${truncateText(result.title, 30)}"`);
-          }
-        }
-        
-        // Check if year is embedded in the title (sometimes in parentheses at the end)
-        if (extractedYear === null && result.title) {
-          const titleYearMatch = result.title.match(/\((\d{4})\)/);
-          if (titleYearMatch && titleYearMatch[1]) {
-            extractedYear = parseInt(titleYearMatch[1], 10);
-            console.log(`Extracted year ${extractedYear} from title for "${truncateText(result.title, 30)}"`);
-          }
-        }
-        
-        // Last fallback - use a reasonable default if still needed
-        if (extractedYear === null) {
-          // Use current year minus 3 as a more reasonable default (not too recent, not too old)
-          extractedYear = new Date().getFullYear() - 3;
-          console.log(`Using fallback year ${extractedYear} for "${truncateText(result.title, 30)}"`);
-        }
-        
-        return {
-          ...result,
-          citation_count: typeof result.citation_count === 'number' ? result.citation_count : 0,
-          // IMPORTANT: Use extracted year if original is null, preserving original otherwise
-          year: (result.year === null || result.year === undefined) ? extractedYear : result.year,
-          doctype: result.doctype || '',
-          property: Array.isArray(result.property) ? result.property : 
-                  (result.property ? [result.property] : [])
-        };
-      });
+      const response = await experimentService.applyBoosts(
+        requestBody.query,
+        requestBody.results,
+        requestBody.boostConfig
+      );
+
+      console.log('Received results:', response);
       
-      console.log('Sending boost experiment request with the first 3 results:', {
-        first_three_processed: processedResults.slice(0, 3).map(r => ({
-          title: truncateText(r.title, 30),
-          original_year: originalResults.find(or => or.title === r.title)?.year,
-          processed_year: r.year
-        }))
-      });
+      // Before calculating rank changes, ensure we preserve the original boost values
+      const currentBoostConfig = { ...boostConfig };
       
-      // Make a direct API call to match the endpoint in the running backend
-      console.log(`📡 Sending request to: ${API_URL}/api/boost-experiment`);
-      const response = await fetch(`${API_URL}/api/boost-experiment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query, // Use the original query, not the transformed one
-          // Only include transformedQuery if needed for debugging
-          // transformedQuery,
-          results: processedResults,
-          boostConfig: normalizedBoostConfig
-        })
-      });
+      // Calculate rank changes
+      const resultsWithRankChanges = {
+        results: calculateRankChanges(originalResults, response.results.origin)
+      };
       
-      console.log('📡 Boost experiment response status:', response.status);
+      // Update state with the boosted results
+      setBoostedResults(resultsWithRankChanges);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Boost experiment error:', errorText);
-        throw new Error(`Failed to apply boosts: ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log('📡 Received boosted results data:', data);
-      
-      // Calculate rank changes directly with our helper function
-      if (data.results && data.results.length > 0) {
-        data.results = calculateRankChanges(originalResults, data.results);
-      }
-      
-      setBoostedResults(data);
-      
-      // Store debug info about the first result for debugging panel
-      if (data.results && data.results.length > 0) {
-        const firstResult = data.results[0];
+      // Set debug info if requested
+      if (debugMode && response.debug) {
+        const firstResult = response.results.origin[0] || {};
         setDebugInfo({
           firstResult,
-          citationFields: {
-            citations: firstResult.citations,
-            citation_count: firstResult.citation_count,
-            citationCount: firstResult.citationCount,
-          },
-          boostFields: {
-            boostFactors: firstResult.boostFactors,
-            citeBoost: firstResult.citeBoost || firstResult.boostFactors?.citeBoost || 0,
-            recencyBoost: firstResult.recencyBoost || firstResult.boostFactors?.recencyBoost || 0,
-            doctypeBoost: firstResult.doctypeBoost || firstResult.boostFactors?.doctypeBoost || 0,
-            refereedBoost: firstResult.refereedBoost || firstResult.boostFactors?.refereedBoost || 0,
-            totalBoost: firstResult.totalBoost,
-            finalBoost: firstResult.finalBoost,
-          },
-          metadataFields: {
-            year: firstResult.year,
-            doctype: firstResult.doctype,
-            property: firstResult.property,
-          }
+          boostFields: response.debug || {},
+          originalQuery: query,
+          transformedQuery: response.transformedQuery || query
         });
       }
+      
+      // Make sure to keep the current boost values in state
+      setBoostConfig(currentBoostConfig);
       
     } catch (err) {
       console.error('Error in boost experiment:', err);
@@ -502,7 +386,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     } finally {
       setLoading(false);
     }
-  }, [API_URL, boostConfig, originalResults, query, transformQuery, calculateRankChanges]);
+  }, [API_URL, boostConfig, originalResults, query, transformQuery, calculateRankChanges, debugMode]);
   
   // Function to run a completely new search with current field weights
   const runNewSearch = useCallback(() => {
@@ -514,16 +398,19 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
       return;
     }
     
+    // Store the current boost configuration to preserve it
+    const currentBoostConfig = { ...boostConfig };
+    
     // Store the current Google Scholar results and original results for preservation
     const currentScholarResults = results?.results?.scholar;
     const cachedOriginalResults = originalResults;
     
     // Check if any field boosts are active - if so, we need to rerun the search
-    const anyFieldBoostsActive = Object.values(boostConfig.fieldBoosts).some(val => val > 0);
-    const anyOtherBoostsActive = boostConfig.citeBoostWeight > 0 || 
-                                boostConfig.recencyBoostWeight > 0 || 
-                                boostConfig.doctypeBoostWeight > 0 ||
-                                boostConfig.refereedBoostWeight > 0;
+    const anyFieldBoostsActive = Object.values(currentBoostConfig.fieldBoosts).some(val => val > 0);
+    const anyOtherBoostsActive = currentBoostConfig.citeBoostWeight > 0 || 
+                                currentBoostConfig.recencyBoostWeight > 0 || 
+                                currentBoostConfig.doctypeBoostWeight > 0 ||
+                                currentBoostConfig.refereedBoostWeight > 0;
     
     // Only for citation and recency boosts, we can apply them locally
     if (!anyFieldBoostsActive && anyOtherBoostsActive) {
@@ -544,10 +431,13 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
         console.log("Running search with transformed query:", transformedQuery);
         
         // Pass the transformed query and boost configuration to the parent
-        onRunNewSearch(transformedQuery, boostConfig)
+        onRunNewSearch(transformedQuery, currentBoostConfig)
           .then((newResults) => {
             setSearchLoading(false);
             console.log("New search completed successfully", newResults);
+            
+            // Make sure we preserve the boost configuration values
+            setBoostConfig(currentBoostConfig);
             
             // If the search response includes both original and boosted results,
             // we need to calculate the rank changes
@@ -577,11 +467,17 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
             console.error("Error running new search:", err);
             setError("Failed to run new search: " + (err.message || 'Unknown error'));
             setSearchLoading(false);
+            
+            // Even in case of error, preserve the boost values
+            setBoostConfig(currentBoostConfig);
           });
       } catch (error) {
         console.error("Error in runNewSearch:", error);
         setError("Failed to transform query: " + (error.message || 'Unknown error'));
         setSearchLoading(false);
+        
+        // Even in case of error, preserve the boost values
+        setBoostConfig(currentBoostConfig);
       }
     } else {
       // If no boosts are active, still show something
