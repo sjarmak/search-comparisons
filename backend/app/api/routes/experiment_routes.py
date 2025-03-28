@@ -905,6 +905,17 @@ async def boost_experiment_legacy(
             max_boost=boost_config_data.get("maxBoost", 5.0)
         )
         
+        # Extract and apply field boosts if they are present
+        field_boosts = boost_config_data.get("fieldBoosts", {})
+        if field_boosts:
+            logger.info(f"Field boosts received: {field_boosts}")
+            logger.info("NOTE: Field boosts are applied here to existing results but not used for searching")
+            
+            # Log each field boost weight for clarity
+            for field, weight in field_boosts.items():
+                if weight > 0:
+                    logger.info(f"Field boost for {field}: {weight}")
+        
         # Log the boost weights being applied
         logger.info(f"Applying boost weights: cite={boost_config.cite_boost_weight}, " +
                    f"recency={boost_config.recency_boost_weight}, " +
@@ -1015,18 +1026,41 @@ async def boost_experiment_legacy(
                     boost_factors.refereed_boost = float(is_refereed) * boost_config.refereed_boost_weight
                     logger.debug(f"Applied refereed boost: {boost_factors.refereed_boost} (is_refereed: {is_refereed})")
                 
+                # 5. Field boosts (New: Apply field-specific boosts)
+                # This simulates the field boosts being applied to existing results
+                field_boost_score = 0.0
+                if field_boosts and boost_config_data.get("enableFieldBoosts", True):
+                    # Apply each field boost
+                    title_weight = field_boosts.get("title", 0)
+                    abstract_weight = field_boosts.get("abstract", 0)
+                    author_weight = field_boosts.get("author", 0)
+                    
+                    # Simple weighted score based on field presence and weight
+                    if title_weight > 0 and result_data.get("title"):
+                        field_boost_score += title_weight
+                        logger.debug(f"Applied title boost: {title_weight}")
+                    
+                    if abstract_weight > 0 and result_data.get("abstract"):
+                        field_boost_score += abstract_weight
+                        logger.debug(f"Applied abstract boost: {abstract_weight}")
+                    
+                    if author_weight > 0 and result_data.get("authors"):
+                        field_boost_score += author_weight
+                        logger.debug(f"Applied author boost: {author_weight}")
+                
                 # Calculate final boost based on combination method
                 if boost_config.combination_method == "sum":
-                    # Simple sum: citation + recency + doctype + refereed
+                    # Simple sum: citation + recency + doctype + refereed + field
                     final_boost = (boost_factors.cite_boost + boost_factors.recency_boost + 
-                                boost_factors.doctype_boost + boost_factors.refereed_boost)
+                                boost_factors.doctype_boost + boost_factors.refereed_boost + field_boost_score)
                 elif boost_config.combination_method == "product":
-                    # Product: (1+citation) * (1+recency) * (1+doctype) * (1+refereed) - 1
+                    # Product: (1+citation) * (1+recency) * (1+doctype) * (1+refereed) * (1+field) - 1
                     final_boost = (
                         (1 + boost_factors.cite_boost) * 
                         (1 + boost_factors.recency_boost) * 
                         (1 + boost_factors.doctype_boost) * 
-                        (1 + boost_factors.refereed_boost)
+                        (1 + boost_factors.refereed_boost) *
+                        (1 + field_boost_score)
                     ) - 1
                 elif boost_config.combination_method == "max":
                     # Maximum: use the highest boost factor
@@ -1034,12 +1068,13 @@ async def boost_experiment_legacy(
                         boost_factors.cite_boost,
                         boost_factors.recency_boost,
                         boost_factors.doctype_boost,
-                        boost_factors.refereed_boost
+                        boost_factors.refereed_boost,
+                        field_boost_score
                     )
                 else:
                     # Default to sum if invalid method
                     final_boost = (boost_factors.cite_boost + boost_factors.recency_boost + 
-                                boost_factors.doctype_boost + boost_factors.refereed_boost)
+                                boost_factors.doctype_boost + boost_factors.refereed_boost + field_boost_score)
                 
                 # Cap the final boost if needed
                 final_boost = min(final_boost, boost_config.max_boost)
@@ -1049,7 +1084,13 @@ async def boost_experiment_legacy(
                     # Keep all original fields
                     **result_data,
                     # Add boost-specific fields
-                    "boostFactors": boost_factors.model_dump(),
+                    "boostFactors": {
+                        "cite_boost": boost_factors.cite_boost,
+                        "recency_boost": boost_factors.recency_boost,
+                        "doctype_boost": boost_factors.doctype_boost,
+                        "refereed_boost": boost_factors.refereed_boost,
+                        "field_boost": field_boost_score
+                    },
                     "finalBoost": final_boost,
                     "originalRank": idx + 1,
                     "rank": idx + 1,  # Will be re-ranked later
@@ -1068,7 +1109,8 @@ async def boost_experiment_legacy(
                         "cite_boost": 0.0,
                         "recency_boost": 0.0,
                         "doctype_boost": 0.0,
-                        "refereed_boost": 0.0
+                        "refereed_boost": 0.0,
+                        "field_boost": 0.0
                     },
                     "finalBoost": 0.0,
                     "originalRank": idx + 1,

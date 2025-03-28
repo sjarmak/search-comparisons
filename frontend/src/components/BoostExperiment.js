@@ -412,80 +412,14 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                                 currentBoostConfig.doctypeBoostWeight > 0 ||
                                 currentBoostConfig.refereedBoostWeight > 0;
     
-    // Only for citation and recency boosts, we can apply them locally
-    if (!anyFieldBoostsActive && anyOtherBoostsActive) {
-      console.log("✅ Only applying local boosts (citation/recency/doctype/refereed)");
-      applyBoosts();
-      return;
-    }
+    // IMPORTANT CHANGE: Always use applyBoosts for all types of boosts
+    // This ensures we're not using the transformed query as an actual search query
+    console.log("✅ Applying all boosts locally - not changing the search query");
+    applyBoosts();
     
-    // For field boosts, we need to run a new search
-    if (anyFieldBoostsActive && typeof onRunNewSearch === 'function') {
-      console.log("🔄 Field boosts active, rerunning search with new weights");
-      
-      // Show loading indicator
-      setSearchLoading(true);
-      
-      try {
-        const transformedQuery = transformQuery(query);
-        console.log("Running search with transformed query:", transformedQuery);
-        
-        // Pass the transformed query and boost configuration to the parent
-        onRunNewSearch(transformedQuery, currentBoostConfig)
-          .then((newResults) => {
-            setSearchLoading(false);
-            console.log("New search completed successfully", newResults);
-            
-            // Make sure we preserve the boost configuration values
-            setBoostConfig(currentBoostConfig);
-            
-            // If the search response includes both original and boosted results,
-            // we need to calculate the rank changes
-            if (newResults.originalResults && newResults.results && newResults.results.origin) {
-              console.log("Calculating rank changes between original and boosted results");
-              
-              // Create a local copy of the boosted results to add rank changes
-              const boostedWithRankChanges = {
-                results: calculateRankChanges(
-                  newResults.originalResults, 
-                  newResults.results.origin
-                )
-              };
-              
-              setBoostedResults(boostedWithRankChanges);
-            }
-            
-            // If we had Google Scholar results before and they're not in the new results,
-            // manually add them back to preserve them
-            if (currentScholarResults && !newResults.results.scholar) {
-              console.log("Manually restoring Google Scholar results in component state");
-              if (!newResults.results) newResults.results = {};
-              newResults.results.scholar = currentScholarResults;
-            }
-          })
-          .catch(err => {
-            console.error("Error running new search:", err);
-            setError("Failed to run new search: " + (err.message || 'Unknown error'));
-            setSearchLoading(false);
-            
-            // Even in case of error, preserve the boost values
-            setBoostConfig(currentBoostConfig);
-          });
-      } catch (error) {
-        console.error("Error in runNewSearch:", error);
-        setError("Failed to transform query: " + (error.message || 'Unknown error'));
-        setSearchLoading(false);
-        
-        // Even in case of error, preserve the boost values
-        setBoostConfig(currentBoostConfig);
-      }
-    } else {
-      // If no boosts are active, still show something
-      console.log("✅ No active boosts, still applying empty boost configuration");
-      applyBoosts();
-    }
+    // No longer use onRunNewSearch with the transformed query which was causing issues
     
-  }, [query, transformQuery, boostConfig, onRunNewSearch, applyBoosts, results, originalResults, calculateRankChanges]);
+  }, [query, transformQuery, boostConfig, originalResults, results, applyBoosts]);
   
   // Apply boosts whenever configuration changes
   useEffect(() => {
