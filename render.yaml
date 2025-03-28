@@ -75,6 +75,7 @@ services:
     region: ohio
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/build
+    nodeVersion: 18.17.1
     envVars:
       - key: REACT_APP_API_URL
         value: https://search-comparisons-api.onrender.com

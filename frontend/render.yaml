@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: search-comparisons-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npx serve -s build
+    nodeVersion: 18.17.1
+    envVars:
+      - key: NODE_ENV
+        value: production 
