@@ -49,7 +49,10 @@ services:
     region: ohio
     plan: starter
     buildCommand: cd backend && pip install -r requirements.txt
-    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: >-
+      cd backend && 
+      echo "WEB_OF_SCIENCE_API_KEY is ${WEB_OF_SCIENCE_API_KEY:0:4}... (length ${#WEB_OF_SCIENCE_API_KEY})" &&
+      WEB_OF_SCIENCE_API_KEY=$WEB_OF_SCIENCE_API_KEY uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: APP_ENVIRONMENT
         value: production
