@@ -857,10 +857,13 @@ async def boost_experiment_legacy(
         Dict[str, Any]: Results with status and boosted results
     """
     try:
-        logger.info(f"Received legacy boost experiment request with query: {data.get('query', '')}")
+        query = data.get("query", "")
+        logger.info(f"Received legacy boost experiment request with query: {query}")
+        
+        # IMPORTANT: Log that field boosts in this experiment don't affect the main search query
+        logger.info("IMPORTANT: Boost experiment only applies boost locally and doesn't affect the Web of Science API query")
         
         # Extract the query and boost config
-        query = data.get("query", "")
         transformed_query = data.get("transformedQuery", None)
         boost_config_data = data.get("boostConfig", {})
         
@@ -901,6 +904,12 @@ async def boost_experiment_legacy(
             combination_method=boost_config_data.get("combinationMethod", "sum"),
             max_boost=boost_config_data.get("maxBoost", 5.0)
         )
+        
+        # Log the boost weights being applied
+        logger.info(f"Applying boost weights: cite={boost_config.cite_boost_weight}, " +
+                   f"recency={boost_config.recency_boost_weight}, " +
+                   f"doctype={boost_config.doctype_boost_weight}, " +
+                   f"refereed={boost_config.refereed_boost_weight}")
         
         # Process each of the input results directly instead of using boost_search_results
         boosted_results = []

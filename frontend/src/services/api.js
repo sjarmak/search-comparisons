@@ -132,6 +132,28 @@ const experimentService = {
   },
   
   /**
+   * Apply boosts to search results - uses the legacy endpoint for compatibility
+   */
+  applyBoosts: async (query, results, boostConfig) => {
+    try {
+      console.log("Using legacy /api/boost-experiment endpoint with boostConfig:", boostConfig);
+      const response = await apiClient.post('/api/boost-experiment', {
+        query,
+        results,
+        boostConfig
+      });
+      
+      return {
+        results: {
+          origin: response.data.results
+        }
+      };
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+  
+  /**
    * Run A/B testing experiment
    */
   runAbTest: async (searchRequest, variation = 'B') => {
