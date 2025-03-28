@@ -6,7 +6,8 @@ import {
   IconButton, AppBar, Toolbar, TableContainer, Table,
   TableHead, TableBody, TableRow, TableCell, Chip,
   List, ListItem, ListItemAvatar, ListItemText, ListItemSecondaryAction,
-  Avatar, Tooltip, Accordion, AccordionSummary, AccordionDetails
+  Avatar, Tooltip, Accordion, AccordionSummary, AccordionDetails,
+  Menu, MenuItem
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import BugReportIcon from '@mui/icons-material/BugReport';
@@ -17,16 +18,36 @@ import LaunchIcon from '@mui/icons-material/Launch';
 import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
 import CheckIcon from '@mui/icons-material/Check';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 
 import { searchService, experimentService, debugService } from './services/api';
 import BoostExperiment from './components/BoostExperiment';
 import QuepidEvaluation from './components/QuepidEvaluation';
+import Login from './components/Login';
+import ProtectedRoute from './components/ProtectedRoute';
+import StableInput from './components/StableInput';
+import { useAuth, DEFAULT_PASSWORD } from './contexts/AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const APP_VERSION = "1.0.0";
 const DEBUG = process.env.REACT_APP_DEBUG === 'true';
 
+/**
+ * Main application component
+ * 
+ * @returns {React.ReactElement} The main application component
+ */
 function App() {
+  // Authentication state
+  const { isAuthenticated, login, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  // User menu state
+  const [anchorEl, setAnchorEl] = useState(null);
+  const openMenu = Boolean(anchorEl);
+  
   // State for search query and options
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -106,6 +127,23 @@ function App() {
       fetchEnvironmentInfo();
     }
   }, []);
+
+  // Handle user menu open
+  const handleMenuClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  // Handle user menu close
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    handleMenuClose();
+    logout();
+    navigate('/login');
+  };
 
   // Handle source selection changes
   const handleSourceChange = (event) => {
@@ -561,27 +599,43 @@ function App() {
     );
   };
 
-  return (
-    <Box sx={{ flexGrow: 1 }}>
+  // The main application UI
+  const AppContent = () => (
+    <>
       <AppBar position="static">
         <Toolbar>
-          <SearchIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Academic Search Engine Comparisons
+            SciX Search Comparisons
           </Typography>
-          {environmentInfo && (
-            <Typography variant="caption" component="div" sx={{ mr: 2 }}>
-              {environmentInfo.environment} v{APP_VERSION}
-            </Typography>
+          {isAuthenticated && (
+            <>
+              <IconButton
+                size="large"
+                edge="end"
+                color="inherit"
+                aria-label="account"
+                aria-controls="menu-appbar"
+                aria-haspopup="true"
+                onClick={handleMenuClick}
+              >
+                <AccountCircleIcon />
+              </IconButton>
+              <Menu
+                id="menu-appbar"
+                anchorEl={anchorEl}
+                open={openMenu}
+                onClose={handleMenuClose}
+                MenuListProps={{
+                  'aria-labelledby': 'user-button',
+                }}
+              >
+                <MenuItem onClick={handleLogout}>
+                  <ExitToAppIcon fontSize="small" sx={{ mr: 1 }} />
+                  Logout
+                </MenuItem>
+              </Menu>
+            </>
           )}
-          <IconButton 
-            color="inherit" 
-            href="https://github.com/adsabs/search-comparisons" 
-            target="_blank"
-            aria-label="GitHub repository"
-          >
-            <GitHubIcon />
-          </IconButton>
         </Toolbar>
         <Tabs 
           value={mainTab} 
@@ -590,10 +644,10 @@ function App() {
           textColor="inherit"
           indicatorColor="secondary"
         >
-          <Tab icon={<SearchIcon />} label="SEARCH" id="tab-0" />
-          <Tab icon={<ScienceIcon />} label="EXPERIMENTS" id="tab-1" />
-          <Tab icon={<BugReportIcon />} label="DEBUG" id="tab-2" />
-          <Tab icon={<InfoIcon />} label="ABOUT" id="tab-3" />
+          <Tab icon={<SearchIcon />} label="SEARCH" />
+          <Tab icon={<ScienceIcon />} label="EXPERIMENTS" />
+          <Tab icon={<BugReportIcon />} label="DEBUG" />
+          <Tab icon={<InfoIcon />} label="ABOUT" />
         </Tabs>
       </AppBar>
 
@@ -612,13 +666,19 @@ function App() {
               <Box component="form" noValidate autoComplete="off">
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <TextField
+                    <StableInput
                       fullWidth
                       label="Search Query"
                       variant="outlined"
                       value={query}
-                      onChange={(e) => setQuery(e.target.value)}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        if (DEBUG) {
+                          console.log('Search query updated:', e.target.value);
+                        }
+                      }}
                       placeholder="Enter your academic search query"
+                      debounceTime={500}
                     />
                   </Grid>
                   
@@ -743,12 +803,17 @@ function App() {
                                   <Typography variant="subtitle1">
                                     Showing results for: <strong>{results.query}</strong>
                                   </Typography>
-                                  <TextField
+                                  <StableInput
                                     size="small"
                                     variant="outlined"
                                     placeholder="Filter results..."
                                     value={filterText}
-                                    onChange={(e) => setFilterText(e.target.value)}
+                                    onChange={(e) => {
+                                      setFilterText(e.target.value);
+                                      if (DEBUG) {
+                                        console.log('Filter text updated:', e.target.value);
+                                      }
+                                    }}
                                     sx={{ width: 250 }}
                                   />
                                 </Box>
@@ -1674,13 +1739,19 @@ function App() {
                 <Box mt={2}>
                   <Grid container spacing={2}>
                     <Grid item xs={12}>
-                      <TextField
+                      <StableInput
                         fullWidth
                         label="Test Search Query"
                         variant="outlined"
                         value={query}
-                        onChange={(e) => setQuery(e.target.value)}
+                        onChange={(e) => {
+                          setQuery(e.target.value);
+                          if (DEBUG) {
+                            console.log('Test search query updated:', e.target.value);
+                          }
+                        }}
                         placeholder="Enter query for testing"
+                        debounceTime={500}
                       />
                     </Grid>
                     
@@ -1778,7 +1849,23 @@ function App() {
           </Box>
         )}
       </Container>
-    </Box>
+    </>
+  );
+
+  return (
+    <Routes>
+      <Route path="/login" element={
+        isAuthenticated ? <Navigate to="/" /> : <Login onLogin={login} correctPassword={DEFAULT_PASSWORD} />
+      } />
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Container maxWidth="xl">
+            <AppContent />
+          </Container>
+        </ProtectedRoute>
+      } />
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
   );
 }
 
