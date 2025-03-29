@@ -213,7 +213,7 @@ async def query_ads_solr(
             }
             
             # Get password
-            ads_solr_password = get_ads_solr_password
+            ads_solr_password = get_ads_solr_password()
 
             # Make request
             logger.info(f"Querying ADS Solr proxy with: {query}")

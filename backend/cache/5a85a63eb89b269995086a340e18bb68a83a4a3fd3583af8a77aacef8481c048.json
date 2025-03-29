@@ -1,0 +1,412 @@
+{
+  "timestamp": 1743269072.6654432,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "Can Quantum-Mechanical Description of Physical Reality Be Considered Complete?",
+      "authors": [
+        "Einstein, A.",
+        "Podolsky, B.",
+        "Rosen, N."
+      ],
+      "abstract": "In a complete theory there is an element corresponding to each element of reality. A sufficient condition for the reality of a physical quantity is the possibility of predicting it with certainty, without disturbing the system. In quantum mechanics in the case of two physical quantities described by non-commuting operators, the knowledge of one precludes the knowledge of the other. Then either (1) the description of reality given by the wave function in quantum mechanics is not complete or (2) these two quantities cannot have simultaneous reality. Consideration of the problem of making predictions concerning a system on the basis of measurements made on another system that had previously interacted with it leads to the result that if (1) is false then (2) is also false. One is thus led to conclude that the description of reality as given by a wave function is not complete.",
+      "doi": "",
+      "year": 1935,
+      "url": "https://ui.adsabs.harvard.edu/abs/1935PhRv...47..777E/abstract",
+      "source": "ads",
+      "rank": 1,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Über die von der molekularkinetischen Theorie der Wärme geforderte Bewegung von in ruhenden Flüssigkeiten suspendierten Teilchen",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1905,
+      "url": "https://ui.adsabs.harvard.edu/abs/1905AnP...322..549E/abstract",
+      "source": "ads",
+      "rank": 2,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Die Grundlage der allgemeinen Relativitätstheorie",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1916,
+      "url": "https://ui.adsabs.harvard.edu/abs/1916AnP...354..769E/abstract",
+      "source": "ads",
+      "rank": 3,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Zur Elektrodynamik bewegter Körper",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1905,
+      "url": "https://ui.adsabs.harvard.edu/abs/1905AnP...322..891E/abstract",
+      "source": "ads",
+      "rank": 4,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Über einen die Erzeugung und Verwandlung des Lichtes betreffenden heuristischen Gesichtspunkt",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1905,
+      "url": "https://ui.adsabs.harvard.edu/abs/1905AnP...322..132E/abstract",
+      "source": "ads",
+      "rank": 5,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Die Feldgleichungen der Gravitation",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1915,
+      "url": "https://ui.adsabs.harvard.edu/abs/1915SPAW.......844E/abstract",
+      "source": "ads",
+      "rank": 6,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Eine neue Bestimmung der Moleküldimensionen",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1906,
+      "url": "https://ui.adsabs.harvard.edu/abs/1906AnP...324..289E/abstract",
+      "source": "ads",
+      "rank": 7,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Lens-Like Action of a Star by the Deviation of Light in the Gravitational Field",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1936,
+      "url": "https://ui.adsabs.harvard.edu/abs/1936Sci....84..506E/abstract",
+      "source": "ads",
+      "rank": 8,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Kosmologische Betrachtungen zur allgemeinen Relativitätstheorie",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1917,
+      "url": "https://ui.adsabs.harvard.edu/abs/1917SPAW.......142E/abstract",
+      "source": "ads",
+      "rank": 9,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Näherungsweise Integration der Feldgleichungen der Gravitation",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1916,
+      "url": "https://ui.adsabs.harvard.edu/abs/1916SPAW.......688E/abstract",
+      "source": "ads",
+      "rank": 10,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "The Particle Problem in the General Theory of Relativity",
+      "authors": [
+        "Einstein, A.",
+        "Rosen, N."
+      ],
+      "abstract": "The writers investigate the possibility of an atomistic theory of matter and electricity which, while excluding singularities of the field, makes use of no other variables than the g<SUB>μν</SUB> of the general relativity theory and the ϕ<SUB>μ</SUB> of the Maxwell theory. By the consideration of a simple example they are led to modify slightly the gravitational equations which then admit regular solutions for the static spherically symmetric case. These solutions involve the mathematical representation of physical space by a space of two identical sheets, a particle being represented by a \"bridge\" connecting these sheets. One is able to understand why no neutral particles of negative mass are to be found. The combined system of gravitational and electromagnetic equations are treated similarly and lead to a similar interpretation. The most natural elementary charged particle is found to be one of zero mass. The many-particle system is expected to be represented by a regular solution of the field equations corresponding to a space of two identical sheets joined by many bridges. In this case, because of the absence of singularities, the field equations determine both the field and the motion of the particles. The many-particle problem, which would decide the value of the theory, has not yet been treated.",
+      "doi": "",
+      "year": 1935,
+      "url": "https://ui.adsabs.harvard.edu/abs/1935PhRv...48...73E/abstract",
+      "source": "ads",
+      "rank": 11,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Zur Quantentheorie der Strahlung",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1917,
+      "url": "https://ui.adsabs.harvard.edu/abs/1917PhyZ...18..121E/abstract",
+      "source": "ads",
+      "rank": 12,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Über Gravitationswellen",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1918,
+      "url": "https://ui.adsabs.harvard.edu/abs/1918SPAW.......154E/abstract",
+      "source": "ads",
+      "rank": 13,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "The Gravitational Equations and the Problem of Motion",
+      "authors": [
+        "Einstein, Albert",
+        "Infeld, L.",
+        "Hoffmann, B."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1938,
+      "url": "https://ui.adsabs.harvard.edu/abs/1938AnMat..39...65E/abstract",
+      "source": "ads",
+      "rank": 14,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Berichtigung zu meiner Arbeit: Eine neue Bestimmung der Moleküldimensionen",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1911,
+      "url": "https://ui.adsabs.harvard.edu/abs/1911AnP...339..591E/abstract",
+      "source": "ads",
+      "rank": 15,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Strahlungs-Emission und ­Absorption nach der Quantentheorie",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1916,
+      "url": "https://ui.adsabs.harvard.edu/abs/1916DPhyG..18..318E/abstract",
+      "source": "ads",
+      "rank": 16,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "On Gravitational Waves",
+      "authors": [
+        "Einstein, A.",
+        "Rosen, N."
+      ],
+      "abstract": "The rigorous solution for cylindrical gravitational waves is given. For the convenience of the reader the theory of gravitational waves and their production, already known in principle, is given in the first part of this paper.After encountering relationships which cast doubt on the existence of rigorous solutions for undulatory gravitational fields, we investigate rigorously the case of cylindrical gravitational waves. It turns out that rigorous solutions exist and that the problem reduces to the usual cylindrical waves in euclidean space.",
+      "doi": "",
+      "year": 1937,
+      "url": "https://ui.adsabs.harvard.edu/abs/1937FrInJ.223...43E/abstract",
+      "source": "ads",
+      "rank": 17,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Ist die Trägheit eines Körpers von seinem Energieinhalt abhängig?",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1905,
+      "url": "https://ui.adsabs.harvard.edu/abs/1905AnP...323..639E/abstract",
+      "source": "ads",
+      "rank": 18,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Über den Einfluß der Schwerkraft auf die Ausbreitung des Lichtes",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1911,
+      "url": "https://ui.adsabs.harvard.edu/abs/1911AnP...340..898E/abstract",
+      "source": "ads",
+      "rank": 19,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Theorie der Opaleszenz von homogenen Flüssigkeiten und Flüssigkeitsgemischen in der Nähe des kritischen Zustandes",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": "",
+      "year": 1910,
+      "url": "https://ui.adsabs.harvard.edu/abs/1910AnP...338.1275E/abstract",
+      "source": "ads",
+      "rank": 20,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    }
+  ]
+}

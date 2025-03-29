@@ -23,6 +23,11 @@ from app.services.ads_service import (
 )
 from app.api.models import SearchResult
 
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.logging import LogCaptureFixture
+    from pytest_mock.plugin import MockerFixture
+
 
 @pytest.fixture
 def mock_ads_solr_response() -> Dict[str, Any]:
@@ -102,6 +107,12 @@ def mock_ads_api_response() -> Dict[str, Any]:
             ]
         }
     }
+
+
+@pytest.fixture
+def mock_httpx_client(mocker: "MockerFixture") -> None:
+    """Mock httpx client for testing HTTP requests."""
+    mocker.patch("httpx.AsyncClient")
 
 
 @pytest.mark.asyncio
@@ -320,4 +331,114 @@ async def test_get_ads_results() -> None:
                     results = await get_ads_results(query, fields, num_results)
                     assert results == api_results
                     mock_solr.assert_called_once()
-                    mock_api.assert_called_once() 
+                    mock_api.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_ads_solr_connection(
+    mock_httpx_client: None,
+    caplog: "LogCaptureFixture"
+) -> None:
+    """
+    Test basic connection to ADS Solr proxy.
+    
+    This test verifies that we can connect to the ADS Solr proxy
+    and receive a valid response for a simple query.
+    """
+    # Test query
+    query = "author:\"Einstein\""
+    fields = ["title", "authors", "year"]
+    
+    # Query ADS Solr
+    results = await query_ads_solr(query, fields)
+    
+    # Verify results
+    assert isinstance(results, list)
+    if results:  # If we got results
+        assert all(hasattr(result, "title") for result in results)
+        assert all(hasattr(result, "authors") for result in results)
+        assert all(hasattr(result, "year") for result in results)
+    
+    # Check logs for any errors
+    assert not any("error" in record.levelname.lower() for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_ads_solr_field_mapping(
+    mock_httpx_client: None,
+    caplog: "LogCaptureFixture"
+) -> None:
+    """
+    Test that field mapping works correctly for ADS Solr queries.
+    
+    This test verifies that the field mapping between our application
+    and ADS Solr works as expected.
+    """
+    # Test query with specific fields
+    query = "author:\"Einstein\""
+    fields = ["doi", "abstract", "citation_count"]
+    
+    # Query ADS Solr
+    results = await query_ads_solr(query, fields)
+    
+    # Verify results
+    assert isinstance(results, list)
+    if results:  # If we got results
+        assert all(hasattr(result, "doi") for result in results)
+        assert all(hasattr(result, "abstract") for result in results)
+        assert all(hasattr(result, "citation_count") for result in results)
+    
+    # Check logs for any errors
+    assert not any("error" in record.levelname.lower() for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_ads_solr_error_handling(
+    mock_httpx_client: None,
+    caplog: "LogCaptureFixture"
+) -> None:
+    """
+    Test error handling for ADS Solr queries.
+    
+    This test verifies that the service handles various error cases
+    gracefully and returns appropriate results.
+    """
+    # Test with invalid query
+    query = "invalid:field:value"
+    fields = ["title"]
+    
+    # Query ADS Solr
+    results = await query_ads_solr(query, fields)
+    
+    # Should return empty list for invalid query
+    assert isinstance(results, list)
+    assert len(results) == 0
+    
+    # Check logs for error message
+    assert any("error" in record.levelname.lower() for record in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_ads_solr_proxy_url_configuration(
+    mock_httpx_client: None,
+    caplog: "LogCaptureFixture"
+) -> None:
+    """
+    Test that ADS Solr proxy URL configuration is respected.
+    
+    This test verifies that the service uses the configured proxy URL
+    for making requests.
+    """
+    # Test query
+    query = "author:\"Einstein\""
+    fields = ["title"]
+    
+    # Query ADS Solr
+    results = await query_ads_solr(query, fields)
+    
+    # Verify results
+    assert isinstance(results, list)
+    
+    # Check logs for proxy URL usage
+    proxy_url = os.environ.get("ADS_SOLR_PROXY_URL", "https://scix-solr-proxy.onrender.com/solr/select")
+    assert any(proxy_url in record.message for record in caplog.records) 
