@@ -14,13 +14,16 @@ from collections import defaultdict, Counter
 from typing import Dict, List, Any, Optional, Tuple
 import math
 from datetime import datetime
+import httpx
+import os
 
-from fastapi import APIRouter, HTTPException, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from pydantic import BaseModel, Field
 
 from ...services import search_service
 from ...services.ads_service import get_ads_results
 from ...services.quepid_service import evaluate_search_results, load_case_with_judgments, get_quepid_cases
+from ...core.config import settings
 from ..models import (
     ErrorResponse, 
     QuepidEvaluationRequest,
@@ -50,41 +53,16 @@ back_compat_router = APIRouter(
 
 
 class BoostConfig(BaseModel):
-    """
-    Configuration for a search result boosting experiment.
-    
-    Attributes:
-        query: Original search query
-        transformed_query: Transformed query if available
-        enable_cite_boost: Whether to apply citation boost
-        cite_boost_weight: Weight for citation boost
-        enable_recency_boost: Whether to apply recency boost
-        recency_boost_weight: Weight for recency boost
-        recency_function: Type of recency decay function
-        recency_multiplier: Multiplier for recency decay
-        recency_midpoint: Midpoint for sigmoid recency (months)
-        enable_doctype_boost: Whether to apply document type boost
-        doctype_boost_weight: Weight for document type boost
-        enable_refereed_boost: Whether to apply refereed boost
-        refereed_boost_weight: Weight for refereed boost
-        combination_method: Method to combine boost factors
-        max_boost: Maximum allowed boost factor
-    """
-    query: str
-    transformed_query: Optional[str] = None
-    enable_cite_boost: bool = True
-    cite_boost_weight: float = 1.0
-    enable_recency_boost: bool = True
-    recency_boost_weight: float = 1.0
-    recency_function: str = "exponential"  # exponential, inverse, linear, sigmoid
-    recency_multiplier: float = 0.01
-    recency_midpoint: int = 36  # 3 years in months
-    enable_doctype_boost: bool = True
-    doctype_boost_weight: float = 1.0
-    enable_refereed_boost: bool = True
-    refereed_boost_weight: float = 1.0
-    combination_method: str = "sum"  # sum, product, max
-    max_boost: float = 5.0
+    """Configuration for boost experiment."""
+    enable_field_boosts: bool = False
+    field_boosts: Dict[str, float] = Field(default_factory=dict)
+    enable_cite_boost: bool = False
+    cite_boost_weight: Optional[float] = None
+    enable_recency_boost: bool = False
+    recency_boost_weight: Optional[float] = None
+    enable_doctype_boost: bool = False
+    doctype_boost_weight: Optional[float] = None
+    combination_method: str = "sum"
 
 
 class BoostFactors(BaseModel):
@@ -840,301 +818,154 @@ async def get_available_quepid_cases() -> List[Dict[str, Any]]:
         )
 
 
-@back_compat_router.post("/boost-experiment")
+@back_compat_router.post("/boost-experiment-legacy")
 async def boost_experiment_legacy(
-    data: dict
-) -> Dict[str, Any]:
+    request: Request,
+    boost_config: BoostConfig
+):
     """
-    Legacy endpoint for backward compatibility with the old boost-experiment API.
-    
-    This endpoint converts the request format from the old API to the new API format
-    and delegates to the boost_search_results function.
-    
-    Args:
-        data: Dictionary containing the boost experiment request data
-        
-    Returns:
-        Dict[str, Any]: Results with status and boosted results
+    Maintain backward compatibility with old boost-experiment API.
+    This endpoint applies various boost factors to search results.
     """
     try:
+        # Extract query and transformed query from request body
+        data = await request.json()
         query = data.get("query", "")
-        logger.info(f"Received legacy boost experiment request with query: {query}")
+        transformed_query = data.get("transformed_query", query)  # Use transformed query if provided
         
-        # IMPORTANT: Log that field boosts in this experiment don't affect the main search query
-        logger.info("IMPORTANT: Boost experiment only applies boost locally and doesn't affect the Web of Science API query")
-        
-        # Extract the query and boost config
-        transformed_query = data.get("transformedQuery", None)
-        boost_config_data = data.get("boostConfig", {})
-        
-        # Process the input results if they are provided
-        input_results = data.get("results", [])
-        logger.info(f"Received {len(input_results)} results to process with the legacy endpoint")
-        
-        # Check if input data is reasonable
         if not query:
-            logger.warning("No query provided in the request")
-            return {
-                "status": "error",
-                "message": "No query provided"
-            }
-            
-        if not input_results:
-            logger.warning("No results provided in the request")
-            return {
-                "status": "error",
-                "message": "No results to process"
-            }
+            raise HTTPException(status_code=400, detail="Query is required")
         
-        # Create a BoostConfig object with the data from the request
-        boost_config = BoostConfig(
-            query=query,
-            transformed_query=transformed_query,
-            enable_cite_boost=boost_config_data.get("enableCiteBoost", True),
-            cite_boost_weight=boost_config_data.get("citeBoostWeight", 1.0),
-            enable_recency_boost=boost_config_data.get("enableRecencyBoost", True),
-            recency_boost_weight=boost_config_data.get("recencyBoostWeight", 1.0),
-            recency_function=boost_config_data.get("recencyFunction", "exponential"),
-            recency_multiplier=boost_config_data.get("recencyMultiplier", 0.01),
-            recency_midpoint=boost_config_data.get("recencyMidpoint", 36),
-            enable_doctype_boost=boost_config_data.get("enableDoctypeBoost", True),
-            doctype_boost_weight=boost_config_data.get("doctypeBoostWeight", 1.0),
-            enable_refereed_boost=boost_config_data.get("enableRefereedBoost", True),
-            refereed_boost_weight=boost_config_data.get("refereedBoostWeight", 1.0),
-            combination_method=boost_config_data.get("combinationMethod", "sum"),
-            max_boost=boost_config_data.get("maxBoost", 5.0)
-        )
+        # Get field boosts and convert string values to float
+        field_boosts = {}
+        if boost_config.enable_field_boosts and boost_config.field_boosts:
+            for field, weight in boost_config.field_boosts.items():
+                if weight and weight != "":  # Only add if weight is not empty
+                    try:
+                        field_boosts[field] = float(weight)
+                    except (ValueError, TypeError):
+                        logger.warning(f"Invalid boost weight for field {field}: {weight}")
+                        continue
         
-        # Extract and apply field boosts if they are present
-        field_boosts = boost_config_data.get("fieldBoosts", {})
-        if field_boosts:
-            logger.info(f"Field boosts received: {field_boosts}")
-            logger.info("NOTE: Field boosts are applied here to existing results but not used for searching")
-            
-            # Log each field boost weight for clarity
-            for field, weight in field_boosts.items():
-                if weight > 0:
-                    logger.info(f"Field boost for {field}: {weight}")
+        logger.info(f"Original query: {query}")
+        logger.info(f"Transformed query: {transformed_query}")
+        logger.info(f"Field boosts: {field_boosts}")
         
-        # Log the boost weights being applied
-        logger.info(f"Applying boost weights: cite={boost_config.cite_boost_weight}, " +
-                   f"recency={boost_config.recency_boost_weight}, " +
-                   f"doctype={boost_config.doctype_boost_weight}, " +
-                   f"refereed={boost_config.refereed_boost_weight}")
+        # Get initial search results from ADS Solr
+        search_url = "https://playground.adsabs.harvard.edu/dev/solr/collection1/select"
+        params = {
+            "q": transformed_query,  # Use the transformed query here
+            "fl": "bibcode,title,author,year,abstract,citation_count,doctype",
+            "rows": 1000,
+            "wt": "json"
+        }
         
-        # Process each of the input results directly instead of using boost_search_results
-        boosted_results = []
-        current_year = datetime.now().year
+        # Add authentication
+        solr_password = os.environ.get("ADS_SOLR_PASSWORD", "")
+        if not solr_password:
+            raise HTTPException(status_code=500, detail="ADS_SOLR_PASSWORD not configured")
         
-        for idx, result_data in enumerate(input_results):
+        logger.info(f"Making request to {search_url} with params: {params}")
+        
+        async with httpx.AsyncClient() as client:
             try:
-                # Convert the input result to a SearchResult object
-                search_result = SearchResult(
-                    title=result_data.get("title", ""),
-                    authors=result_data.get("authors", []),
-                    abstract=result_data.get("abstract", ""),
-                    url=result_data.get("url", ""),
-                    source="input",
-                    rank=idx + 1,
-                    score=1.0,
-                    citation_count=result_data.get("citation_count", 0),
-                    year=result_data.get("year", None),
-                    doctype=result_data.get("doctype", ""),
-                    doi=result_data.get("doi", ""),
-                    property=result_data.get("property", [])
+                response = await client.get(
+                    search_url, 
+                    params=params, 
+                    auth=httpx.BasicAuth('ads', solr_password)
                 )
-                
-                # Initialize boost factors
-                boost_factors = BoostFactors()
-                
-                # 1. Citation boost (Enhanced version - use logarithmic scaling)
-                if boost_config.enable_cite_boost:
-                    citation_count = result_data.get("citation_count", 0) or 0
-                    
-                    # Use logarithmic scaling to handle large variations in citation counts
-                    cite_boost = math.log1p(citation_count) * boost_config.cite_boost_weight
-                    boost_factors.cite_boost = cite_boost
-                    logger.debug(f"Applied citation boost: {cite_boost} for {citation_count} citations")
-                
-                # 2. Recency boost (with different decay functions)
-                if boost_config.enable_recency_boost:
-                    pub_year = result_data.get("year")
-                    if pub_year:
-                        # Calculate age in months (approximate)
-                        age_in_years = current_year - pub_year
-                        age_in_months = age_in_years * 12
-                        
-                        recency_boost = 0.0
-                        
-                        # Apply different decay functions
-                        if boost_config.recency_function == "exponential":
-                            # Exponential decay: e^(-m * age_months)
-                            recency_boost = math.exp(-boost_config.recency_multiplier * age_in_months)
-                        elif boost_config.recency_function == "inverse":
-                            # Reciprocal/inverse Function: 1/(1 + multiplier * age_months)
-                            recency_boost = 1 / (1 + boost_config.recency_multiplier * age_in_months)
-                        elif boost_config.recency_function == "linear":
-                            # Linear Decay: max(1 - m * age_months, 0)
-                            recency_boost = max(0, 1 - boost_config.recency_multiplier * age_in_months)
-                        elif boost_config.recency_function == "sigmoid":
-                            # Logistic/Sigmoid: 1/(1 + e^(m * (age_months - midpoint)))
-                            recency_boost = 1 / (1 + math.exp(boost_config.recency_multiplier * 
-                                                            (age_in_months - boost_config.recency_midpoint)))
-                        
-                        boost_factors.recency_boost = recency_boost * boost_config.recency_boost_weight
-                        logger.debug(f"Applied recency boost: {boost_factors.recency_boost} for year {pub_year}")
-                
-                # 3. Document type boost
-                if boost_config.enable_doctype_boost:
-                    doctype = result_data.get("doctype", "") or ""
-                    
-                    # Normalize doctype to lowercase string for comparison
-                    doctype_str = doctype.lower() if isinstance(doctype, str) else ""
-                    
-                    # Weights based on ADS document types, ordered by importance
-                    doctype_ranks = {
-                        "review": 1,       # Review article (highest rank)
-                        "book": 2,         # Book
-                        "article": 3,      # Standard article
-                        "eprint": 4,       # Preprints
-                        "proceedings": 5,  # Conference proceedings
-                        "inproceedings": 5,# Conference proceedings (same rank)
-                        "thesis": 6,       # Thesis/dissertation
-                        "": 7              # Default/unknown (lowest rank)
-                    }
-                    
-                    # Calculate boosting using the rank-to-boost conversion formula
-                    rank = doctype_ranks.get(doctype_str, 7)  # Default to lowest rank if unknown
-                    unique_ranks = sorted(set(doctype_ranks.values()))
-                    total_ranks = len(unique_ranks)
-                    
-                    # Apply the formula: 1 - (rank_index / (num_unique_ranks - 1))
-                    rank_index = unique_ranks.index(rank)
-                    doctype_boost = 1 - (rank_index / (total_ranks - 1)) if total_ranks > 1 else 0
-                    
-                    boost_factors.doctype_boost = doctype_boost * boost_config.doctype_boost_weight
-                    logger.debug(f"Applied doctype boost: {boost_factors.doctype_boost} for type {doctype_str}")
-                
-                # 4. Refereed boost (Simple binary boost)
-                if boost_config.enable_refereed_boost:
-                    properties = result_data.get("property", []) or []
-                    if isinstance(properties, str):
-                        properties = [properties]
-                    
-                    is_refereed = "REFEREED" in properties
-                    # Simple binary boost: 1 if refereed, 0 if not
-                    boost_factors.refereed_boost = float(is_refereed) * boost_config.refereed_boost_weight
-                    logger.debug(f"Applied refereed boost: {boost_factors.refereed_boost} (is_refereed: {is_refereed})")
-                
-                # 5. Field boosts (New: Apply field-specific boosts)
-                # This simulates the field boosts being applied to existing results
-                field_boost_score = 0.0
-                if field_boosts and boost_config_data.get("enableFieldBoosts", True):
-                    # Apply each field boost
-                    title_weight = field_boosts.get("title", 0)
-                    abstract_weight = field_boosts.get("abstract", 0)
-                    author_weight = field_boosts.get("author", 0)
-                    
-                    # Simple weighted score based on field presence and weight
-                    if title_weight > 0 and result_data.get("title"):
-                        field_boost_score += title_weight
-                        logger.debug(f"Applied title boost: {title_weight}")
-                    
-                    if abstract_weight > 0 and result_data.get("abstract"):
-                        field_boost_score += abstract_weight
-                        logger.debug(f"Applied abstract boost: {abstract_weight}")
-                    
-                    if author_weight > 0 and result_data.get("authors"):
-                        field_boost_score += author_weight
-                        logger.debug(f"Applied author boost: {author_weight}")
-                
-                # Calculate final boost based on combination method
-                if boost_config.combination_method == "sum":
-                    # Simple sum: citation + recency + doctype + refereed + field
-                    final_boost = (boost_factors.cite_boost + boost_factors.recency_boost + 
-                                boost_factors.doctype_boost + boost_factors.refereed_boost + field_boost_score)
-                elif boost_config.combination_method == "product":
-                    # Product: (1+citation) * (1+recency) * (1+doctype) * (1+refereed) * (1+field) - 1
-                    final_boost = (
-                        (1 + boost_factors.cite_boost) * 
-                        (1 + boost_factors.recency_boost) * 
-                        (1 + boost_factors.doctype_boost) * 
-                        (1 + boost_factors.refereed_boost) *
-                        (1 + field_boost_score)
-                    ) - 1
-                elif boost_config.combination_method == "max":
-                    # Maximum: use the highest boost factor
-                    final_boost = max(
-                        boost_factors.cite_boost,
-                        boost_factors.recency_boost,
-                        boost_factors.doctype_boost,
-                        boost_factors.refereed_boost,
-                        field_boost_score
-                    )
-                else:
-                    # Default to sum if invalid method
-                    final_boost = (boost_factors.cite_boost + boost_factors.recency_boost + 
-                                boost_factors.doctype_boost + boost_factors.refereed_boost + field_boost_score)
-                
-                # Cap the final boost if needed
-                final_boost = min(final_boost, boost_config.max_boost)
-                
-                # Create boosted result 
-                boosted_result = {
-                    # Keep all original fields
-                    **result_data,
-                    # Add boost-specific fields
-                    "boostFactors": {
-                        "cite_boost": boost_factors.cite_boost,
-                        "recency_boost": boost_factors.recency_boost,
-                        "doctype_boost": boost_factors.doctype_boost,
-                        "refereed_boost": boost_factors.refereed_boost,
-                        "field_boost": field_boost_score
-                    },
-                    "finalBoost": final_boost,
-                    "originalRank": idx + 1,
-                    "rank": idx + 1,  # Will be re-ranked later
-                    "rankChange": 0  # Will be calculated after sorting
-                }
-                
-                boosted_results.append(boosted_result)
-                logger.debug(f"Legacy result {idx+1}: Final boost={final_boost}")
-                
+                response.raise_for_status()
+                search_data = response.json()
+            except httpx.HTTPError as e:
+                logger.error(f"HTTP error occurred: {str(e)}")
+                logger.error(f"Response status: {e.response.status_code if hasattr(e, 'response') else 'No response'}")
+                logger.error(f"Response body: {e.response.text if hasattr(e, 'response') else 'No response'}")
+                raise HTTPException(status_code=500, detail=f"Error fetching results: {str(e)}")
             except Exception as e:
-                logger.error(f"Error processing legacy result {idx}: {str(e)}", exc_info=True)
-                # Still add the result, but with no boost
-                boosted_result = {
-                    **result_data,
-                    "boostFactors": {
-                        "cite_boost": 0.0,
-                        "recency_boost": 0.0,
-                        "doctype_boost": 0.0,
-                        "refereed_boost": 0.0,
-                        "field_boost": 0.0
-                    },
-                    "finalBoost": 0.0,
-                    "originalRank": idx + 1,
-                    "rank": idx + 1,
-                    "rankChange": 0
+                logger.error(f"Error making request: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Error making request: {str(e)}")
+            
+        if not search_data.get("response", {}).get("docs"):
+            return {
+                "boosted_results": [],
+                "metadata": {
+                    "query": query,
+                    "transformed_query": transformed_query,
+                    "field_boosts": field_boosts,
+                    "citation_boost": boost_config.cite_boost_weight if boost_config.enable_cite_boost else None,
+                    "recency_boost": boost_config.recency_boost_weight if boost_config.enable_recency_boost else None,
+                    "doctype_boost": boost_config.doctype_boost_weight if boost_config.enable_doctype_boost else None,
+                    "combination_method": boost_config.combination_method
                 }
-                boosted_results.append(boosted_result)
+            }
+            
+        # Process results with boosts
+        boosted_results = []
+        for doc in search_data["response"]["docs"]:
+            boost_factors = []
+            
+            # Apply citation boost if enabled
+            if boost_config.enable_cite_boost and boost_config.cite_boost_weight is not None:
+                cite_count = doc.get("citation_count", 0)
+                if cite_count > 0:
+                    cite_boost = boost_config.cite_boost_weight * (1 + math.log1p(cite_count))
+                    boost_factors.append(cite_boost)
+            
+            # Apply recency boost if enabled
+            if boost_config.enable_recency_boost and boost_config.recency_boost_weight is not None:
+                year = doc.get("year")
+                if year:
+                    current_year = datetime.now().year
+                    age = current_year - year
+                    if age > 0:
+                        recency_boost = boost_config.recency_boost_weight * (1 / (1 + age))
+                        boost_factors.append(recency_boost)
+            
+            # Apply document type boost if enabled
+            if boost_config.enable_doctype_boost and boost_config.doctype_boost_weight is not None:
+                doctype = doc.get("doctype", "").lower()
+                if doctype in ["article", "journal"]:
+                    doctype_boost = boost_config.doctype_boost_weight
+                    boost_factors.append(doctype_boost)
+            
+            # Calculate final boost score based on combination method
+            final_boost = 1.0
+            if boost_factors:
+                if boost_config.combination_method == "sum":
+                    final_boost = 1.0 + sum(boost_factors)
+                elif boost_config.combination_method == "product":
+                    final_boost = math.prod(boost_factors)
+                elif boost_config.combination_method == "max":
+                    final_boost = 1.0 + max(boost_factors)
+            
+            boosted_results.append({
+                "bibcode": doc["bibcode"],
+                "title": doc.get("title", ""),
+                "authors": doc.get("author", []),
+                "year": doc.get("year"),
+                "abstract": doc.get("abstract", ""),
+                "citation_count": doc.get("citation_count", 0),
+                "doctype": doc.get("doctype", ""),
+                "boost_score": final_boost,
+                "boost_factors": boost_factors
+            })
         
-        # Sort results by final boost score (descending)
-        boosted_results.sort(key=lambda x: x.get("finalBoost", 0), reverse=True)
+        # Sort by boost score and return top 10
+        boosted_results.sort(key=lambda x: x["boost_score"], reverse=True)
         
-        # Re-rank and calculate rank changes
-        for idx, result in enumerate(boosted_results, 1):
-            original_rank = result["originalRank"]
-            new_rank = idx
-            result["rank"] = new_rank
-            result["rankChange"] = original_rank - new_rank
-        
-        # Return the results
         return {
-            "status": "success",
-            "results": boosted_results
+            "boosted_results": boosted_results[:10],
+            "metadata": {
+                "query": query,
+                "transformed_query": transformed_query,
+                "field_boosts": field_boosts,
+                "citation_boost": boost_config.cite_boost_weight if boost_config.enable_cite_boost else None,
+                "recency_boost": boost_config.recency_boost_weight if boost_config.enable_recency_boost else None,
+                "doctype_boost": boost_config.doctype_boost_weight if boost_config.enable_doctype_boost else None,
+                "combination_method": boost_config.combination_method
+            }
         }
         
     except Exception as e:
-        logger.exception(f"Error in legacy boost experiment endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing boost experiment: {str(e)}") 
+        logger.error(f"Error in boost experiment: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) 

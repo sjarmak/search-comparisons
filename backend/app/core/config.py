@@ -59,11 +59,19 @@ class Settings(BaseSettings):
         CACHE_TTL_SECONDS: Cache time-to-live in seconds
         ADS_API_TOKEN: API token for ADS API
         ADS_ENDPOINT: ADS API endpoint
+        ADS_API_KEY: API key for ADS API
+        ADS_SOLR_PROXY_URL: URL for ADS Solr proxy
+        ADS_SOLR_PASSWORD: Password for ADS Solr proxy
+        ADS_QUERY_METHOD: Method to use for ADS queries
         SCHOLAR_USE_PROXY: Flag to use proxy for Google Scholar
         SEMANTIC_SCHOLAR_API_KEY: API key for Semantic Scholar
         SEMANTIC_SCHOLAR_ENDPOINT: Semantic Scholar API endpoint
         WEB_OF_SCIENCE_API_KEY: API key for Web of Science
         WEB_OF_SCIENCE_ENDPOINT: Web of Science API endpoint
+        CACHE_EXPIRY: Cache expiration time in seconds
+        CACHE_DIR: Directory for cache files
+        NUM_RESULTS: Default number of results to return
+        RATE_LIMIT_DELAY: Delay between API calls in seconds
     """
     # Core application settings
     PROJECT_NAME: str = "Search Engine Comparator"
@@ -81,10 +89,16 @@ class Settings(BaseSettings):
     # Cache settings
     CACHE_ENABLED: bool = True
     CACHE_TTL_SECONDS: int = 3600  # 1 hour
+    CACHE_EXPIRY: int = 3600  # 1 hour
+    CACHE_DIR: str = "./cache"
     
     # API settings - ADS
     ADS_API_TOKEN: Optional[str] = None
+    ADS_API_KEY: Optional[str] = None
     ADS_ENDPOINT: str = "https://api.adsabs.harvard.edu/v1"
+    ADS_SOLR_PROXY_URL: Optional[str] = None
+    ADS_SOLR_PASSWORD: Optional[str] = None
+    ADS_QUERY_METHOD: str = "solr_first"
     
     # API settings - Google Scholar
     SCHOLAR_USE_PROXY: bool = False
@@ -96,6 +110,10 @@ class Settings(BaseSettings):
     # API settings - Web of Science
     WEB_OF_SCIENCE_API_KEY: Optional[str] = None
     WEB_OF_SCIENCE_ENDPOINT: str = "https://wos-api.clarivate.com/api/woslite/v1"
+    
+    # General settings
+    NUM_RESULTS: int = 10
+    RATE_LIMIT_DELAY: int = 2
     
     class Config:
         """

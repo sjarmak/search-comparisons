@@ -103,8 +103,8 @@ SERVICE_CONFIG = {
 
 # Create FastAPI app
 app = FastAPI(
-    title="Academic Search Results Comparator API",
-    description="API for comparing search results from multiple academic search engines",
+    title="Search Comparisons API",
+    description="API for comparing search results across different sources",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -112,13 +112,13 @@ app = FastAPI(
     debug=os.getenv("DEBUG", "True").lower() in ("true", "1", "t", "yes")
 )
 
-# Configure CORS with wildcard for development
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development/testing
-    allow_credentials=False,  # Must be False when using wildcard origins
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Allow all origins during development
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 
@@ -161,12 +161,11 @@ async def health_check() -> Dict[str, Any]:
     }
 
 
-# Include routers
+# Register routes
 app.include_router(search_routes.router)
 app.include_router(debug_routes.router)
 app.include_router(experiment_routes.router)
-# Include legacy routes for backward compatibility
-app.include_router(experiment_routes.back_compat_router)
+app.include_router(experiment_routes.back_compat_router)  # Include the backward compatibility router
 
 
 @app.on_event("startup")

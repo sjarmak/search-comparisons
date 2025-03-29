@@ -4,7 +4,7 @@ import {
   Slider, FormControlLabel, Switch, Typography, FormControl,
   InputLabel, Select, MenuItem, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, Divider,
-  CircularProgress, Alert, Tooltip, IconButton, Collapse, List, ListItem, ListItemText
+  CircularProgress, Alert, Tooltip, IconButton, Collapse, List, ListItem, ListItemText, TextField
 } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -37,43 +37,32 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
   
   // Boost configuration state
   const [boostConfig, setBoostConfig] = useState({
-    // Citation boost
-    enableCiteBoost: true,
-    citeBoostWeight: 0.0,
-    
-    // Recency boost
-    enableRecencyBoost: true,
-    recencyBoostWeight: 0.0,
-    recencyFunction: "exponential", // Changed to match backend default
-    recencyMultiplier: 0.01, // Changed to match backend default
-    recencyMidpoint: 36,
-    
-    // Document type boost
-    enableDoctypeBoost: true,
-    doctypeBoostWeight: 0.0,
-    
-    // Refereed boost
-    enableRefereedBoost: true,
-    refereedBoostWeight: 0.0,
-    
-    // Combination method
-    combinationMethod: "sum",
-    
-    // Field-specific query boosts (new addition)
-    enableFieldBoosts: true,
+    enableFieldBoosts: false,
     fieldBoosts: {
-      title: 0.0,
-      abstract: 0.0,
-      author: 0.0,
-      year: 0.0,
+      title: '',
+      abstract: '',
+      author: ''
     },
-    
-    // Query transformation options (new addition)
-    queryTransformation: {
-      enableTermSplitting: true,
-      enablePhrasePreservation: true,
-    }
+    enableCiteBoost: false,
+    citeBoostWeight: '',
+    enableRecencyBoost: false,
+    recencyBoostWeight: '',
+    enableDoctypeBoost: false,
+    doctypeBoostWeight: '',
+    combinationMethod: 'sum'
   });
+  
+  // Function to handle field boost changes
+  const handleFieldBoostChange = (field, value) => {
+    setBoostConfig(prev => ({
+      ...prev,
+      enableFieldBoosts: true, // Always enable field boosts when a value is entered
+      fieldBoosts: {
+        ...prev.fieldBoosts,
+        [field]: value
+      }
+    }));
+  };
   
   // Function to transform the query based on the field boosts
   const transformQuery = useCallback((originalQuery) => {
@@ -112,7 +101,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     
     // For each field, add a boosted term
     Object.entries(boostConfig.fieldBoosts).forEach(([field, boost]) => {
-      if (boost > 0) {
+      if (boost !== '' && boost !== null && boost !== undefined && boost > 0) {
         // Format the boost with one decimal place
         const formattedBoost = parseFloat(boost).toFixed(1);
         
@@ -312,81 +301,80 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
   }, []);
   
   // Apply the boost experiment
-  const applyBoosts = useCallback(async () => {
-    console.log("🚀 applyBoosts called with originalResults length:", originalResults?.length);
-    
-    if (!originalResults || originalResults.length === 0) {
-      console.log("❌ No original results to modify");
-      setError('No original results to modify');
-      return;
-    }
-    
-    console.log("✅ Starting boost process with config:", boostConfig);
+  const applyBoosts = async () => {
     setLoading(true);
     setError(null);
-    setDebugInfo(null);
     
     try {
-      // Choose the appropriate endpoint based on whether we're using weighted queries
-      const endpoint = `${API_URL}/api/experiments/boost`;
-      
-      // Always include the current boostConfig - this ensures we preserve the values
-      const requestBody = {
-        query,
-        results: originalResults,
-        boostConfig: {
-          ...boostConfig,
-          // Make sure we're using the current values from state, not defaults
-          citeBoostWeight: boostConfig.citeBoostWeight,
-          recencyBoostWeight: boostConfig.recencyBoostWeight,
-          doctypeBoostWeight: boostConfig.doctypeBoostWeight,
-          refereedBoostWeight: boostConfig.refereedBoostWeight,
-          fieldBoosts: { ...boostConfig.fieldBoosts }
-        }
+      // Clean up the boost config before sending
+      const cleanedBoostConfig = {
+        ...boostConfig,
+        fieldBoosts: Object.fromEntries(
+          Object.entries(boostConfig.fieldBoosts)
+            .filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+            .map(([key, value]) => [key, parseFloat(value)])
+        )
       };
       
-      console.log(`Sending request to ${endpoint}:`, requestBody);
+      // Get the transformed query
+      const transformedQuery = transformQuery(query);
       
-      const response = await experimentService.applyBoosts(
-        requestBody.query,
-        requestBody.results,
-        requestBody.boostConfig
-      );
-
-      console.log('Received results:', response);
+      console.log("Sending boost config:", cleanedBoostConfig);
+      console.log("Transformed query:", transformedQuery);
       
-      // Before calculating rank changes, ensure we preserve the original boost values
-      const currentBoostConfig = { ...boostConfig };
+      const response = await fetch(`${API_URL}/api/boost-experiment-legacy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: query,
+          transformed_query: transformedQuery,
+          boostConfig: cleanedBoostConfig
+        })
+      });
       
-      // Calculate rank changes
-      const resultsWithRankChanges = {
-        results: calculateRankChanges(originalResults, response.results.origin)
-      };
-      
-      // Update state with the boosted results
-      setBoostedResults(resultsWithRankChanges);
-      
-      // Set debug info if requested
-      if (debugMode && response.debug) {
-        const firstResult = response.results.origin[0] || {};
-        setDebugInfo({
-          firstResult,
-          boostFields: response.debug || {},
-          originalQuery: query,
-          transformedQuery: response.transformedQuery || query
-        });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      // Make sure to keep the current boost values in state
-      setBoostConfig(currentBoostConfig);
+      const data = await response.json();
+      console.log("Received boost experiment response:", data); // Debug log
+      
+      // Set debug info first
+      setDebugInfo({
+        firstResult: data.boosted_results[0] || {},
+        citationFields: {
+          citation_count: data.boosted_results[0]?.citation_count,
+        },
+        boostFields: {
+          boost_score: data.boosted_results[0]?.boost_score,
+          boost_factors: data.boosted_results[0]?.boost_factors,
+        },
+        ...data.metadata
+      });
+      
+      // Then set boosted results with the correct structure
+      setBoostedResults({
+        results: data.boosted_results.map(result => ({
+          ...result,
+          author: result.authors, // Map authors field to author for consistency
+          finalBoost: result.boost_score,
+          boostFactors: {
+            citation: result.boost_factors?.[0] || 0,
+            recency: result.boost_factors?.[1] || 0,
+            doctype: result.boost_factors?.[2] || 0
+          }
+        }))
+      });
       
     } catch (err) {
-      console.error('Error in boost experiment:', err);
-      setError(err.message || "Failed to apply boosts. Please check the console for details.");
+      setError(err.message);
+      console.error('Error applying boosts:', err);
     } finally {
       setLoading(false);
     }
-  }, [API_URL, boostConfig, originalResults, query, transformQuery, calculateRankChanges, debugMode]);
+  };
   
   // Function to run a completely new search with current field weights
   const runNewSearch = useCallback(() => {
@@ -409,8 +397,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     const anyFieldBoostsActive = Object.values(currentBoostConfig.fieldBoosts).some(val => val > 0);
     const anyOtherBoostsActive = currentBoostConfig.citeBoostWeight > 0 || 
                                 currentBoostConfig.recencyBoostWeight > 0 || 
-                                currentBoostConfig.doctypeBoostWeight > 0 ||
-                                currentBoostConfig.refereedBoostWeight > 0;
+                                currentBoostConfig.doctypeBoostWeight > 0;
     
     // IMPORTANT CHANGE: Always use applyBoosts for all types of boosts
     // This ensures we're not using the transformed query as an actual search query
@@ -482,7 +469,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
   
   // Enhanced debug component to inspect fields and values
   const renderDebugPanel = () => {
-    if (!debugInfo) return null;
+    if (!debugInfo || !debugInfo.firstResult) return null;
     
     return (
       <Box sx={{ mt: 2, mb: 2, border: 1, borderColor: 'warning.light', p: 2, borderRadius: 1 }}>
@@ -504,46 +491,46 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
               <TableRow>
                 <TableCell>citation_count</TableCell>
                 <TableCell>
-                  {debugInfo.firstResult.citation_count !== undefined ? (
+                  {debugInfo.firstResult?.citation_count !== undefined ? (
                     <Chip label="Yes" size="small" color="success" />
                   ) : (
                     <Chip label="No" size="small" color="error" />
                   )}
                 </TableCell>
-                <TableCell>{debugInfo.firstResult.citation_count !== undefined ? String(debugInfo.firstResult.citation_count) : 'N/A'}</TableCell>
+                <TableCell>{debugInfo.firstResult?.citation_count !== undefined ? String(debugInfo.firstResult.citation_count) : 'N/A'}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>year</TableCell>
                 <TableCell>
-                  {debugInfo.firstResult.year !== undefined ? (
+                  {debugInfo.firstResult?.year !== undefined ? (
                     <Chip label="Yes" size="small" color="success" />
                   ) : (
                     <Chip label="No" size="small" color="error" />
                   )}
                 </TableCell>
-                <TableCell>{debugInfo.firstResult.year !== undefined ? String(debugInfo.firstResult.year) : 'N/A'}</TableCell>
+                <TableCell>{debugInfo.firstResult?.year !== undefined ? String(debugInfo.firstResult.year) : 'N/A'}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>doctype</TableCell>
                 <TableCell>
-                  {debugInfo.firstResult.doctype !== undefined ? (
+                  {debugInfo.firstResult?.doctype !== undefined ? (
                     <Chip label="Yes" size="small" color="success" />
                   ) : (
                     <Chip label="No" size="small" color="error" />
                   )}
                 </TableCell>
-                <TableCell>{debugInfo.firstResult.doctype !== undefined ? String(debugInfo.firstResult.doctype) : 'N/A'}</TableCell>
+                <TableCell>{debugInfo.firstResult?.doctype !== undefined ? String(debugInfo.firstResult.doctype) : 'N/A'}</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>property</TableCell>
                 <TableCell>
-                  {debugInfo.firstResult.property !== undefined ? (
+                  {debugInfo.firstResult?.property !== undefined ? (
                     <Chip label="Yes" size="small" color="success" />
                   ) : (
                     <Chip label="No" size="small" color="error" />
                   )}
                 </TableCell>
-                <TableCell>{debugInfo.firstResult.property !== undefined ? 
+                <TableCell>{debugInfo.firstResult?.property !== undefined ? 
                   (Array.isArray(debugInfo.firstResult.property) ? 
                     debugInfo.firstResult.property.join(', ') : 
                     String(debugInfo.firstResult.property)) : 
@@ -564,7 +551,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
               </TableRow>
             </TableHead>
             <TableBody>
-              {Object.entries(debugInfo.citationFields).map(([field, value]) => (
+              {Object.entries(debugInfo.citationFields || {}).map(([field, value]) => (
                 <TableRow key={field}>
                   <TableCell>{field}</TableCell>
                   <TableCell>
@@ -592,7 +579,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
               </TableRow>
             </TableHead>
             <TableBody>
-              {Object.entries(debugInfo.boostFields).map(([field, value]) => (
+              {Object.entries(debugInfo.boostFields || {}).map(([field, value]) => (
                 <TableRow key={field}>
                   <TableCell>{field}</TableCell>
                   <TableCell>
@@ -650,141 +637,194 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     }));
   };
   
-  // New handler for field boost changes
-  const handleFieldBoostChange = (field, value) => {
-    setBoostConfig(prev => ({
-      ...prev,
-      fieldBoosts: {
-        ...prev.fieldBoosts,
-        [field]: value
-      }
-    }));
-  };
-  
-  // New handler for query transformation options
-  const handleQueryTransformationChange = (option, value) => {
-    setBoostConfig(prev => ({
-      ...prev,
-      queryTransformation: {
-        ...prev.queryTransformation,
-        [option]: value
-      }
-    }));
-  };
-  
-  // New handler for text input changes - allow much higher values now
-  const handleTextInputChange = (field, event) => {
-    const value = parseFloat(event.target.value);
-    if (!isNaN(value) && value >= 0) {
-      console.log(`Updating ${field} to ${value}`);
-      handleConfigChange(field, value);
-    }
-  };
-  
-  // New handler for field boost text input changes - allow much higher values now
-  const handleFieldBoostTextInputChange = (field, event) => {
-    const value = parseFloat(event.target.value);
-    if (!isNaN(value) && value >= 0) {
-      console.log(`Updating field boost ${field} to ${value}`);
-      handleFieldBoostChange(field, value);
-    }
-  };
-  
   // Render the boost controls section
   const renderBoostControls = () => (
-    <Paper sx={{ p: 2, mb: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Boost Configuration</Typography>
-        <Box>
+    <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Typography variant="h6" gutterBottom>
+        Boost Configuration
+      </Typography>
+      
+      <Grid container spacing={2}>
+        {/* Field Boosts */}
+        <Grid item xs={12}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={boostConfig.enableFieldBoosts}
+                onChange={(e) => setBoostConfig(prev => ({
+                  ...prev,
+                  enableFieldBoosts: e.target.checked
+                }))}
+              />
+            }
+            label="Enable Field Boosts"
+          />
+        </Grid>
+        
+        {boostConfig.enableFieldBoosts && (
+          <>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Title Weight"
+                type="number"
+                value={boostConfig.fieldBoosts.title}
+                onChange={(e) => handleFieldBoostChange('title', e.target.value)}
+                inputProps={{ step: "0.1", min: "0" }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Abstract Weight"
+                type="number"
+                value={boostConfig.fieldBoosts.abstract}
+                onChange={(e) => handleFieldBoostChange('abstract', e.target.value)}
+                inputProps={{ step: "0.1", min: "0" }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <TextField
+                fullWidth
+                label="Author Weight"
+                type="number"
+                value={boostConfig.fieldBoosts.author}
+                onChange={(e) => handleFieldBoostChange('author', e.target.value)}
+                inputProps={{ step: "0.1", min: "0" }}
+              />
+            </Grid>
+          </>
+        )}
+
+        {/* Citation Boost */}
+        <Grid item xs={12}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={boostConfig.enableCiteBoost}
+                onChange={(e) => setBoostConfig(prev => ({
+                  ...prev,
+                  enableCiteBoost: e.target.checked
+                }))}
+              />
+            }
+            label="Enable Citation Boost"
+          />
+        </Grid>
+        
+        {boostConfig.enableCiteBoost && (
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Citation Boost Weight"
+              type="number"
+              value={boostConfig.citeBoostWeight}
+              onChange={(e) => setBoostConfig(prev => ({
+                ...prev,
+                citeBoostWeight: e.target.value
+              }))}
+              inputProps={{ step: "0.1", min: "0" }}
+            />
+          </Grid>
+        )}
+
+        {/* Recency Boost */}
+        <Grid item xs={12}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={boostConfig.enableRecencyBoost}
+                onChange={(e) => setBoostConfig(prev => ({
+                  ...prev,
+                  enableRecencyBoost: e.target.checked
+                }))}
+              />
+            }
+            label="Enable Recency Boost"
+          />
+        </Grid>
+        
+        {boostConfig.enableRecencyBoost && (
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Recency Boost Weight"
+              type="number"
+              value={boostConfig.recencyBoostWeight}
+              onChange={(e) => setBoostConfig(prev => ({
+                ...prev,
+                recencyBoostWeight: e.target.value
+              }))}
+              inputProps={{ step: "0.1", min: "0" }}
+            />
+          </Grid>
+        )}
+
+        {/* Document Type Boost */}
+        <Grid item xs={12}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={boostConfig.enableDoctypeBoost}
+                onChange={(e) => setBoostConfig(prev => ({
+                  ...prev,
+                  enableDoctypeBoost: e.target.checked
+                }))}
+              />
+            }
+            label="Enable Document Type Boost"
+          />
+        </Grid>
+        
+        {boostConfig.enableDoctypeBoost && (
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Document Type Boost Weight"
+              type="number"
+              value={boostConfig.doctypeBoostWeight}
+              onChange={(e) => setBoostConfig(prev => ({
+                ...prev,
+                doctypeBoostWeight: e.target.value
+              }))}
+              inputProps={{ step: "0.1", min: "0" }}
+            />
+          </Grid>
+        )}
+
+        {/* Combination Method */}
+        <Grid item xs={12}>
+          <FormControl fullWidth>
+            <InputLabel>Combination Method</InputLabel>
+            <Select
+              value={boostConfig.combinationMethod}
+              onChange={(e) => setBoostConfig(prev => ({
+                ...prev,
+                combinationMethod: e.target.value
+              }))}
+              label="Combination Method"
+            >
+              <MenuItem value="sum">Sum</MenuItem>
+              <MenuItem value="product">Product</MenuItem>
+              <MenuItem value="max">Max</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Apply Changes Button */}
+        <Grid item xs={12}>
           <Button
             variant="contained"
             color="primary"
-            size="small"
-            onClick={() => {
-              console.log("🔘 Apply Changes button clicked directly");
-              runNewSearch();
-            }}
-            disabled={searchLoading || loading}
-            sx={{ ml: 1 }}
+            onClick={applyBoosts}
+            disabled={loading}
+            fullWidth
           >
-            {(searchLoading || loading) ? <CircularProgress size={20} sx={{ mr: 1 }} color="inherit" /> : null}
-            Apply Changes
+            {loading ? <CircularProgress size={24} /> : 'Apply Changes'}
           </Button>
-        </Box>
-      </Box>
-      
-      <Grid container spacing={2}>
-        {/* Field Boost Controls */}
-        <Grid item xs={12} md={6}>
-          <Typography variant="subtitle1" gutterBottom>Field Boost Weights</Typography>
-          
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" gutterBottom>Title Weight: {boostConfig.fieldBoosts.title.toFixed(1)}</Typography>
-            <Slider
-              value={boostConfig.fieldBoosts.title}
-              onChange={(e, value) => handleFieldBoostChange('title', value)}
-              min={0}
-              max={20}
-              step={0.1}
-              valueLabelDisplay="auto"
-            />
-          </Box>
-          
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" gutterBottom>Abstract Weight: {boostConfig.fieldBoosts.abstract.toFixed(1)}</Typography>
-            <Slider
-              value={boostConfig.fieldBoosts.abstract}
-              onChange={(e, value) => handleFieldBoostChange('abstract', value)}
-              min={0}
-              max={20}
-              step={0.1}
-              valueLabelDisplay="auto"
-            />
-          </Box>
-          
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" gutterBottom>Author Weight: {boostConfig.fieldBoosts.author.toFixed(1)}</Typography>
-            <Slider
-              value={boostConfig.fieldBoosts.author}
-              onChange={(e, value) => handleFieldBoostChange('author', value)}
-              min={0}
-              max={20}
-              step={0.1}
-              valueLabelDisplay="auto"
-            />
-          </Box>
-        </Grid>
-        
-        {/* Other Boost Controls */}
-        <Grid item xs={12} md={6}>
-          <Typography variant="subtitle1" gutterBottom>Citation & Recency Boost</Typography>
-          
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" gutterBottom>Citation Boost: {boostConfig.citeBoostWeight.toFixed(1)}</Typography>
-            <Slider
-              value={boostConfig.citeBoostWeight}
-              onChange={(e, value) => handleConfigChange('citeBoostWeight', value)}
-              min={0}
-              max={5}
-              step={0.1}
-              valueLabelDisplay="auto"
-            />
-          </Box>
-          
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="body2" gutterBottom>Recency Boost: {boostConfig.recencyBoostWeight.toFixed(1)}</Typography>
-            <Slider
-              value={boostConfig.recencyBoostWeight}
-              onChange={(e, value) => handleConfigChange('recencyBoostWeight', value)}
-              min={0}
-              max={5}
-              step={0.1}
-              valueLabelDisplay="auto"
-            />
-          </Box>
         </Grid>
       </Grid>
-    </Paper>
+    </Box>
   );
   
   return (
