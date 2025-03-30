@@ -31,30 +31,84 @@ class SearchRequest(BaseModel):
     useTransformedQuery: Optional[bool] = False
 
 
-class SearchResult(BaseModel):
-    """
-    Model representing a single search result from any search engine.
+class BoostConfig(BaseModel):
+    """Configuration for search result boosting.
     
     Attributes:
-        title: Title of the result
-        authors: List of authors (optional)
-        abstract: Abstract or summary (optional)
-        doi: Digital Object Identifier (optional)
-        year: Publication year (optional)
-        url: URL to the result (optional)
-        source: Search engine that provided this result
-        rank: Position in the results from the source
-        citation_count: Number of citations (optional)
-        doctype: Document type (optional)
-        property: List of properties (optional)
-        original_rank: Original rank before any boosting (optional)
-        rank_change: Change in rank after boosting (optional)
-        original_score: Original score before boosting (optional)
-        boosted_score: Score after boosting (optional)
-        boost_factors: Factors applied during boosting (optional)
+        citation_boost: Factor to boost results based on citation count
+        min_citations: Minimum citation count required for citation boost
+        recency_boost: Factor to boost results based on publication year
+        reference_year: Year to use as reference for recency boost
+        doctype_boosts: Dictionary mapping document types to their boost values
+    """
+    citation_boost: float = 0.0
+    min_citations: int = 0
+    recency_boost: float = 0.0
+    reference_year: Optional[int] = None
+    doctype_boosts: Dict[str, float] = Field(default_factory=dict)
+
+
+class BoostFactors(BaseModel):
+    """Factors used to boost search results.
+    
+    Attributes:
+        cite_boost: Boost from citation count
+        recency_boost: Boost from publication year
+        doctype_boost: Boost from document type
+        refereed_boost: Boost from refereed status
+    """
+    cite_boost: float = 0.0
+    recency_boost: float = 0.0
+    doctype_boost: float = 0.0
+    refereed_boost: float = 0.0
+
+
+class BoostResult(BaseModel):
+    """
+    Model representing the boost factors and final boost score for a result.
+    
+    Attributes:
+        boost_factors: Dictionary of individual boost factors applied
+        final_boost: The final combined boost score
+    """
+    boost_factors: Dict[str, float]
+    final_boost: float
+
+
+class SearchRequestWithBoosts(SearchRequest):
+    """
+    Extended search request model that includes boost configuration.
+    
+    Attributes:
+        boost_config: Configuration for various boost factors
+    """
+    boost_config: Optional[BoostConfig] = None
+
+
+class SearchResult(BaseModel):
+    """
+    Model representing a single search result.
+    
+    Attributes:
+        title: Title of the paper
+        authors: List of authors
+        abstract: Abstract text
+        doi: Digital Object Identifier
+        year: Publication year
+        url: URL to the paper
+        source: Source of the result
+        rank: Rank in search results
+        citation_count: Number of citations
+        doctype: Document type
+        property: List of properties
+        boosted_score: Score after applying boosts
+        original_score: Original score before boosts
+        original_rank: Original rank before boosts
+        rank_change: Change in rank after boosts
+        boost_factors: Dictionary of applied boost factors
     """
     title: str
-    authors: Optional[List[str]] = None
+    authors: List[str]
     abstract: Optional[str] = None
     doi: Optional[str] = None
     year: Optional[int] = None
@@ -64,12 +118,10 @@ class SearchResult(BaseModel):
     citation_count: Optional[int] = None
     doctype: Optional[str] = None
     property: Optional[List[str]] = None
-    
-    # Fields for boost experiment
+    boosted_score: Optional[float] = None
+    original_score: Optional[float] = None
     original_rank: Optional[int] = None
     rank_change: Optional[int] = None
-    original_score: Optional[float] = None
-    boosted_score: Optional[float] = None
     boost_factors: Optional[Dict[str, float]] = None
 
 
@@ -188,4 +240,21 @@ class QuepidEvaluationResponse(BaseModel):
     source_results: List[QuepidEvaluationSourceResult]
     total_judged: int
     total_relevant: int
-    available_queries: Optional[List[str]] = None 
+    available_queries: Optional[List[str]] = None
+
+
+class BoostedSearchResult(SearchResult):
+    """Search result with boost information.
+    
+    Attributes:
+        boost_factors: Individual boost factors applied
+        final_boost: Combined boost score
+        original_rank: Rank before boosting
+        rank_change: Change in rank after boosting
+    """
+    boost_factors: BoostFactors
+    final_boost: float
+    original_rank: int
+    rank_change: int
+    source: str = "ads"
+    rank: int = 1 

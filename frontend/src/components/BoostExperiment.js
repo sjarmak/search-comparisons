@@ -35,34 +35,45 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
   const [debugMode, setDebugMode] = useState(false);
   const [debugInfo, setDebugInfo] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [transformedQuery, setTransformedQuery] = useState(null);
   
-  // Boost configuration state
+  // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
-    enableFieldBoosts: false,
+    enableFieldBoosts: true,
     fieldBoosts: {
-      title: '',
-      abstract: '',
-      author: ''
+      title: 0.0,  // Set default to 0
+      abstract: 0.0,
+      authors: 0.0,
+      year: 0.0,
     },
-    enableCiteBoost: false,
-    citeBoostWeight: '',
-    enableRecencyBoost: false,
-    recencyBoostWeight: '',
-    enableDoctypeBoost: false,
-    doctypeBoostWeight: '',
-    combinationMethod: 'sum'
+    citationBoost: 0.0,  // Set default to 0
+    recencyBoost: 0.0,  // Set default to 0
+    referenceYear: new Date().getFullYear(),
+    doctypeBoosts: {
+      journal: 0.0,  // Set default to 0
+      conference: 0.0,
+      book: 0.0,
+      thesis: 0.0,
+    }
   });
   
-  // Function to handle field boost changes
-  const handleFieldBoostChange = (field, value) => {
-    setBoostConfig(prev => ({
-      ...prev,
-      enableFieldBoosts: true, // Always enable field boosts when a value is entered
-      fieldBoosts: {
-        ...prev.fieldBoosts,
-        [field]: value
+  // Function to handle boost changes
+  const handleBoostChange = (type, field, value) => {
+    setBoostConfig(prev => {
+      if (type === 'fieldBoosts' || type === 'doctypeBoosts') {
+        return {
+          ...prev,
+          [type]: {
+            ...prev[type],
+            [field]: value
+          }
+        };
       }
-    }));
+      return {
+        ...prev,
+        [type]: value
+      };
+    });
   };
   
   // Function to transform the query based on the field boosts
@@ -372,125 +383,55 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     });
   }, []);
   
-  // Apply the boost experiment
-  const applyBoosts = async () => {
+  // Function to handle running the boost experiment
+  const handleRunBoostExperiment = async () => {
     setLoading(true);
     setError(null);
-    
     try {
-      // Clean up the boost config before sending
-      const cleanedBoostConfig = {
-        ...boostConfig,
-        fieldBoosts: Object.fromEntries(
-          Object.entries(boostConfig.fieldBoosts)
-            .filter(([_, value]) => value !== '' && value !== null && value !== undefined)
-            .map(([key, value]) => [key, parseFloat(value)])
-        )
-      };
-      
-      // Get the transformed query
+      // Transform the query
       const transformedQuery = transformQuery(query);
       
-      console.log("Sending boost config:", cleanedBoostConfig);
-      console.log("Transformed query:", transformedQuery);
-      
-      const response = await fetch(`${API_URL}/api/boost-experiment-legacy`, {
+      // Make the API request
+      const response = await fetch(`${API_URL}/api/search/compare`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          query: query,
-          transformed_query: transformedQuery,
-          boostConfig: cleanedBoostConfig
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log("Received boost experiment response:", data); // Debug log
-      
-      // Set debug info first
-      setDebugInfo({
-        firstResult: data.boosted_results[0] || {},
-        citationFields: {
-          citation_count: data.boosted_results[0]?.citation_count,
-        },
-        boostFields: {
-          boost_score: data.boosted_results[0]?.boost_score,
-          boost_factors: data.boosted_results[0]?.boost_factors,
-        },
-        ...data.metadata
-      });
-      
-      // Then set boosted results with the correct structure
-      setBoostedResults({
-        results: data.boosted_results.map(result => ({
-          ...result,
-          author: result.authors, // Map authors field to author for consistency
-          finalBoost: result.boost_score,
-          boostFactors: {
-            citation: result.boost_factors?.[0] || 0,
-            recency: result.boost_factors?.[1] || 0,
-            doctype: result.boost_factors?.[2] || 0
+          query: transformedQuery,
+          originalQuery: query,
+          sources: ['semanticScholar', 'scholar', 'ads'],
+          metrics: ['ndcg@10', 'precision@10', 'recall@10'],
+          fields: ['title', 'abstract', 'authors', 'year', 'citation_count', 'doctype'],
+          max_results: 20,
+          useTransformedQuery: true,
+          boost_config: {
+            citation_boost: parseFloat(boostConfig.citationBoost),
+            recency_boost: parseFloat(boostConfig.recencyBoost),
+            reference_year: parseInt(boostConfig.referenceYear),
+            doctype_boosts: Object.fromEntries(
+              Object.entries(boostConfig.doctypeBoosts)
+                .map(([key, value]) => [key, parseFloat(value)])
+            )
           }
-        }))
+        }),
       });
-      
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to run boost experiment');
+      }
+
+      const data = await response.json();
+      setBoostedResults(data);
+      setTransformedQuery(transformedQuery);
     } catch (err) {
-      setError(err.message);
-      console.error('Error applying boosts:', err);
+      console.error('Error running boost experiment:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
-  
-  // Function to run a completely new search with current field weights
-  const runNewSearch = useCallback(() => {
-    console.log("🚀 Apply Changes button clicked!");
-    
-    if (!query) {
-      console.log("❌ No query to search with");
-      setError('No query to search with');
-      return;
-    }
-    
-    // Store the current boost configuration to preserve it
-    const currentBoostConfig = { ...boostConfig };
-    
-    // Store the current Google Scholar results and original results for preservation
-    const currentScholarResults = results?.results?.scholar;
-    const cachedOriginalResults = originalResults;
-    
-    // Check if any field boosts are active - if so, we need to rerun the search
-    const anyFieldBoostsActive = Object.values(currentBoostConfig.fieldBoosts).some(val => val > 0);
-    const anyOtherBoostsActive = currentBoostConfig.citeBoostWeight > 0 || 
-                                currentBoostConfig.recencyBoostWeight > 0 || 
-                                currentBoostConfig.doctypeBoostWeight > 0;
-    
-    // IMPORTANT CHANGE: Always use applyBoosts for all types of boosts
-    // This ensures we're not using the transformed query as an actual search query
-    console.log("✅ Applying all boosts locally - not changing the search query");
-    applyBoosts();
-    
-    // No longer use onRunNewSearch with the transformed query which was causing issues
-    
-  }, [query, transformQuery, boostConfig, originalResults, results, applyBoosts]);
-  
-  // Apply boosts whenever configuration changes
-  useEffect(() => {
-    console.log("🔄 Initial useEffect to apply boosts on component mount");
-    
-    // Apply boosts on initial component mount to ensure results are shown
-    if (originalResults && originalResults.length > 0 && !boostedResults) {
-      console.log("✅ Applying initial boosts on mount");
-      applyBoosts();
-    }
-    
-  }, [originalResults, applyBoosts, boostedResults]);
   
   // Helper functions
   const truncateText = (text, maxLength) => {
@@ -702,205 +643,115 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     );
   }
   
-  const handleConfigChange = (field, value) => {
-    setBoostConfig(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-  
-  // Render the boost controls section
+  // Function to render boost controls
   const renderBoostControls = () => (
-    <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+    <Box sx={{ mb: 3 }}>
       <Typography variant="h6" gutterBottom>
-        Boost Configuration
+        Boost Controls
       </Typography>
-
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={boostConfig.enableFieldBoosts}
-                onChange={(e) => setBoostConfig(prev => ({
-                  ...prev,
-                  enableFieldBoosts: e.target.checked
-                }))}
+      
+      {/* Field Boosts */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Field Boosts
+        </Typography>
+        <Grid container spacing={2}>
+          {Object.entries(boostConfig.fieldBoosts).map(([field, value]) => (
+            <Grid item xs={12} sm={6} md={3} key={field}>
+              <TextField
+                fullWidth
+                label={`${field.charAt(0).toUpperCase() + field.slice(1)} Boost`}
+                type="number"
+                value={value}
+                onChange={(e) => handleBoostChange('fieldBoosts', field, e.target.value)}
+                inputProps={{ min: 0, step: 0.1 }}
               />
-            }
-            label="Enable Field Boosts"
-          />
+            </Grid>
+          ))}
         </Grid>
+      </Box>
 
-        {boostConfig.enableFieldBoosts && (
-          <>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Title Weight"
-                type="number"
-                value={boostConfig.fieldBoosts.title}
-                onChange={(e) => handleFieldBoostChange('title', e.target.value)}
-                inputProps={{ step: "0.1", min: "0" }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Abstract Weight"
-                type="number"
-                value={boostConfig.fieldBoosts.abstract}
-                onChange={(e) => handleFieldBoostChange('abstract', e.target.value)}
-                inputProps={{ step: "0.1", min: "0" }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Author Weight"
-                type="number"
-                value={boostConfig.fieldBoosts.author}
-                onChange={(e) => handleFieldBoostChange('author', e.target.value)}
-                inputProps={{ step: "0.1", min: "0" }}
-              />
-            </Grid>
-
-            {/* Add TransformedQuery component here */}
-            <Grid item xs={12}>
-              <Box sx={{ mt: 2, mb: 2 }}>
-                <TransformedQuery 
-                  query={query}
-                  fieldBoosts={boostConfig.fieldBoosts}
-                />
-              </Box>
-            </Grid>
-          </>
-        )}
-
-        <Grid item xs={12}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={boostConfig.enableCiteBoost}
-                onChange={(e) => setBoostConfig(prev => ({
-                  ...prev,
-                  enableCiteBoost: e.target.checked
-                }))}
-              />
-            }
-            label="Enable Citation Boost"
-          />
-        </Grid>
-
-        {boostConfig.enableCiteBoost && (
+      {/* Citation Boost */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Citation Boost
+        </Typography>
+        <Grid container spacing={2}>
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Citation Boost Weight"
+              label="Citation Boost Factor"
               type="number"
-              value={boostConfig.citeBoostWeight}
-              onChange={(e) => handleConfigChange('citeBoostWeight', e.target.value)}
-              inputProps={{ step: "0.1", min: "0" }}
+              value={boostConfig.citationBoost}
+              onChange={(e) => handleBoostChange('citationBoost', null, e.target.value)}
+              inputProps={{ min: 0, step: 0.1 }}
             />
           </Grid>
-        )}
-
-        {/* Recency Boost */}
-        <Grid item xs={12}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={boostConfig.enableRecencyBoost}
-                onChange={(e) => setBoostConfig(prev => ({
-                  ...prev,
-                  enableRecencyBoost: e.target.checked
-                }))}
-              />
-            }
-            label="Enable Recency Boost"
-          />
         </Grid>
-        
-        {boostConfig.enableRecencyBoost && (
-          <Grid item xs={12}>
+      </Box>
+
+      {/* Recency Boost */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Recency Boost
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Recency Boost Weight"
+              label="Recency Boost Factor"
               type="number"
-              value={boostConfig.recencyBoostWeight}
-              onChange={(e) => setBoostConfig(prev => ({
-                ...prev,
-                recencyBoostWeight: e.target.value
-              }))}
-              inputProps={{ step: "0.1", min: "0" }}
+              value={boostConfig.recencyBoost}
+              onChange={(e) => handleBoostChange('recencyBoost', null, e.target.value)}
+              inputProps={{ min: 0, step: 0.1 }}
             />
           </Grid>
-        )}
-
-        {/* Document Type Boost */}
-        <Grid item xs={12}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={boostConfig.enableDoctypeBoost}
-                onChange={(e) => setBoostConfig(prev => ({
-                  ...prev,
-                  enableDoctypeBoost: e.target.checked
-                }))}
-              />
-            }
-            label="Enable Document Type Boost"
-          />
-        </Grid>
-        
-        {boostConfig.enableDoctypeBoost && (
-          <Grid item xs={12}>
+          <Grid item xs={12} sm={6}>
             <TextField
               fullWidth
-              label="Document Type Boost Weight"
+              label="Reference Year"
               type="number"
-              value={boostConfig.doctypeBoostWeight}
-              onChange={(e) => setBoostConfig(prev => ({
-                ...prev,
-                doctypeBoostWeight: e.target.value
-              }))}
-              inputProps={{ step: "0.1", min: "0" }}
+              value={boostConfig.referenceYear}
+              onChange={(e) => handleBoostChange('referenceYear', null, e.target.value)}
+              inputProps={{ min: 1900, max: new Date().getFullYear() }}
             />
           </Grid>
-        )}
-
-        {/* Combination Method */}
-        <Grid item xs={12}>
-          <FormControl fullWidth>
-            <InputLabel>Combination Method</InputLabel>
-            <Select
-              value={boostConfig.combinationMethod}
-              onChange={(e) => setBoostConfig(prev => ({
-                ...prev,
-                combinationMethod: e.target.value
-              }))}
-              label="Combination Method"
-            >
-              <MenuItem value="sum">Sum</MenuItem>
-              <MenuItem value="product">Product</MenuItem>
-              <MenuItem value="max">Max</MenuItem>
-            </Select>
-          </FormControl>
         </Grid>
+      </Box>
 
-        {/* Apply Changes Button */}
-        <Grid item xs={12}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={applyBoosts}
-            disabled={loading}
-            fullWidth
-          >
-            {loading ? <CircularProgress size={24} /> : 'Apply Changes'}
-          </Button>
+      {/* Document Type Boosts */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Document Type Boosts
+        </Typography>
+        <Grid container spacing={2}>
+          {Object.entries(boostConfig.doctypeBoosts).map(([type, value]) => (
+            <Grid item xs={12} sm={6} md={3} key={type}>
+              <TextField
+                fullWidth
+                label={`${type.charAt(0).toUpperCase() + type.slice(1)} Boost`}
+                type="number"
+                value={value}
+                onChange={(e) => handleBoostChange('doctypeBoosts', type, e.target.value)}
+                inputProps={{ min: 0, step: 0.1 }}
+              />
+            </Grid>
+          ))}
         </Grid>
-      </Grid>
+      </Box>
+
+      {/* Transformed Query Display */}
+      <TransformedQuery query={query} fieldBoosts={boostConfig.fieldBoosts} />
+
+      {/* Run Experiment Button */}
+      <Button
+        variant="contained"
+        onClick={handleRunBoostExperiment}
+        disabled={loading || !query}
+        sx={{ mt: 2 }}
+      >
+        {loading ? <CircularProgress size={24} /> : 'Run Boost Experiment'}
+      </Button>
     </Box>
   );
   
@@ -953,7 +804,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                 {renderDebugPanel()}
               </Collapse>
 
-              {boostedResults && boostedResults.results ? (
+              {boostedResults && boostedResults.results && Object.keys(boostedResults.results).length > 0 ? (
                 <>
                   <Box sx={{ display: 'flex', mb: 2 }}>
                     {/* Title Headers */}
@@ -1079,7 +930,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                                     </Box>
                                   }
                                 />
-                                {boostedResults && boostedResults.results && (
+                                {boostedResults && boostedResults.results && Array.isArray(boostedResults.results) && (
                                   <Box 
                                     className="connector-point"
                                     data-target={`boosted-item-${boostedResults.results.findIndex(
@@ -1105,7 +956,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                       width: '33%', 
                       px: 1, 
                       height: '65vh', 
-                      overflow: 'hidden',  // Change from 'auto' to 'hidden'
+                      overflow: 'hidden',
                       display: 'flex',
                       flexDirection: 'column'
                     }} id="boosted-results-container">
@@ -1114,173 +965,163 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                         border: '1px solid', 
                         borderColor: 'primary.light', 
                         borderRadius: 1,
-                        overflow: 'auto',  // Allow only vertical scrolling inside the list
-                        overflowX: 'hidden',  // Hide horizontal scrolling
+                        overflow: 'auto',
+                        overflowX: 'hidden',
                         flexGrow: 1
                       }}>
-                        {boostedResults.results.map((result, index) => {
-                          // Get the rankChange directly from the result
-                          const rankChange = result.rankChange || 0;
-                          
-                          // Determine border style based on magnitude of change
-                          let borderStyle = {};
-                          if (Math.abs(rankChange) >= 5) {
-                            // Major change - thicker border
-                            borderStyle = {
-                              borderLeft: rankChange !== 0 ? '6px solid' : 'none',
-                              borderLeftColor: rankChange > 0 ? 'success.main' : rankChange < 0 ? 'error.main' : 'transparent',
-                              bgcolor: rankChange !== 0 ? (rankChange > 0 ? 'success.50' : 'error.50') : 'transparent'
-                            };
-                          } else if (rankChange !== 0) {
-                            // Minor change - standard border
-                            borderStyle = {
-                              borderLeft: '4px solid',
-                              borderLeftColor: rankChange > 0 ? 'success.main' : 'error.main',
-                            };
-                          }
-                          
-                          // Get boost factors for this result
-                          const boostFactors = {};
-                          if (result.boostFactors) {
-                            Object.entries(result.boostFactors).forEach(([key, value]) => {
-                              boostFactors[key] = value;
-                            });
-                          }
-                          
-                          return (
-                            <Tooltip
-                              key={result.bibcode || index}
-                              title={
-                                <Box>
-                                  <Typography variant="subtitle2">{result.title}</Typography>
-                                  <Typography variant="body2">
-                                    <strong>Authors:</strong> {formatAuthors(result.author)}
-                                  </Typography>
-                                  {result.abstract && (
+                        {boostedResults && boostedResults.results && Object.keys(boostedResults.results).length > 0 ? (
+                          Object.values(boostedResults.results)[0].map((result, index) => {
+                            // Find the original result
+                            const originalResult = originalResults.find(
+                              r => r.bibcode === result.bibcode || r.title === result.title
+                            );
+                            const originalIndex = originalResult ? originalResults.indexOf(originalResult) : -1;
+                            const rankChange = originalIndex !== -1 ? originalIndex - index : 0;
+                            
+                            // Determine border style based on magnitude of change
+                            let borderStyle = {};
+                            if (Math.abs(rankChange) >= 5) {
+                              borderStyle = {
+                                borderLeft: rankChange !== 0 ? '6px solid' : 'none',
+                                borderLeftColor: rankChange > 0 ? 'success.main' : rankChange < 0 ? 'error.main' : 'transparent',
+                                bgcolor: rankChange !== 0 ? (rankChange > 0 ? 'success.50' : 'error.50') : 'transparent'
+                              };
+                            } else if (rankChange !== 0) {
+                              borderStyle = {
+                                borderLeft: '4px solid',
+                                borderLeftColor: rankChange > 0 ? 'success.main' : 'error.main',
+                              };
+                            }
+                            
+                            return (
+                              <Tooltip
+                                key={result.bibcode || index}
+                                title={
+                                  <Box>
+                                    <Typography variant="subtitle2">{result.title}</Typography>
                                     <Typography variant="body2">
-                                      <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
+                                      <strong>Authors:</strong> {formatAuthors(result.author)}
                                     </Typography>
-                                  )}
-                                  <Divider sx={{ my: 1 }} />
-                                  <Typography variant="body2">
-                                    <strong>Original Rank:</strong> {result.originalRank || 'N/A'}
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    <strong>Rank Change:</strong> {rankChange > 0 ? '+' : ''}{rankChange}
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    <strong>Boost Score:</strong> {result.finalBoost ? result.finalBoost.toFixed(2) : 'N/A'}
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    <strong>Applied Boosts:</strong>
-                                  </Typography>
-                                  <Box component="ul" sx={{ mt: 0.5, pl: 2 }}>
-                                    {Object.entries(boostFactors).map(([key, value]) => (
-                                      <Typography component="li" variant="caption" key={key}>
-                                        {key}: {value && value.toFixed ? value.toFixed(2) : value}
+                                    {result.abstract && (
+                                      <Typography variant="body2">
+                                        <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
                                       </Typography>
-                                    ))}
-                                  </Box>
-                                </Box>
-                              }
-                              placement="right"
-                            >
-                              <ListItem 
-                                id={`boosted-item-${index}`}
-                                key={result.bibcode || result.title} 
-                                divider
-                                sx={{ 
-                                  px: 2, 
-                                  py: 1,
-                                  position: 'relative',
-                                  ...borderStyle,
-                                  transition: 'background-color 0.3s ease',
-                                  whiteSpace: 'normal'  // Allow text to wrap
-                                }}
-                              >
-                                <ListItemText
-                                  primary={
-                                    <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                      <Typography 
-                                        variant="body2" 
-                                        component="span"
-                                        sx={{ 
-                                          minWidth: '24px',
-                                          fontWeight: 'bold',
-                                          mr: 1
-                                        }}
-                                      >
-                                        {index + 1}
-                                      </Typography>
-                                      <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                          {truncateText(result.title, 60)}
+                                    )}
+                                    <Divider sx={{ my: 1 }} />
+                                    <Typography variant="body2">
+                                      <strong>Original Rank:</strong> {originalIndex !== -1 ? originalIndex + 1 : 'N/A'}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Rank Change:</strong> {rankChange > 0 ? '+' : ''}{rankChange}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Boost Score:</strong> {result.boosted_score ? result.boosted_score.toFixed(2) : 'N/A'}
+                                    </Typography>
+                                    <Typography variant="body2">
+                                      <strong>Applied Boosts:</strong>
+                                    </Typography>
+                                    <Box component="ul" sx={{ mt: 0.5, pl: 2 }}>
+                                      {result.boost_factors && Object.entries(result.boost_factors).map(([key, value]) => (
+                                        <Typography component="li" variant="caption" key={key}>
+                                          {key}: {value && value.toFixed ? value.toFixed(2) : value}
                                         </Typography>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                          {result.year && (
-                                            <Chip 
-                                              label={`${result.year}`} 
-                                              size="small" 
-                                              variant="outlined"
-                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                            />
-                                          )}
-                                          {result.citation_count !== undefined && (
-                                            <Chip 
-                                              label={`Citations: ${result.citation_count}`} 
-                                              size="small"
-                                              variant="outlined"
-                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                            />
-                                          )}
-                                          {rankChange !== 0 && (
-                                            <Chip 
-                                              icon={rankChange > 0 ? <ArrowUpward fontSize="small" /> : <ArrowDownward fontSize="small" />}
-                                              label={`${rankChange > 0 ? '+' : ''}${rankChange}`}
-                                              size="small"
-                                              color={rankChange > 0 ? 'success' : 'error'}
-                                              sx={{ 
-                                                height: 20, 
-                                                '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
-                                                fontWeight: Math.abs(rankChange) >= 5 ? 'bold' : 'normal'
-                                              }}
-                                            />
-                                          )}
-                                          {result.finalBoost !== undefined && (
-                                            <Chip 
-                                              label={`Boost: ${result.finalBoost.toFixed(1)}`} 
-                                              size="small"
-                                              color="primary"
-                                              sx={{ 
-                                                height: 20, 
-                                                '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
-                                                fontWeight: 'bold', 
-                                                bgcolor: `rgba(25, 118, 210, ${Math.min(result.finalBoost / 20, 1)})`
-                                              }}
-                                            />
-                                          )}
+                                      ))}
+                                    </Box>
+                                  </Box>
+                                }
+                                placement="right"
+                              >
+                                <ListItem 
+                                  id={`boosted-item-${index}`}
+                                  key={result.bibcode || result.title} 
+                                  divider
+                                  sx={{ 
+                                    px: 2, 
+                                    py: 1,
+                                    position: 'relative',
+                                    ...borderStyle,
+                                    transition: 'background-color 0.3s ease',
+                                    whiteSpace: 'normal'
+                                  }}
+                                >
+                                  <ListItemText
+                                    primary={
+                                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                        <Typography 
+                                          variant="body2" 
+                                          component="span"
+                                          sx={{ 
+                                            minWidth: '24px',
+                                            fontWeight: 'bold',
+                                            mr: 1
+                                          }}
+                                        >
+                                          {index + 1}
+                                        </Typography>
+                                        <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                            {truncateText(result.title, 60)}
+                                          </Typography>
+                                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                            {result.year && (
+                                              <Chip 
+                                                label={`${result.year}`} 
+                                                size="small" 
+                                                variant="outlined"
+                                                sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                              />
+                                            )}
+                                            {result.citation_count !== undefined && (
+                                              <Chip 
+                                                label={`Citations: ${result.citation_count}`} 
+                                                size="small"
+                                                variant="outlined"
+                                                sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                              />
+                                            )}
+                                            {result.boosted_score !== undefined && (
+                                              <Chip 
+                                                label={`Boost: ${result.boosted_score.toFixed(1)}`} 
+                                                size="small"
+                                                color="primary"
+                                                sx={{ 
+                                                  height: 20, 
+                                                  '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                                                  fontWeight: 'bold', 
+                                                  bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
+                                                }}
+                                              />
+                                            )}
+                                          </Box>
                                         </Box>
                                       </Box>
-                                    </Box>
-                                  }
-                                />
-                                {result.originalRank && (
-                                  <Box 
-                                    className="connector-point"
-                                    data-target={`original-item-${result.originalRank - 1}`}
-                                    data-change={rankChange}
-                                    sx={{ 
-                                      position: 'absolute', 
-                                      left: 0, 
-                                      height: '100%', 
-                                      width: 4
-                                    }} 
+                                    }
                                   />
-                                )}
-                              </ListItem>
-                            </Tooltip>
-                          );
-                        })}
+                                  {originalIndex !== -1 && (
+                                    <Box 
+                                      className="connector-point"
+                                      data-target={`original-item-${originalIndex}`}
+                                      data-change={rankChange}
+                                      sx={{ 
+                                        position: 'absolute', 
+                                        left: 0, 
+                                        height: '100%', 
+                                        width: 4
+                                      }} 
+                                    />
+                                  )}
+                                </ListItem>
+                              </Tooltip>
+                            );
+                          })
+                        ) : (
+                          <ListItem>
+                            <ListItemText
+                              primary="No boosted results available"
+                              secondary="Please run a boost experiment to see the results"
+                            />
+                          </ListItem>
+                        )}
                       </List>
                     </Box>
 

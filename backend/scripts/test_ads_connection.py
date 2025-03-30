@@ -21,9 +21,12 @@ from app.services.ads_service import query_ads_solr, get_ads_results
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def test_basic_query() -> None:
-    """Test a basic query to ADS Solr."""
-    query = 'author:"Einstein"'
+async def test_basic_query(query: str) -> None:
+    """Test a basic query to ADS Solr.
+    
+    Args:
+        query: The search query to test.
+    """
     fields = ["title", "authors", "year", "abstract"]
     
     logger.info(f"Testing basic query: {query}")
@@ -37,9 +40,12 @@ async def test_basic_query() -> None:
         logger.info(f"Year: {result.year}")
         logger.info(f"Abstract: {result.abstract[:200]}...")
 
-async def test_combined_query() -> None:
-    """Test the combined query method that tries both Solr and API."""
-    query = 'author:"Einstein"'
+async def test_combined_query(query: str) -> None:
+    """Test the combined query method that tries both Solr and API.
+    
+    Args:
+        query: The search query to test.
+    """
     fields = ["title", "authors", "year", "abstract"]
     
     logger.info(f"Testing combined query method: {query}")
@@ -58,6 +64,9 @@ async def main() -> None:
     # Load environment variables
     load_dotenv()
     
+    # Get query from command line argument or use default
+    query = sys.argv[1] if len(sys.argv) > 1 else 'author:"Einstein"'
+    
     # Print configuration
     logger.info("Current configuration:")
     logger.info(f"ADS_SOLR_PROXY_URL: {os.environ.get('ADS_SOLR_PROXY_URL')}")
@@ -65,10 +74,10 @@ async def main() -> None:
     
     # Run tests
     logger.info("\nTesting basic Solr query...")
-    await test_basic_query()
+    await test_basic_query(query)
     
     logger.info("\nTesting combined query method...")
-    await test_combined_query()
+    await test_combined_query(query)
 
 if __name__ == "__main__":
     asyncio.run(main()) 

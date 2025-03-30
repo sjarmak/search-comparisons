@@ -1,0 +1,24 @@
+{
+  "timestamp": 1743363988.6229918,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "[Web of Science API Error]",
+      "authors": [],
+      "abstract": "Web of Science API key not found in environment variables.",
+      "doi": null,
+      "year": null,
+      "url": "https://webofknowledge.com",
+      "source": "webOfScience",
+      "rank": 1,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    }
+  ]
+}

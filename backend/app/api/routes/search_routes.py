@@ -10,9 +10,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel
 
-from ...api.models import SearchRequest, SearchResult, SearchResponse
+from ...api.models import SearchRequest, SearchResult, SearchResponse, SearchRequestWithBoosts, BoostConfig
 from ...services.search_service import get_results_with_fallback, compare_results, SearchService
 from ...services.query_transformation import transform_query_with_boosts
+from ...services.boost_service import apply_all_boosts
 
 # Create router
 router = APIRouter(
@@ -35,9 +36,13 @@ class TransformQueryResponse(BaseModel):
     """Response model for query transformation."""
     transformed_query: str
 
+class SearchRequestWithBoosts(SearchRequest):
+    """Extended search request model that includes boost configurations."""
+    boost_config: Optional[BoostConfig] = None
+
 @router.post("/search/compare")
 async def compare_search_engines(
-    search_request: SearchRequest
+    search_request: SearchRequestWithBoosts
 ) -> Dict[str, Any]:
     """
     Compare search results from multiple academic search engines.
@@ -79,41 +84,58 @@ async def compare_search_engines(
             query=search_request.query,
             sources=search_request.sources,
             fields=search_request.fields,
-            max_results=search_request.max_results
+            max_results=search_request.max_results,
+            use_transformed_query=search_request.useTransformedQuery,
+            original_query=search_request.originalQuery
         )
         
         # Check if we got any results
-        if not results:
-            logger.warning("No results found from any source")
+        if not any(results.values()):
             raise HTTPException(status_code=404, detail="No results found from any source")
         
-        # Log result counts
-        for source, source_results in results.items():
-            logger.info(f"Retrieved {len(source_results)} results from {source}")
+        # Apply boosts if configured
+        if search_request.boost_config:
+            logger.info(f"Applying boosts with config: {search_request.boost_config.model_dump_json()}")
+            for source, source_results in results.items():
+                if source_results:
+                    boosted_results = apply_all_boosts(
+                        source_results,
+                        citation_boost=search_request.boost_config.citation_boost,
+                        min_citations=search_request.boost_config.min_citations,
+                        recency_boost=search_request.boost_config.recency_boost,
+                        reference_year=search_request.boost_config.reference_year,
+                        doctype_boosts=search_request.boost_config.doctype_boosts
+                    )
+                    results[source] = boosted_results
+                    logger.info(f"Retrieved {len(boosted_results)} results from {source}")
         
-        # Compare results using specified metrics and fields
-        comparison = compare_results(
-            sources_results=results,
-            metrics=search_request.metrics,
-            fields=search_request.fields
-        )
+        # Compare results if we have multiple sources
+        comparison_metrics = {}
+        if len(search_request.sources) > 1:
+            comparison_metrics = compare_results(
+                results,
+                search_request.metrics,
+                search_request.fields
+            )
         
-        # Return combined results and comparison
         return {
             "query": search_request.query,
-            "originalQuery": search_request.originalQuery,
             "sources": search_request.sources,
             "metrics": search_request.metrics,
             "fields": search_request.fields,
             "results": results,
-            "comparison": comparison
+            "comparison": comparison_metrics
         }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Error in search comparison: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Search comparison failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error in search comparison: {str(e)}")
 
 @router.post("/search", response_model=SearchResponse)
-async def search(request: SearchRequest) -> SearchResponse:
+async def search(request: SearchRequestWithBoosts) -> SearchResponse:
     """Handle search requests.
 
     Args:
@@ -124,6 +146,18 @@ async def search(request: SearchRequest) -> SearchResponse:
     """
     try:
         results = await search_service.search(request)
+        
+        # Apply boosts if configured
+        if request.boost_config:
+            results = apply_all_boosts(
+                results,
+                citation_boost=request.boost_config.citation_boost,
+                min_citations=request.boost_config.min_citations,
+                recency_boost=request.boost_config.recency_boost,
+                reference_year=request.boost_config.reference_year,
+                doctype_boosts=request.boost_config.doctype_boosts
+            )
+        
         return SearchResponse(results=results)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

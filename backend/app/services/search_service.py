@@ -144,7 +144,9 @@ async def get_results_with_fallback(
     sources: List[str], 
     fields: List[str], 
     max_results: Optional[int] = None,
-    attempts: int = 2
+    attempts: int = 2,
+    use_transformed_query: bool = False,
+    original_query: Optional[str] = None
 ) -> Dict[str, List[SearchResult]]:
     """
     Get search results from multiple sources with fallback mechanisms.
@@ -159,6 +161,8 @@ async def get_results_with_fallback(
         fields: List of fields to retrieve
         max_results: Maximum number of results to return per source
         attempts: Maximum number of retry attempts per source
+        use_transformed_query: Whether to use the transformed query
+        original_query: The original query before transformation
     
     Returns:
         Dict[str, List[SearchResult]]: Dictionary mapping source names to result lists
@@ -204,18 +208,40 @@ async def get_results_with_fallback(
             logger.info(f"Attempt {attempt_count} for {source}")
             
             try:
+                # Determine which query to use based on source
+                effective_query = query
+                if use_transformed_query and original_query:
+                    if source == "ads":
+                        # For ADS, we need to modify the transformed query to be compatible with Solr
+                        # Extract the base terms without boost syntax
+                        base_terms = []
+                        for term in original_query.split():
+                            if term.startswith('"') and term.endswith('"'):
+                                # Handle quoted phrases
+                                base_terms.append(term)
+                            else:
+                                # Handle individual terms
+                                base_terms.append(term)
+                        
+                        # Create a simple Solr query
+                        effective_query = " OR ".join(base_terms)
+                        logger.info(f"Using simplified query for ADS Solr: {effective_query}")
+                    else:
+                        effective_query = original_query  # Use original query for other sources
+                        logger.info(f"Using original query for {source}: {original_query}")
+                
                 if source == "ads":
-                    source_results = await get_ads_results(query, fields, num_results)
+                    source_results = await get_ads_results(effective_query, fields, num_results)
                 elif source == "scholar":
                     if attempt_count == 1:
-                        source_results = await get_scholar_results(query, fields, num_results)
+                        source_results = await get_scholar_results(effective_query, fields, num_results)
                     else:
                         # Fallback method for scholar
-                        source_results = await get_scholar_results_fallback(query, num_results)
+                        source_results = await get_scholar_results_fallback(effective_query, num_results)
                 elif source == "semanticScholar":
-                    source_results = await get_semantic_scholar_results(query, fields, num_results)
+                    source_results = await get_semantic_scholar_results(effective_query, fields, num_results)
                 elif source == "webOfScience":
-                    source_results = await get_web_of_science_results(query, fields, num_results)
+                    source_results = await get_web_of_science_results(effective_query, fields, num_results)
                 else:
                     logger.warning(f"Unknown source: {source}")
                     break

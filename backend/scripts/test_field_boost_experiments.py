@@ -1,11 +1,11 @@
 """
-Script to test the boost experiments functionality.
+Script to test the field boost experiments functionality.
 
 This script tests the field boost implementation by:
 1. Making a search request with field boosts
 2. Verifying query transformation
-3. Checking original results remain unchanged
-4. Verifying boosted results appear correctly
+3. Checking results are properly boosted by field
+4. Comparing results with and without field boosts
 """
 import asyncio
 import os
@@ -46,15 +46,11 @@ def main(query: str) -> None:
     request_data = {
         "query": query,
         "transformed_query": transformed_query,
-        "citation_boost": 1.0,
+        "citation_boost": 0.0,  # Disable other boosts for field boost testing
         "min_citations": 0,
-        "recency_boost": 1.0,
+        "recency_boost": 0.0,
         "reference_year": datetime.now().year,
-        "doctype_boosts": {
-            "article": 1.5,
-            "review": 2.0,
-            "proceedings": 1.0
-        },
+        "doctype_boosts": {},  # Disable doctype boosts
         "source": "ads",
         "rank": 1
     }
@@ -71,7 +67,7 @@ def main(query: str) -> None:
             timeout=30
         )
         response.raise_for_status()
-        logger.info("Boost experiment completed successfully")
+        logger.info("Field boost experiment completed successfully")
         logger.info(f"Response: {json.dumps(response.json(), indent=2)}")
     except httpx.HTTPError as e:
         logger.error(f"Error making request: {str(e)}")
@@ -81,6 +77,6 @@ def main(query: str) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python test_boost_experiments.py <query>")
+        print("Usage: python test_field_boost_experiments.py <query>")
         sys.exit(1)
     main(sys.argv[1]) 

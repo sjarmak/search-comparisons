@@ -1,0 +1,429 @@
+{
+  "timestamp": 1743364037.861234,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "Mean flow structure of katabatic winds and turbulent mixing properties",
+      "authors": [
+        "C. Charrondière",
+        "C. Brun",
+        "E. Hopfinger"
+      ],
+      "abstract": "Abstract The recent field measurements of katabatic winds on steep alpine slopes provide a unique database for theoretical analysis of the mean flow development and the determination of mixing properties. The theory is based on the depth-integrated momentum and heat equations, and demonstrates an increase in mean velocity $U$ with downstream distance $x$ according to $x^{n}$ ($n\\leq 1/2$). An equation for the mean wind velocity is established, expressing its dependency on the buoyancy flux, related to the heat flux to the ground, entrainment and bottom friction. No ambient stratification, and ambient wind and constant ground surface temperature, lead to $U{\\sim} x^{1/2}$, while constant heat flux to the ground leads to $U{\\sim} x^{1/3}$ and requires that the reduced gravity decreases as $x^{-1/3}$. Stable ambient stratification $N$ causes, in addition to small-amplitude mean flow oscillations, a decrease in reduced gravity with $x$, in which case the assumption of constant surface heat flux along $x$ is only an approximation. The turbulent fluxes are a function of gradient Richardson number $Ri$ with the ratio of turbulent diffusivity to viscosity $K_h/K_m$ changing from nearly $1.4$ to approximately $0.5$ at $Ri\\approx 0.5$. A new mixing efficiency is introduced that includes turbulence kinetic energy production or consumption by along-slope turbulent buoyancy flux. It increases with $Ri$ up to $0.25$ at $Ri\\approx 0.5$ and then remains nearly constant. The measurements allowed us to determine the bottom drag coefficients and interfacial entrainment, with the ground surface heat flux being determined from the mean buoyancy flux.",
+      "doi": "10.1017/jfm.2022.281",
+      "year": 2022,
+      "url": "https://www.semanticscholar.org/paper/cb22b18aa5840396722170324b3211c9b7e2c86c",
+      "source": "semanticScholar",
+      "rank": 1,
+      "citation_count": 4,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Katabatic Winds over Steep Slopes: Overview of a Field Experiment Designed to Investigate Slope-Normal Velocity and Near-Surface Turbulence",
+      "authors": [
+        "C. Charrondière",
+        "C. Brun",
+        "J. Cohard"
+      ],
+      "abstract": null,
+      "doi": "10.1007/s10546-021-00644-y",
+      "year": 2021,
+      "url": "https://www.semanticscholar.org/paper/7718aa8c777e81a0757f1173f2f5f2b9f38a2171",
+      "source": "semanticScholar",
+      "rank": 2,
+      "citation_count": 9,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Impact of katabatic winds on the environment of Neanderthals during the Middle Palaeolithic in westernmost Europe",
+      "authors": [
+        "J. Lefort",
+        "J. Monnier",
+        "J. Renouf"
+      ],
+      "abstract": "Compilation of the offshore and onshore altitudinal limits of the loess deposits of western France and southern England shows that they were deposited by low‐level wind fields. These relate to (i) the deflation of silt‐rich sediment extracted from the outwash plains of the not far distant British–Irish Ice Sheet and from the palaeo‐rivers of the Channel, and (ii) the existence of north and north‐western palaeo‐winds deduced from particle size analysis and heavy mineral distribution, and suggest (iii) that loess particles were transported by strong katabatic winds blowing from the northern ice‐covered regions towards Brittany and Normandy. Comparison between the main orientation of Neanderthal shelters and the direction of the katabatic winds shows that they were perpendicular to each other. The dominant orientation of the shelters was apparently ruled by these winds. A small‐scale study concentrating on the penultimate glaciation shows that in contrast to Brittany and Normandy where loess deposits accumulated on north‐facing cliffs, in England the same particles were deposited on the leeside of the hills. The existence of deflation zones, violently swept by Marine Isotope Stage 6 katabatic winds south of the British–Irish ice sheet, was probably at the origin of the restricted number of Neanderthals at that time in England. © 2021 John Wiley & Sons, Ltd.",
+      "doi": "10.1002/jqs.3361",
+      "year": 2021,
+      "url": "https://www.semanticscholar.org/paper/17614066437b4a9c706ba7f9288597d4e31beb86",
+      "source": "semanticScholar",
+      "rank": 3,
+      "citation_count": 3,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Transit boosting of trans-Channel katabatic winds by depressions associated with the west European storms tracks: impact on Pleistocene loess deposits",
+      "authors": [
+        "J. Lefort",
+        "J. Renouf",
+        "G. Danukalova"
+      ],
+      "abstract": "Onshore and offshore sedimentological, geochemical, geomorphological, palaeontological and geochronological studies of loess deposits located under and around the English Channel revealed that they were transported by katabatic winds generated by the British–Irish Ice Sheet. Katabatic winds, which are low-altitude wind flows, were able to jump over the low southern British hills but were stopped by the higher Brittany and Normandy hills. This regional topography is interrupted by a north–south corridor linking the northern and southern shores of Brittany where loess propagated down to the mouth of the Loire River. This long transit shows that the total distance travelled by the katabatic wind was around 750 km, which represents an unusual distance for the propagation of this wind under continental conditions. Strong similarities with Antarctica and Greenland, where well documented cases of katabatic winds are known, show that the transit of the trans-Channel katabatic winds were strongly enhanced by the seasonal drift of storms propagating in an eastward direction along the axis of the English Channel. This increasing strength of the north–south katabatic flux was probably at the origin of the transport of loess particles down to the mouth of the Loire River.",
+      "doi": "10.1144/jgs2021-078",
+      "year": 2021,
+      "url": "https://www.semanticscholar.org/paper/9a724d3f0f3d4a5f0afadfd0761f9f61a71f8670",
+      "source": "semanticScholar",
+      "rank": 4,
+      "citation_count": 1,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Inside Katabatic Winds Over the Terra Nova Bay Polynya: 1. Atmospheric Jet and Surface Conditions",
+      "authors": [
+        "P. Guest"
+      ],
+      "abstract": "The atmospheric and surface conditions during a late autumnal strong katabatic wind event were quantified using ship and rawinsonde measurements over the Terra Nova Bay coastal polynya. Wind speeds decreased from 35 to 18 ms−1, while the wind direction decreased 18° over the distance from the Nansen Ice Shelf edge out 99 km eastward toward the Ross Sea. Maximum velocity winds (jet cores) at 173, 238, 179 and 144 m elevation were associated with atmospheric boundary layers capped by temperature inversions with bases at 294, 325, 226 and 196 m elevation. The tops of the inversion layers (near 700 m at all locations) also marked the top of the katabatic wind layer. Boundary layer air temperature and specific humidity increased from −31 to −21°C and 0.1 to 0.6 gkg−1, respectively, in response to the warm polynya surface. The air at 15 ± 8 m elevation was saturated with respect to ice, causing supersaturation and snow growth where the air parcels become cooler in the upper atmospheric boundary layer. The surface was characterized by three zones, a fluid zone (open ocean, frazil, shuga and pancake floes), an accumulation zone (fused, rafted and compressed pancake floes) and a young floe zone (large floes). The surface temperature varied from freezing (−1.7°C) in the fluid zone to near air temperature (−20°C) in the floe zone with the largest horizontal surface temperature gradient occurring in the transition between the fluid zone and the accumulation zone, and at the edges of leads in the floe zone.",
+      "doi": "10.1029/2021JD034902",
+      "year": 2021,
+      "url": "https://www.semanticscholar.org/paper/3c0140b834c72f806e9b4a36fd1bd876c77b735d",
+      "source": "semanticScholar",
+      "rank": 5,
+      "citation_count": 8,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Inside Katabatic Winds Over the Terra Nova Bay Polynya: 2. Dynamic and Thermodynamic Analyses",
+      "authors": [
+        "P. Guest"
+      ],
+      "abstract": "Surface fluxes and atmospheric boundary layer budgets of enthalpy and momentum are quantified using bulk and integral methods based on measurements obtained during a research vessel transect across the Terra Nova Bay polynya during an intense late autumnal katabatic wind event. The surface sensible, latent, and net radiation heat fluxes had maximum upward values of 2,500 ± 600, 400 ± 100, and 100 ± 7 Wm−2, respectively, which occurred over open regions that had been cleared of sea ice by the wind stress. In these open areas, sea spray enhanced the sensible and latent heat fluxes (LHFs) by an estimated 106% and 18%, respectively. As sea ice formed on the surface and became thicker in the downwind direction, the sensible and LHFs decreased to 50% of their maximum values over pancake ice and to 5% at the downwind end of the transect, where snow‐covered young ice flows were present. Snow growth removed over 50% of the water vapor that came from the surface. The surface wind stress ranged from mean values of 2.9 Nm−2 in the most upwind regions to 0.9 Nm−2 at the end of the transect, with smaller scale variations of almost a factor of three due to different surface types (roughnesses) and gustiness. The downwind slowing and turning of the wind vector can be almost entirely explained by frictional and inertial forces, indicating the horizontal pressure gradient was weak. This case could serve as a case study for future modeling studies of coastal polynyas.",
+      "doi": "10.1029/2021JD034904",
+      "year": 2021,
+      "url": "https://www.semanticscholar.org/paper/3ffebbb9751d2adc46c4efde29f2d7b7e9cdca6e",
+      "source": "semanticScholar",
+      "rank": 6,
+      "citation_count": 10,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Local Katabatic Winds of the Russian Federation and Their Observation Using Synthetic Aperture Radar Imagery",
+      "authors": [
+        "A. Ivanov"
+      ],
+      "abstract": null,
+      "doi": "10.1134/S0001433820090121",
+      "year": 2020,
+      "url": "https://www.semanticscholar.org/paper/e0540e89abc7c05cf2841d8a83b13ab69d09aa7f",
+      "source": "semanticScholar",
+      "rank": 7,
+      "citation_count": 1,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Can katabatic winds directly force retreat of Greenland outlet glaciers? Hypothesis test on Helheim Glacier in Sermilik Fjord",
+      "authors": [
+        "Iain Wheel",
+        "P. Christoffersen",
+        "S. Mernild"
+      ],
+      "abstract": "Abstract. Katabatic winds drive sea ice export from glaciated fjords across Greenland and other high latitude environments, but few studies have investigated the extent to which they also drive inflow of warm water and whether they have a direct impact on glaciers stability. Using ERA5 reanalysis data, verified by two local weather stations, we create a timeseries of katabatic winds across Sermilik Fjord in southeast Greenland. Using this along with hydrographic data, from 2009–2013, positioned across the fjord, we analyse changes in fjord circulation during individual katabatic flows. Changes in melange presence are analysed too, via the use of MODIS and Landsat-7 satellite imagery. We show that warm water influxes are associated with katabatic winds, and that the potential submarine melt rates vary up to four-fold, dependant on katabatic wind strength. Rapid retreat of Helheim Glacier occurred during strong downslope wind events which removed the ice melange, and so the well documented retreat of Helheim between 2001–2005 is predicted to be in part because of strong katabatic winds. Removal of the ice-melange led to a series of calving events, driven by a lack of buttressing and weakness propagation up the glacier causing a retreat of up to 1.5 km. In contrast to previous research in which katabatic winds were seen as having an indirect influence on glaciers, we report direct forcing on Helheim Glacier through episodes of retreat occurring in response to inflow of warm water masses and removal of proglacial ice melange after downslope wind events.",
+      "doi": "10.5194/tc-2020-194",
+      "year": 2020,
+      "url": "https://www.semanticscholar.org/paper/3c8686a75900ddf1ecd825b105cbb1d98ddf6875",
+      "source": "semanticScholar",
+      "rank": 8,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Spatial Distribution of Wildfires Ignited under Katabatic versus Non-Katabatic Winds in Mediterranean Southern California USA",
+      "authors": [
+        "C. Kolden",
+        "J. Abatzoglou"
+      ],
+      "abstract": "Wildfires are a major hazard to humans in the southern California Mediterranean ecosystem and improving our understanding and delineation of different fire regimes is critical to mitigating wildfire-related hazards. Recent research has demonstrated that there are two distinct fire regimes in this region based on the presence or absence of katabatic winds (primarily Santa Ana winds) concurrent with the fire. Here, we expand the katabatic wind category to include Sundowner winds along the Santa Barbara front range and analyze the spatial relationships and difference in ignition sources between fires associated with katabatic and non-katabatic wind events from 1948–2017. We found distinct spatial extents for katabatic versus non-katabatic fires, with areas of the higher number of repeat fires generally associated with one fire type or the other. These spatial delineations were consistent with prior analyses of katabatic wind patterns and were also related to the climatology of marine influences across the region. Finally, we contextualize the burn perimeter of the 2017 Thomas Fire, the largest fire in modern California history, relative to spatial patterns of katabatic and non-katabatic fires. The 2017 Thomas Fire began during the longest Santa Ana event in the last 70 years in an area that has been burned repeatedly by Santa Ana fires. However, the Thomas Fire ultimately burned into a region where there were no prior Santa Ana fires. The spatial delineation of two relatively distinct fire regimes is critical to making management decisions, such as where to locate suppression resources at critical times and where fuel treatments might be most effective. However, the anomalous pattern of the Thomas Fire also points to the potential for changes in anthropogenic and environmental factors to disrupt historical spatial patterns and suggests that spatial patterns of fire regimes are themselves prospective metrics of global change.",
+      "doi": "10.3390/FIRE1020019",
+      "year": 2018,
+      "url": "https://www.semanticscholar.org/paper/8e434ce2bdb68eb0f254bcb900f8f8b04cd0ff59",
+      "source": "semanticScholar",
+      "rank": 9,
+      "citation_count": 48,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Katabatic winds diminish precipitation contribution to the Antarctic ice mass balance",
+      "authors": [
+        "J. Grazioli",
+        "J. Madeleine",
+        "H. Gallee"
+      ],
+      "abstract": "Significance Precipitation over Antarctica remains largely unknown, despite its crucial role in the surface mass balance of the Antarctic ice sheet. Using unprecedented observations covering an entire year, this work describes a previously unknown mechanism that leads to the sublimation of a large fraction of snowfall in the lower atmosphere, resulting from the interaction of precipitation and katabatic winds. Snowfall sublimation in the atmosphere, caused by katabatic winds, is in the order of 35% in the margins of East Antarctica. This process critically affects the interpretation of satellite-based remote sensing observations close to the ground and suggests that snowfall sublimation in a warming climate may counterbalance the expected increase of precipitation. Snowfall in Antarctica is a key term of the ice sheet mass budget that influences the sea level at global scale. Over the continental margins, persistent katabatic winds blow all year long and supply the lower troposphere with unsaturated air. We show that this dry air leads to significant low-level sublimation of snowfall. We found using unprecedented data collected over 1 year on the coast of Adélie Land and simulations from different atmospheric models that low-level sublimation accounts for a 17% reduction of total snowfall over the continent and up to 35% on the margins of East Antarctica, significantly affecting satellite-based estimations close to the ground. Our findings suggest that, as climate warming progresses, this process will be enhanced and will limit expected precipitation increases at the ground level.",
+      "doi": "10.1073/pnas.1707633114",
+      "year": 2017,
+      "url": "https://www.semanticscholar.org/paper/47c8a2dbd7ffe6014679d35ca00e8b9735a267ee",
+      "source": "semanticScholar",
+      "rank": 10,
+      "citation_count": 106,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Local katabatic winds of the Russian Federation and their observation from space using SAR imagery.",
+      "authors": [
+        "A. Ivanov",
+        "А.Ю. Иванов"
+      ],
+      "abstract": "Data from the spaceborne synthetic aperture radars (SAR) provide new opportunities for observing and studying local katabatic winds (bora, foehn) in various marine regions of the Russian Federation and adjacent countries. The impact of these winds on the characteristics of small-scale wind waves leads to the formation of characteristic manifestations on the sea surface which are displayed on SAR images. Satellite SAR images, in contrast to sub-satellite observations, make it possible to see the phenomenon in the coastal zones of seas and large lakes, judge the spatial scale of the phenomenon and determine a number of it quantitative characteristics. Analysis of collected SAR images shows that local winds, bora-like and foehn-like, have similar characteristics and cover vast areas of the inland and marginal seas of the Russian Federation. The similarity of the surface manifestations of the local winds, clearly speaks about the same physical and aerohydrodynamic mechanisms of their display on SAR images. It is shown that spaceborne SAR data and images, which are two-dimensional spatial patterns of frozen wind, are extremely useful for research and monitoring local winds over the seas of the Russian Federation, especially where the network of weather stations is extremely rare.",
+      "doi": "10.31857/s0205-96142019515-35",
+      "year": 2019,
+      "url": "https://www.semanticscholar.org/paper/7e18a32a0bafb848c4aaa41c2c15c79d374dc9b6",
+      "source": "semanticScholar",
+      "rank": 11,
+      "citation_count": 4,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "The effects of a slope angle, inversion strength and the eddy transfer coefficient on katabatic winds",
+      "authors": [
+        "I. Jóhannesdóttir"
+      ],
+      "abstract": null,
+      "doi": null,
+      "year": 2019,
+      "url": "https://www.semanticscholar.org/paper/cb6394b2cfb665471bf1bb78bbcc3c83a4e08a53",
+      "source": "semanticScholar",
+      "rank": 12,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Sea surface temperature changes with katabatic winds observed from IR and SAR images",
+      "authors": [
+        "Chung‐Ru Ho",
+        "Fei Lai"
+      ],
+      "abstract": "Katabatic winds generally flow from mountains or hills down to their lee side in the paths of depression. If the mountain or hill is near a coast, the katabatic winds may cause imprints on the sea surface. The katabatic wind pattern shown on a synthetic aperture radar (SAR) image is a bright-dark region that mirrors the coastal mountain topography. In this study, bright regions on SAR images caused by katabatic winds are found in the west of Hengchun Peninsula where is located in the southern Taiwan. The katabatic winds cause the sea state variations and then the sea surface temperature changes. Relationships between normalized radar cross section (NRCS) and sea surface temperature (SST) as well as the temperature difference between air and sea in the west of Hengchun Peninsula are investigated to find out the air-sea heat transfer. The results show that 1) the SST decreases when the NRCS increases, that is, the higher wind speed would cause the SST lower; and 2) the gradient of linear relationship between NRCS and SST is related to the temperature difference between air and sea, that is, the higher temperature difference could increase the release of heat from the ocean to the atmosphere.",
+      "doi": "10.1117/12.2532239",
+      "year": 2019,
+      "url": "https://www.semanticscholar.org/paper/e728e9df26995681989c5449597e6cd5cf25cdf3",
+      "source": "semanticScholar",
+      "rank": 13,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Transport of Late Pleistocene loess particles by katabatic winds during the lowstands of the English Channel",
+      "authors": [
+        "J. Lefort",
+        "J. Monnier",
+        "G. Danukalova"
+      ],
+      "abstract": "Studies of the submerged Pleistocene conglomerate cored and dredged in the English Channel show that it resulted from the cementation of stony beaches under a loess blanket. Although the loess cover was later washed out by younger transgressions, the northern limit of the conglomerate corresponds to the original offshore extension of the loess deposits. Compilation of offshore and onshore altitudes of the limits of these deposits shows that loess was deposited by low-level wind fields never thicker than 200 m. Mapping surveys show that the present limits of loess are probably close to their original boundaries. The past proximity of the British Ice Sheet, the accumulation of dusty sediments coating north-facing cliffs of Brittany originating in the outwash of the British–Irish Ice Sheet and in the palaeo-rivers of the English Channel, as well as the southeastward orientation of the palaeo-winds deduced from particle size analysis and heavy minerals distribution, suggest that large volumes of loess were transported by strong katabatic winds blowing from the northern ice-covered regions towards Brittany and Normandy. The existence of katabatic winds is also consistent with the drift of ice rafts that transported Icelandic basalts now grounded in Brittany and possibly with the orientation of Homo neandertalensis shelters.",
+      "doi": "10.1144/jgs2019-070",
+      "year": 2019,
+      "url": "https://www.semanticscholar.org/paper/8bc181bfbf21e08dce1e653283287da7ec7e3557",
+      "source": "semanticScholar",
+      "rank": 14,
+      "citation_count": 9,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak and intense katabatic winds: impacts on turbulent characteristics in the stable boundary layer and CO2 transport",
+      "authors": [
+        "J. A. Arrillaga",
+        "C. Yagüe",
+        "C. Román‐Cascón"
+      ],
+      "abstract": "Abstract. The role of thermally-driven local downslope or katabatic flows in the dynamics and turbulent features of the stable boundary layer (SBL) is investigated using observations. Measurements are carried out in a relatively flat area 2-km away from the steep slopes of the Guadarrama Mountain Range (Spain). Forty katabatic events are selected from an observational database spanning the 2017-summer period, by using an objective and systematic algorithm that is able to account for local and synoptic forcings. We subsequently classify the katabatic events into weak, moderate and intense according to the observed maximum wind speed. This classification enables us to contrast the main differences in dynamics and thermal structure. We find that the stronger katabatic events are associated with an earlier onset time of these flows. We relate it to very low soil-moisture values (\n",
+      "doi": "10.5194/ACP-2018-944",
+      "year": 2018,
+      "url": "https://www.semanticscholar.org/paper/4d07aeb1baf7cc523842078793ef15cbff3aee63",
+      "source": "semanticScholar",
+      "rank": 15,
+      "citation_count": 1,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Katabatic winds inspire sound rendition of Antarctic experience",
+      "authors": [
+        "P. Samartzis"
+      ],
+      "abstract": null,
+      "doi": null,
+      "year": 2016,
+      "url": "https://www.semanticscholar.org/paper/e59bd268cab3babdd4caedcd3fa029a9868e7b19",
+      "source": "semanticScholar",
+      "rank": 16,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Numerical simulations and observations of the role of katabatic winds in the creation and maintenance of Scharffenbergbotnen blue ice area, Antarctica",
+      "authors": [
+        "T. Zwinger",
+        "T. Malm",
+        "M. Schäfer"
+      ],
+      "abstract": "Abstract. We model the role of katabatic winds in the formation and maintenance of a blue ice area in Scharffenbergbotnen valley, Antarctica, using the finite element code Elmer. The high-horizontal-resolution (50–200 m) numerical simulations of the local wind flow from katabatic wind fronts show high spatial variability in wind-impact patterns and good congruence between places with high near-surface wind speeds and the blue ice area. In addition we perform wind simulations on an altered glacier geometry that resembles the thicker ice cover at the Late Glacial Maximum (LGM). These simulations indicate that the pronounced spatial wind-impact patterns depend on present-day geometry and did not occur during the LGM. This leads to the conclusion that the formation of the inner blue ice area of the Scharffenbergbotnen valley started only after the lowering of the ice surface, i.e. after the LGM. Experiments with smoothed surface topography suggest that detailed positions of the high wind regions, and hence individual blue ice fields, may have varied as the ice sheet lowered. The simulation results obtained with the present-day geometry were fortuitously confirmed by the destruction of a field camp located in a high-wind-speed area and its subsequent redistribution to low-velocity areas. The experiments and the field observations are consistent with localized violent katabatic events rather than synoptic-scale storms, playing the dominant role in the formation and maintenance of this and perhaps many blue ice areas.",
+      "doi": "10.5194/TC-9-1415-2015",
+      "year": 2015,
+      "url": "https://www.semanticscholar.org/paper/7d82022441bdeaa4466c7efc666b3e4bf9ec6548",
+      "source": "semanticScholar",
+      "rank": 17,
+      "citation_count": 4,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "MOUNTAIN METEOROLOGY | Katabatic Winds",
+      "authors": [
+        "T. Parish"
+      ],
+      "abstract": null,
+      "doi": "10.1016/B978-0-12-382225-3.00189-4",
+      "year": 2015,
+      "url": "https://www.semanticscholar.org/paper/8fec4bd18544a708ade709e59b45c8ebf392d1cd",
+      "source": "semanticScholar",
+      "rank": 18,
+      "citation_count": 1,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Waves and turbulence in katabatic winds",
+      "authors": [
+        "P. Monti",
+        "H. Fernando",
+        "M. Princevac"
+      ],
+      "abstract": null,
+      "doi": "10.1007/s10652-014-9348-1",
+      "year": 2014,
+      "url": "https://www.semanticscholar.org/paper/ab6e87f862907c6d6db2cacd8c99f7a25b4b6492",
+      "source": "semanticScholar",
+      "rank": 19,
+      "citation_count": 7,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Potential of katabatic and valley winds for generation of wind energy",
+      "authors": [
+        "J. Esteban"
+      ],
+      "abstract": null,
+      "doi": null,
+      "year": 2017,
+      "url": "https://www.semanticscholar.org/paper/b0359741dfbabe3957b02cc6b89287e6de2a15b7",
+      "source": "semanticScholar",
+      "rank": 20,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    }
+  ]
+}

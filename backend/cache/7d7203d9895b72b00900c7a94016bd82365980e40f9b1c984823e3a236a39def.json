@@ -1,5 +1,5 @@
 {
-  "timestamp": 1743269137.69172,
+  "timestamp": 1743361408.3428018,
   "expiry": 86400,
   "results": [
     {
@@ -18,10 +18,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -38,10 +38,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -58,10 +58,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -78,10 +78,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -98,10 +98,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -118,10 +118,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -138,10 +138,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -158,10 +158,50 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Kosmologische Betrachtungen zur allgemeinen Relativitätstheorie",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": null,
+      "year": 1917,
+      "url": "https://ui.adsabs.harvard.edu/abs/1917SPAW.......142E/abstract",
+      "source": "ads",
+      "rank": 9,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
       "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Näherungsweise Integration der Feldgleichungen der Gravitation",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": null,
+      "year": 1916,
+      "url": "https://ui.adsabs.harvard.edu/abs/1916SPAW.......688E/abstract",
+      "source": "ads",
+      "rank": 10,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
       "boost_factors": null
     },
     {
@@ -175,54 +215,14 @@
       "year": 1935,
       "url": "https://ui.adsabs.harvard.edu/abs/1935PhRv...48...73E/abstract",
       "source": "ads",
-      "rank": 9,
-      "citation_count": 0,
-      "doctype": "",
-      "property": [],
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Kosmologische Betrachtungen zur allgemeinen Relativitätstheorie",
-      "authors": [
-        "Einstein, Albert"
-      ],
-      "abstract": "",
-      "doi": null,
-      "year": 1917,
-      "url": "https://ui.adsabs.harvard.edu/abs/1917SPAW.......142E/abstract",
-      "source": "ads",
-      "rank": 10,
-      "citation_count": 0,
-      "doctype": "",
-      "property": [],
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Näherungsweise Integration der Feldgleichungen der Gravitation",
-      "authors": [
-        "Einstein, Albert"
-      ],
-      "abstract": "",
-      "doi": null,
-      "year": 1916,
-      "url": "https://ui.adsabs.harvard.edu/abs/1916SPAW.......688E/abstract",
-      "source": "ads",
       "rank": 11,
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -239,10 +239,70 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Über Gravitationswellen",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": null,
+      "year": 1918,
+      "url": "https://ui.adsabs.harvard.edu/abs/1918SPAW.......154E/abstract",
+      "source": "ads",
+      "rank": 13,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
       "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Strahlungs-Emission und ­Absorption nach der Quantentheorie",
+      "authors": [
+        "Einstein, Albert"
+      ],
+      "abstract": "",
+      "doi": null,
+      "year": 1916,
+      "url": "https://ui.adsabs.harvard.edu/abs/1916DPhyG..18..318E/abstract",
+      "source": "ads",
+      "rank": 14,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Berichtigung zu meiner Arbeit: Eine neue Bestimmung der Moleküldimensionen",
+      "authors": [
+        "Einstein, A."
+      ],
+      "abstract": "",
+      "doi": null,
+      "year": 1911,
+      "url": "https://ui.adsabs.harvard.edu/abs/1911AnP...339..591E/abstract",
+      "source": "ads",
+      "rank": 15,
+      "citation_count": 0,
+      "doctype": "",
+      "property": [],
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
       "boost_factors": null
     },
     {
@@ -257,74 +317,14 @@
       "year": 1938,
       "url": "https://ui.adsabs.harvard.edu/abs/1938AnMat..39...65E/abstract",
       "source": "ads",
-      "rank": 13,
-      "citation_count": 0,
-      "doctype": "",
-      "property": [],
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Über Gravitationswellen",
-      "authors": [
-        "Einstein, Albert"
-      ],
-      "abstract": "",
-      "doi": null,
-      "year": 1918,
-      "url": "https://ui.adsabs.harvard.edu/abs/1918SPAW.......154E/abstract",
-      "source": "ads",
-      "rank": 14,
-      "citation_count": 0,
-      "doctype": "",
-      "property": [],
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Strahlungs-Emission und ­Absorption nach der Quantentheorie",
-      "authors": [
-        "Einstein, Albert"
-      ],
-      "abstract": "",
-      "doi": null,
-      "year": 1916,
-      "url": "https://ui.adsabs.harvard.edu/abs/1916DPhyG..18..318E/abstract",
-      "source": "ads",
-      "rank": 15,
-      "citation_count": 0,
-      "doctype": "",
-      "property": [],
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Berichtigung zu meiner Arbeit: Eine neue Bestimmung der Moleküldimensionen",
-      "authors": [
-        "Einstein, A."
-      ],
-      "abstract": "",
-      "doi": null,
-      "year": 1911,
-      "url": "https://ui.adsabs.harvard.edu/abs/1911AnP...339..591E/abstract",
-      "source": "ads",
       "rank": 16,
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -342,10 +342,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -362,10 +362,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -383,10 +383,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -404,10 +404,10 @@
       "citation_count": 0,
       "doctype": "",
       "property": [],
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     }
   ]
