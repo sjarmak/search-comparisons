@@ -73,6 +73,38 @@ class SearchResult(BaseModel):
     boost_factors: Optional[Dict[str, float]] = None
 
 
+class MetricResult(BaseModel):
+    """
+    Model representing a single metric result.
+    
+    Attributes:
+        name: The name of the metric (e.g., ndcg@10)
+        value: The metric value
+        description: A brief description of the metric (optional)
+    """
+    name: str
+    value: float
+    description: Optional[str] = None
+
+
+class SearchResponse(BaseModel):
+    """
+    Model representing the complete search response from the API.
+    
+    Attributes:
+        query: The search query string
+        results: List of search results from each source
+        metrics: List of metric results for each source
+        total_results: Total number of results returned
+        transformed_query: The transformed query with field boosts (optional)
+    """
+    query: str
+    results: List[SearchResult]
+    metrics: Optional[List[MetricResult]] = None
+    total_results: int
+    transformed_query: Optional[str] = None
+
+
 class ErrorResponse(BaseModel):
     """
     Model representing an error response from the API.
@@ -117,20 +149,6 @@ class QuepidEvaluationRequest(BaseModel):
     case_id: int = Field(gt=0)
     fields: Optional[List[str]] = None
     max_results: Optional[int] = Field(default=20, ge=1, le=1000)
-
-
-class MetricResult(BaseModel):
-    """
-    Model representing a single metric result.
-    
-    Attributes:
-        name: The name of the metric (e.g., ndcg@10)
-        value: The metric value
-        description: A brief description of the metric (optional)
-    """
-    name: str
-    value: float
-    description: Optional[str] = None
 
 
 class QuepidEvaluationSourceResult(BaseModel):

@@ -17,6 +17,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { experimentService, API_URL as DEFAULT_API_URL } from '../services/api';
 import { List as ListIcon } from '@mui/icons-material';
 import LaunchIcon from '@mui/icons-material/Launch';
+import { TransformedQuery } from './TransformedQuery';
 
 /**
  * Component for experimenting with different boost factors and their impact on ranking
@@ -86,7 +87,6 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
         console.log("Extracted original query term:", cleanQuery);
       } else {
         // If we can't extract the original term, use the original query from props
-        // This should be the very basic query that was first used
         cleanQuery = query;
         console.log("Using original prop query:", cleanQuery);
       }
@@ -94,29 +94,80 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     
     if (!cleanQuery) return "";
     
-    console.log("Transforming query:", cleanQuery, "with config:", boostConfig.queryTransformation);
+    console.log("Transforming query:", cleanQuery, "with config:", boostConfig);
     
-    // Create a simpler query format with field boosts - greatly simplified!
+    // Sort fields by boost value in descending order
+    const sortedFields = Object.entries(boostConfig.fieldBoosts)
+      .filter(([_, boost]) => boost !== '' && boost !== null && boost !== undefined && boost > 0)
+      .sort(([_, a], [__, b]) => parseFloat(b) - parseFloat(a))
+      .map(([field]) => field);
+    
+    if (sortedFields.length === 0) {
+      return cleanQuery;
+    }
+    
     const parts = [];
     
-    // For each field, add a boosted term
-    Object.entries(boostConfig.fieldBoosts).forEach(([field, boost]) => {
-      if (boost !== '' && boost !== null && boost !== undefined && boost > 0) {
-        // Format the boost with one decimal place
-        const formattedBoost = parseFloat(boost).toFixed(1);
+    // Process each field in order of highest boost first
+    for (const field of sortedFields) {
+      const boost = parseFloat(boostConfig.fieldBoosts[field]).toFixed(1);
+      
+      // Split query into terms and phrases
+      const terms = [];
+      const phrases = [];
+      let currentTerm = [];
+      let inPhrase = false;
+      
+      // Split the query into terms and phrases
+      const words = cleanQuery.split(/\s+/);
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
         
-        // Handle phrase queries (if the original query contains spaces)
-        if (cleanQuery.includes(' ')) {
-          parts.push(`${field}:"${cleanQuery}"^${formattedBoost}`);
+        if (word.startsWith('"')) {
+          inPhrase = true;
+          currentTerm = [word.slice(1)];
+        } else if (word.endsWith('"')) {
+          inPhrase = false;
+          currentTerm.push(word.slice(0, -1));
+          phrases.push(currentTerm.join(' '));
+          currentTerm = [];
+        } else if (inPhrase) {
+          currentTerm.push(word);
         } else {
-          parts.push(`${field}:${cleanQuery}^${formattedBoost}`);
+          terms.push(word);
         }
       }
-    });
-    
-    // If no field boosts are applied, use the original query
-    if (parts.length === 0) {
-      return cleanQuery;
+      
+      // Add single terms
+      for (const term of terms) {
+        parts.push(`${field}:${term}^${boost}`);
+      }
+      
+      // Add phrases
+      for (const phrase of phrases) {
+        parts.push(`${field}:"${phrase}"^${boost}`);
+      }
+      
+      // Generate combinations of non-phrase terms if we have at least 2
+      if (terms.length >= 2) {
+        // Generate combinations of size 2 to n
+        for (let size = 2; size <= terms.length; size++) {
+          const combinations = getCombinations(terms, size);
+          for (const combo of combinations) {
+            parts.push(`${field}:"${combo.join(' ')}"^${boost}`);
+          }
+        }
+      }
+      
+      // Handle mixed terms and phrases
+      if (terms.length > 0 && phrases.length > 0) {
+        for (const phrase of phrases) {
+          for (const term of terms) {
+            parts.push(`${field}:"${phrase} ${term}"^${boost}`);
+            parts.push(`${field}:"${term} ${phrase}"^${boost}`);
+          }
+        }
+      }
     }
     
     // Join all parts with OR operators
@@ -124,6 +175,27 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     console.log("Final transformed query:", result);
     return result;
   }, [boostConfig, query]);
+  
+  // Helper function to generate combinations
+  const getCombinations = (arr, size) => {
+    const result = [];
+    
+    function combine(start, current) {
+      if (current.length === size) {
+        result.push([...current]);
+        return;
+      }
+      
+      for (let i = start; i < arr.length; i++) {
+        current.push(arr[i]);
+        combine(i + 1, current);
+        current.pop();
+      }
+    }
+    
+    combine(0, []);
+    return result;
+  };
   
   // Debug logging
   useEffect(() => {
@@ -643,9 +715,8 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
       <Typography variant="h6" gutterBottom>
         Boost Configuration
       </Typography>
-      
+
       <Grid container spacing={2}>
-        {/* Field Boosts */}
         <Grid item xs={12}>
           <FormControlLabel
             control={
@@ -660,7 +731,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
             label="Enable Field Boosts"
           />
         </Grid>
-        
+
         {boostConfig.enableFieldBoosts && (
           <>
             <Grid item xs={12} sm={4}>
@@ -693,10 +764,19 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                 inputProps={{ step: "0.1", min: "0" }}
               />
             </Grid>
+
+            {/* Add TransformedQuery component here */}
+            <Grid item xs={12}>
+              <Box sx={{ mt: 2, mb: 2 }}>
+                <TransformedQuery 
+                  query={query}
+                  fieldBoosts={boostConfig.fieldBoosts}
+                />
+              </Box>
+            </Grid>
           </>
         )}
 
-        {/* Citation Boost */}
         <Grid item xs={12}>
           <FormControlLabel
             control={
@@ -711,7 +791,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
             label="Enable Citation Boost"
           />
         </Grid>
-        
+
         {boostConfig.enableCiteBoost && (
           <Grid item xs={12}>
             <TextField
@@ -719,10 +799,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
               label="Citation Boost Weight"
               type="number"
               value={boostConfig.citeBoostWeight}
-              onChange={(e) => setBoostConfig(prev => ({
-                ...prev,
-                citeBoostWeight: e.target.value
-              }))}
+              onChange={(e) => handleConfigChange('citeBoostWeight', e.target.value)}
               inputProps={{ step: "0.1", min: "0" }}
             />
           </Grid>

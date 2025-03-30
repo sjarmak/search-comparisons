@@ -23,6 +23,90 @@ from .web_of_science_service import get_web_of_science_results
 # Setup logging
 logger = logging.getLogger(__name__)
 
+
+class SearchService:
+    """
+    Service class for handling search operations across different search engines.
+    
+    This class provides methods for performing searches, handling fallbacks,
+    and computing similarity metrics between results from different sources.
+    """
+    
+    def __init__(self):
+        """Initialize the search service with default configuration."""
+        self.service_config = SERVICE_CONFIG
+        self.default_num_results = DEFAULT_NUM_RESULTS
+    
+    async def search(
+        self,
+        query: str,
+        sources: List[str],
+        fields: List[str],
+        max_results: Optional[int] = None,
+        attempts: int = 2
+    ) -> Dict[str, List[SearchResult]]:
+        """
+        Perform a search across multiple sources with fallback mechanisms.
+        
+        Args:
+            query: Search query string
+            sources: List of search engine sources to query
+            fields: List of fields to retrieve
+            max_results: Maximum number of results to return per source
+            attempts: Maximum number of retry attempts per source
+        
+        Returns:
+            Dict[str, List[SearchResult]]: Dictionary mapping source names to result lists
+        """
+        return await get_results_with_fallback(
+            query=query,
+            sources=sources,
+            fields=fields,
+            max_results=max_results,
+            attempts=attempts
+        )
+    
+    def compare(
+        self,
+        sources_results: Dict[str, List[SearchResult]],
+        metrics: List[str],
+        fields: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Compare search results from different sources using specified metrics.
+        
+        Args:
+            sources_results: Dictionary mapping source names to result lists
+            metrics: List of similarity metrics to compute
+            fields: List of fields to use for comparisons
+        
+        Returns:
+            Dict[str, Any]: Dictionary with comparison results
+        """
+        return compare_results(
+            sources_results=sources_results,
+            metrics=metrics,
+            fields=fields
+        )
+    
+    async def get_paper_details(
+        self,
+        doi: str,
+        sources: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Get detailed information about a paper from multiple sources.
+        
+        Args:
+            doi: Digital Object Identifier of the paper
+            sources: Optional list of sources to query
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing paper details from each source
+        """
+        return await get_paper_details(doi=doi, sources=sources)
+
+
 # Service configuration with fallback settings
 SERVICE_CONFIG = {
     "ads": {

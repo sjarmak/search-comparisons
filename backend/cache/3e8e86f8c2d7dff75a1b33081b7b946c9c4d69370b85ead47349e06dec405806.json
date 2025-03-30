@@ -1,5 +1,5 @@
 {
-  "timestamp": 1743099798.959192,
+  "timestamp": 1743360031.047616,
   "expiry": 86400,
   "results": [
     {
@@ -263,16 +263,15 @@
       "boost_factors": null
     },
     {
-      "title": "Mass Transfer via Low-Velocity Rebound in a Microgravity Environment",
+      "title": "Microgravity Experiments on Accretion in the Protoplanetary Disk",
       "authors": [
-        "S. Jarmak",
-        "J. Colwell",
-        "J. Brisset"
+        "Ad Brown",
+        "S. Jarmak"
       ],
       "abstract": null,
       "doi": null,
-      "year": 2017,
-      "url": "https://www.semanticscholar.org/paper/884b5128dce92cda0e0aa6b2ab6779c91b2283b1",
+      "year": 2016,
+      "url": "https://www.semanticscholar.org/paper/c750c9fd61b2231cae1ab04796fc7644f1ba73fb",
       "source": "semanticScholar",
       "rank": 13,
       "citation_count": 0,
@@ -285,37 +284,18 @@
       "boost_factors": null
     },
     {
-      "title": "Microgravity Experiments on Accretion in the Protoplanetary Disk",
+      "title": "Mass Transfer via Low-Velocity Rebound in a Microgravity Environment",
       "authors": [
-        "Ad Brown",
-        "S. Jarmak"
+        "S. Jarmak",
+        "J. Colwell",
+        "J. Brisset"
       ],
       "abstract": null,
       "doi": null,
-      "year": 2016,
-      "url": "https://www.semanticscholar.org/paper/c750c9fd61b2231cae1ab04796fc7644f1ba73fb",
+      "year": 2017,
+      "url": "https://www.semanticscholar.org/paper/884b5128dce92cda0e0aa6b2ab6779c91b2283b1",
       "source": "semanticScholar",
       "rank": 14,
-      "citation_count": 0,
-      "doctype": null,
-      "property": null,
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Transformations in Serbian Translations of Poems by T.H. Shevchenko",
-      "authors": [
-        "Weronika Jarmak"
-      ],
-      "abstract": null,
-      "doi": "10.16926/j.2015.11.05",
-      "year": 2015,
-      "url": "https://www.semanticscholar.org/paper/94ea293ed7cfbc94fdc3b9e8f87eb84919c5d9cc",
-      "source": "semanticScholar",
-      "rank": 15,
       "citation_count": 0,
       "doctype": null,
       "property": null,
@@ -334,6 +314,26 @@
       "doi": null,
       "year": 2015,
       "url": "https://www.semanticscholar.org/paper/458cdec09d3f0440157b2350310b1d6ecbb316ea",
+      "source": "semanticScholar",
+      "rank": 15,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "original_rank": null,
+      "rank_change": null,
+      "original_score": null,
+      "boosted_score": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Transformations in Serbian Translations of Poems by T.H. Shevchenko",
+      "authors": [
+        "Weronika Jarmak"
+      ],
+      "abstract": null,
+      "doi": "10.16926/j.2015.11.05",
+      "year": 2015,
+      "url": "https://www.semanticscholar.org/paper/94ea293ed7cfbc94fdc3b9e8f87eb84919c5d9cc",
       "source": "semanticScholar",
       "rank": 16,
       "citation_count": 0,

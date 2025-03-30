@@ -8,9 +8,11 @@ multiple engines and computing similarity metrics.
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, List, Any, Optional
+from pydantic import BaseModel
 
-from ...api.models import SearchRequest, SearchResult
-from ...services.search_service import get_results_with_fallback, compare_results
+from ...api.models import SearchRequest, SearchResult, SearchResponse
+from ...services.search_service import get_results_with_fallback, compare_results, SearchService
+from ...services.query_transformation import transform_query_with_boosts
 
 # Create router
 router = APIRouter(
@@ -22,6 +24,16 @@ router = APIRouter(
 # Set up logging
 logger = logging.getLogger(__name__)
 
+search_service = SearchService()
+
+class TransformQueryRequest(BaseModel):
+    """Request model for query transformation."""
+    query: str
+    field_boosts: Dict[str, float]
+
+class TransformQueryResponse(BaseModel):
+    """Response model for query transformation."""
+    transformed_query: str
 
 @router.post("/search/compare")
 async def compare_search_engines(
@@ -98,4 +110,36 @@ async def compare_search_engines(
         }
     except Exception as e:
         logger.error(f"Error in search comparison: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Search comparison failed: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Search comparison failed: {str(e)}")
+
+@router.post("/search", response_model=SearchResponse)
+async def search(request: SearchRequest) -> SearchResponse:
+    """Handle search requests.
+
+    Args:
+        request: The search request containing query and parameters
+
+    Returns:
+        SearchResponse containing search results
+    """
+    try:
+        results = await search_service.search(request)
+        return SearchResponse(results=results)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/transform-query", response_model=TransformQueryResponse)
+async def transform_query(request: TransformQueryRequest) -> TransformQueryResponse:
+    """Transform a query with field boosts.
+
+    Args:
+        request: The request containing query and field boosts
+
+    Returns:
+        TransformQueryResponse containing the transformed query
+    """
+    try:
+        transformed_query = transform_query_with_boosts(request.query, request.field_boosts)
+        return TransformQueryResponse(transformed_query=transformed_query)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 
