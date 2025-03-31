@@ -16,13 +16,22 @@ import math
 from datetime import datetime
 import httpx
 import os
+from urllib.parse import urljoin
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from ...services import search_service
-from ...services.ads_service import get_ads_results
-from ...services.quepid_service import evaluate_search_results, load_case_with_judgments, get_quepid_cases
+from ...services.ads_service import get_ads_results, query_ads_solr
+from ...services.quepid_service import (
+    evaluate_search_results, 
+    load_case_with_judgments, 
+    get_quepid_cases,
+    get_case_judgments,
+    get_book_judgments,
+    extract_doc_id,
+    calculate_ndcg
+)
 from ...core.config import settings
 from ..models import (
     ErrorResponse, 
@@ -34,6 +43,7 @@ from ..models import (
     SearchRequest,
     BoostConfig
 )
+from ...services.boost_service import apply_all_boosts
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -589,239 +599,197 @@ async def analyze_search_logs() -> Dict[str, Any]:
     }
 
 
-@router.post(
-    "/quepid-evaluation", 
-    response_model=QuepidEvaluationResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        404: {"model": ErrorResponse},
-        500: {"model": ErrorResponse}
-    }
-)
-async def evaluate_search_with_quepid(request: QuepidEvaluationRequest) -> QuepidEvaluationResponse:
+@router.post("/quepid-evaluation", response_model=QuepidEvaluationResponse)
+async def evaluate_search_with_quepid(
+    request: QuepidEvaluationRequest,
+    background_tasks: BackgroundTasks
+) -> Dict[str, Any]:
     """
     Evaluate search results against Quepid judgments.
     
-    This endpoint executes a search query against multiple sources and
-    evaluates the results using relevance judgments from Quepid,
-    calculating metrics such as nDCG@10.
-    
     Args:
-        request: The evaluation request parameters
+        request: The evaluation request containing query, case ID, and other parameters
+        background_tasks: FastAPI background tasks handler
     
     Returns:
-        QuepidEvaluationResponse: The evaluation results for each source
-    
-    Raises:
-        HTTPException: If there's an error processing the request
+        Dict[str, Any]: Evaluation results including metrics and judged documents
     """
-    logger.info(f"Quepid evaluation request: {request.dict()}")
-    
-    start_time = time.time()
-    
     try:
-        # Validate the case exists and contains judgments
-        case = await load_case_with_judgments(request.case_id)
-        if not case:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Quepid case {request.case_id} not found or contains no judgments"
-            )
+        logger.info(f"Quepid evaluation request: {request.dict()}")
         
-        # Use default fields if none provided
-        fields = request.fields or ["title", "abstract", "authors", "year", "doi", "url"]
-        
-        # Find closest matching query if exact match not found
-        query_to_use = request.query
-        available_queries = case.queries
-        
-        if request.query not in case.judgments:
-            closest_query = find_closest_query(request.query, case.queries)
-            if closest_query:
-                logger.info(f"Using closest query match: '{closest_query}' instead of '{request.query}'")
-                query_to_use = closest_query
-            else:
-                error_msg = f"No matching query found for '{request.query}' in case {request.case_id}"
-                logger.warning(error_msg)
-                return QuepidEvaluationResponse(
-                    query=request.query,
-                    case_id=request.case_id,
-                    case_name=case.name,
-                    source_results=[],
-                    total_judged=0,
-                    total_relevant=0,
-                    available_queries=case.queries
-                )
+        # Get case data from Quepid
+        case_data = await get_case_judgments(request.case_id)
+        if not case_data:
+            raise HTTPException(status_code=404, detail=f"Case {request.case_id} not found")
         
         # Get judgments for the query
-        judgments = case.judgments.get(query_to_use, [])
+        judgments = {}
+        for query_data in case_data.get('queries', []):
+            if query_data['query'] == request.query:
+                judgments = query_data.get('ratings', {})
+                break
+        
         if not judgments:
-            error_msg = f"No judgments found for query '{query_to_use}' in case {request.case_id}"
-            logger.warning(error_msg)
-            return QuepidEvaluationResponse(
-                query=request.query,
-                case_id=request.case_id,
-                case_name=case.name,
-                source_results=[],
-                total_judged=0,
-                total_relevant=0,
-                available_queries=case.queries
+            raise HTTPException(
+                status_code=404,
+                detail=f"No judgments found for query '{request.query}' in case {request.case_id}"
             )
         
-        # Count total judged and relevant documents
-        total_judged = len(judgments)
-        total_relevant = sum(1 for j in judgments if j.rating > 0)
+        # Get document titles from Quepid
+        doc_titles = {}
+        try:
+            book_id = case_data.get('book_id')
+            if book_id:
+                titles_data = await get_book_judgments(book_id)
+                for doc in titles_data.get('judgements', []):
+                    doc_id = doc.get('doc_id')
+                    if doc_id:
+                        doc_titles[doc_id] = doc.get('title', '')
+        except Exception as e:
+            logger.warning(f"Failed to get document titles: {str(e)}")
         
-        # Get search results for each source
-        source_results = []
-        base_results = {}  # Store base results for each source
-        
-        for source in request.sources:
-            try:
-                # Get results from the source
-                results = await search_service.get_results_with_fallback(
-                    source=source,
-                    query=query_to_use,
-                    fields=fields,
-                    num_results=request.max_results
-                )
-                
-                # Store base results
-                base_results[source] = results
-                
-                # Evaluate base results
-                base_eval = await evaluate_search_results(
-                    query=query_to_use,
-                    search_results=results,
-                    case_id=request.case_id
-                )
-                
-                # Format base metrics
-                base_metrics = []
-                for name, value in base_eval.get("ndcg", {}).items():
-                    base_metrics.append(MetricResult(
-                        name=name,
-                        value=value,
-                        description=f"Normalized Discounted Cumulative Gain at {name.split('@')[1]}"
-                    ))
-                
-                for name, value in base_eval.get("precision", {}).items():
-                    base_metrics.append(MetricResult(
-                        name=name,
-                        value=value,
-                        description=f"Precision at {name.split('@')[1]}"
-                    ))
-                
-                base_metrics.append(MetricResult(
-                    name="recall",
-                    value=base_eval.get("recall", 0.0),
-                    description="Recall (relevant retrieved / total relevant)"
-                ))
-                
-                # Add base results
-                source_results.append(QuepidEvaluationSourceResult(
-                    source=source,
-                    metrics=base_metrics,
-                    judged_retrieved=base_eval.get("judged_retrieved", 0),
-                    relevant_retrieved=base_eval.get("relevant_retrieved", 0),
-                    results_count=base_eval.get("results_count", 0),
-                    config=BoostConfig(
-                        name="Base Results",
-                        citation_boost=0.0,
-                        recency_boost=0.0,
-                        doctype_boosts={}
-                    )
-                ))
-                
-                # Evaluate with boost configurations if provided
-                if request.boost_configs:
-                    for boost_config in request.boost_configs:
-                        try:
-                            # Apply boosts to results
-                            boosted_results = await apply_all_boosts(
-                                results,
-                                boost_config.dict()
-                            )
-                            
-                            # Evaluate boosted results
-                            boost_eval = await evaluate_search_results(
-                                query=query_to_use,
-                                search_results=boosted_results,
-                                case_id=request.case_id
-                            )
-                            
-                            # Calculate improvement
-                            base_ndcg = base_eval.get("ndcg", {}).get("ndcg@10", 0.0)
-                            boost_ndcg = boost_eval.get("ndcg", {}).get("ndcg@10", 0.0)
-                            improvement = boost_ndcg - base_ndcg
-                            
-                            # Format boost metrics
-                            boost_metrics = []
-                            for name, value in boost_eval.get("ndcg", {}).items():
-                                boost_metrics.append(MetricResult(
-                                    name=name,
-                                    value=value,
-                                    description=f"Normalized Discounted Cumulative Gain at {name.split('@')[1]}"
-                                ))
-                            
-                            for name, value in boost_eval.get("precision", {}).items():
-                                boost_metrics.append(MetricResult(
-                                    name=name,
-                                    value=value,
-                                    description=f"Precision at {name.split('@')[1]}"
-                                ))
-                            
-                            boost_metrics.append(MetricResult(
-                                name="recall",
-                                value=boost_eval.get("recall", 0.0),
-                                description="Recall (relevant retrieved / total relevant)"
-                            ))
-                            
-                            # Add boosted results
-                            source_results.append(QuepidEvaluationSourceResult(
-                                source=source,
-                                metrics=boost_metrics,
-                                judged_retrieved=boost_eval.get("judged_retrieved", 0),
-                                relevant_retrieved=boost_eval.get("relevant_retrieved", 0),
-                                results_count=boost_eval.get("results_count", 0),
-                                improvement=improvement,
-                                config=boost_config
-                            ))
-                            
-                        except Exception as boost_error:
-                            logger.error(f"Error applying boost config {boost_config.name}: {str(boost_error)}", exc_info=True)
-                            continue
-                
-            except Exception as e:
-                logger.error(f"Error evaluating {source} results: {str(e)}", exc_info=True)
-                # Continue with other sources
-        
-        # Create response
-        response = QuepidEvaluationResponse(
+        # Get search results
+        search_results = await query_ads_solr(
             query=request.query,
-            case_id=request.case_id,
-            case_name=case.name,
-            source_results=source_results,
-            total_judged=total_judged,
-            total_relevant=total_relevant,
-            available_queries=case.queries if query_to_use != request.query else None
+            fields=["id", "title", "abstract", "author", "citation_count", 
+                    "pubdate", "doctype", "identifier"],
+            num_results=request.max_results
         )
         
-        # Log timing
-        end_time = time.time()
-        logger.info(f"Quepid evaluation completed in {end_time - start_time:.2f}s")
+        # Process results and calculate metrics
+        processed_results = []
+        judged_retrieved = 0
+        relevant_retrieved = 0
         
-        return response
-    
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
-    
+        for result in search_results:
+            # Extract document ID from URL
+            doc_id = extract_doc_id(result)
+            if not doc_id:
+                continue
+            
+            # Get judgment for this document
+            judgment = judgments.get(doc_id, 0)
+            if isinstance(judgment, dict):
+                rating = judgment.get('rating', 0)
+            else:
+                rating = float(judgment)
+            
+            # Check if document is judged and relevant
+            has_judgment = doc_id in judgments
+            is_relevant = rating > 0
+            
+            if has_judgment:
+                judged_retrieved += 1
+            if is_relevant:
+                relevant_retrieved += 1
+            
+            # Get document title from Quepid if available
+            title = doc_titles.get(doc_id, result.title)
+            
+            processed_results.append({
+                "title": title,
+                "authors": getattr(result, 'author', []),
+                "year": getattr(result, 'year', ''),
+                "citation_count": getattr(result, 'citation_count', 0),
+                "doc_type": getattr(result, 'doctype', ''),
+                "url": getattr(result, 'url', ''),
+                "doc_id": doc_id,
+                "rating": rating,
+                "has_judgment": has_judgment,
+                "judgment": rating
+            })
+        
+        # Calculate metrics
+        metrics = {}
+        for k in [5, 10, 20]:
+            if len(processed_results) >= k:
+                # Calculate nDCG
+                ratings = [r["rating"] for r in processed_results[:k]]
+                metrics[f"ndcg@{k}"] = calculate_ndcg(ratings, k)
+                
+                # Calculate precision@k
+                relevant_count = sum(1 for r in processed_results[:k] if r["rating"] > 0)
+                metrics[f"p@{k}"] = relevant_count / k
+        
+        # Calculate recall
+        total_relevant = sum(1 for r in processed_results if r["rating"] > 0)
+        metrics["recall"] = total_relevant / len(judgments) if judgments else 0
+        
+        # Format judged titles
+        judged_titles = []
+        for doc_id, judgment in judgments.items():
+            if isinstance(judgment, dict):
+                rating = judgment.get('rating', 0)
+                title = judgment.get('title', '')
+            else:
+                rating = float(judgment)
+                title = doc_titles.get(doc_id, '')
+            
+            if title:
+                judged_titles.append({
+                    "title": title,
+                    "rating": rating,
+                    "bibcode": doc_id,
+                    "clean_title": title.lower().replace(r'[^a-z0-9]', '')
+                })
+        
+        # Format response
+        source_result = QuepidEvaluationSourceResult(
+            source="ads",
+            metrics=[
+                MetricResult(
+                    name=name,
+                    value=value,
+                    description=f"{name} metric"
+                )
+                for name, value in metrics.items()
+            ],
+            judged_retrieved=judged_retrieved,
+            relevant_retrieved=relevant_retrieved,
+            results_count=len(processed_results),
+            results=[
+                SearchResult(
+                    title=r["title"],
+                    authors=r["authors"],
+                    year=r["year"],
+                    citation_count=r["citation_count"],
+                    doctype=r["doc_type"],
+                    url=r["url"],
+                    doc_id=r["doc_id"],
+                    rating=r["rating"],
+                    has_judgment=r["has_judgment"],
+                    judgment=r["judgment"],
+                    source="ads",
+                    rank=idx + 1
+                )
+                for idx, r in enumerate(processed_results)
+            ],
+            config=BoostConfig(
+                name="Base Results",
+                citation_boost=0.0,
+                recency_boost=0.0,
+                doctype_boosts={}
+            ),
+            judged_titles=judged_titles
+        )
+
+        return QuepidEvaluationResponse(
+            query=request.query,
+            case_id=request.case_id,
+            case_name=case_data.get('case_name', f'Case {request.case_id}'),
+            source_results=[source_result],
+            total_judged=len(judgments),
+            total_relevant=sum(1 for j in judgments.values() if 
+                (isinstance(j, dict) and j.get('rating', 0) > 0) or 
+                (isinstance(j, (int, float)) and j > 0)),
+            available_queries=[q['query'] for q in case_data.get('queries', [])]
+        )
+        
     except Exception as e:
-        logger.error(f"Quepid evaluation error: {str(e)}", exc_info=True)
+        logger.error(f"Error in Quepid evaluation: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error evaluating results: {str(e)}"
+            detail=f"Error evaluating search results: {str(e)}"
         )
 
 

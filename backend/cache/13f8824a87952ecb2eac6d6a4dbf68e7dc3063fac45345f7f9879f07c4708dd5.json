@@ -1,0 +1,429 @@
+{
+  "timestamp": 1743446221.3281631,
+  "expiry": 86400,
+  "results": [
+    {
+      "title": "Probing the universe with weak lensing",
+      "authors": [
+        "Y Mellier"
+      ],
+      "abstract": "weak lensing for the study of distantgalaxies and of the population of lensed sources as a  function of redshift.Finally, I discuss the potential of weak lensing  weak lensing with the CMB.",
+      "doi": null,
+      "year": 1999,
+      "url": "https://www.annualreviews.org/content/journals/10.1146/annurev.astro.37.1.127",
+      "source": "scholar",
+      "rank": 1,
+      "citation_count": 688,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak lensing for precision cosmology",
+      "authors": [
+        "R Mandelbaum"
+      ],
+      "abstract": "The focus of this review is on weak lensing method development and systematics mitigation  in preparation for the surveys that will happen in the 2020s, which will have such small",
+      "doi": null,
+      "year": 2018,
+      "url": "https://www.annualreviews.org/content/journals/10.1146/annurev-astro-081817-051928",
+      "source": "scholar",
+      "rank": 2,
+      "citation_count": 444,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak lensing and cosmology",
+      "authors": [
+        "N Kaiser"
+      ],
+      "abstract": "We explore the dependence of weak lensing phenomena on the  lensing  by indi- ∞ 4 vidual clusters. Our main goal is to elucidate the dependence of weak lensing",
+      "doi": null,
+      "year": 1998,
+      "url": "https://iopscience.iop.org/article/10.1086/305515/meta",
+      "source": "scholar",
+      "rank": 3,
+      "citation_count": 568,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Cosmology with weak lensing surveys",
+      "authors": [
+        "D Munshi",
+        "P Valageas",
+        "L Van Waerbeke",
+        "A Heavens"
+      ],
+      "abstract": "We present in greater detail the weak lensing distortion of the CMB radiation in Section 9.  In Section 10 we also discuss how weak lensing can be combined or cross-correlated with",
+      "doi": null,
+      "year": 2008,
+      "url": "https://www.sciencedirect.com/science/article/pii/S0370157308000756",
+      "source": "scholar",
+      "rank": 4,
+      "citation_count": 377,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "A method for weak lensing observations",
+      "authors": [
+        "N Kaiser",
+        "G Squires",
+        "T Broadhurst"
+      ],
+      "abstract": "been observed in the absence of lensing and where angles are measured relative to some  fiducial point on the image (eg the centre). In the weak lensing regime — the main subject of",
+      "doi": null,
+      "year": 1994,
+      "url": "https://arxiv.org/abs/astro-ph/9411005",
+      "source": "scholar",
+      "rank": 5,
+      "citation_count": 1077,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "3D weak lensing",
+      "authors": [
+        "A Heavens"
+      ],
+      "abstract": "I propose an analysis method, based on spin-spherical harmonics and spherical Bessel  functions, for large-scale weak lensing surveys which have source-distance information through",
+      "doi": null,
+      "year": 2003,
+      "url": "https://academic.oup.com/mnras/article-abstract/343/4/1327/1068747",
+      "source": "scholar",
+      "rank": 6,
+      "citation_count": 226,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Measuring the dark side (with weak lensing)",
+      "authors": [
+        "L Amendola",
+        "M Kunz",
+        "D Sapone"
+      ],
+      "abstract": "-scale weak lensing surveys like the proposed DUNE satellite to these parameters (assuming  systematic errors can be controlled). We find that a large-scale weak lensing tomographic",
+      "doi": null,
+      "year": 2008,
+      "url": "https://iopscience.iop.org/article/10.1088/1475-7516/2008/04/013/meta",
+      "source": "scholar",
+      "rank": 7,
+      "citation_count": 468,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak gravitational lensing",
+      "authors": [
+        "M Bartelmann",
+        "P Schneider"
+      ],
+      "abstract": "by weak lensing, lensing of galaxies by galaxies, and weak  is how weak lensing effects  can be quantified and measured. The following two sections describe the theory of weak lensing",
+      "doi": null,
+      "year": 2001,
+      "url": "https://www.sciencedirect.com/science/article/pii/S037015730000082X",
+      "source": "scholar",
+      "rank": 8,
+      "citation_count": 3120,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak lensing analysis in three dimensions",
+      "authors": [
+        "PG Castro",
+        "AF Heavens",
+        "TD Kitching"
+      ],
+      "abstract": "-sky 3-dimensional analysis of the weak lensing fields and their  coefficients of the weak  lensing shear and convergence to the  of large-scale weak lensing surveys which will provide",
+      "doi": null,
+      "year": 2005,
+      "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.72.023516",
+      "source": "scholar",
+      "rank": 9,
+      "citation_count": 195,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Defining a weak lensing experiment in space",
+      "authors": [
+        "M Cropper",
+        "H Hoekstra",
+        "T Kitching"
+      ],
+      "abstract": "In this paper, we develop a framework by which weak lensing  also to ground-based weak  lensing surveys). The formalism for  With respect to its weak lensing capabilities, Euclid can be",
+      "doi": null,
+      "year": 2013,
+      "url": "https://academic.oup.com/mnras/article-abstract/431/4/3103/1137698",
+      "source": "scholar",
+      "rank": 10,
+      "citation_count": 141,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak lensing and dark energy",
+      "authors": [
+        "D Huterer"
+      ],
+      "abstract": "weak lensing surveys to probe dark energy. Dark energy modifies the distance-redshift relation  as well as the matter power spectrum, both of which affect the weak lensing  weak lensing",
+      "doi": null,
+      "year": 2002,
+      "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.65.063001",
+      "source": "scholar",
+      "rank": 11,
+      "citation_count": 309,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Practical weak-lensing shear measurement with metacalibration",
+      "authors": [
+        "ES Sheldon",
+        "EM Huff"
+      ],
+      "abstract": "Metacalibration is a recently introduced method to accurately measure weak gravitational  lensing shear using only the available imaging data, without need for prior information about",
+      "doi": null,
+      "year": 2017,
+      "url": "https://iopscience.iop.org/article/10.3847/1538-4357/aa704b/meta",
+      "source": "scholar",
+      "rank": 12,
+      "citation_count": 316,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak lensing of the CMB",
+      "authors": [
+        "D Hanson",
+        "A Challinor",
+        "A Lewis"
+      ],
+      "abstract": "from the weak lensing of other sources, such as galaxies. We discuss the statistics of the  lensing  We then focus on methods for reconstructing the lensing deflections, describing efficient",
+      "doi": null,
+      "year": 2010,
+      "url": "https://link.springer.com/article/10.1007/s10714-010-1036-y",
+      "source": "scholar",
+      "rank": 13,
+      "citation_count": 147,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak-Lensing Surveys and the Intrinsic Correlation ofGalaxy Ellipticities",
+      "authors": [
+        "RAC Croft",
+        "CA Metzler"
+      ],
+      "abstract": "measurably di†erent results from weak lensing for some statistics we have not considered  here. For example, the probability distribution of the lensing convergence is predicted to have",
+      "doi": null,
+      "year": 2000,
+      "url": "https://iopscience.iop.org/article/10.1086/317856/meta",
+      "source": "scholar",
+      "rank": 14,
+      "citation_count": 317,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Detailed cluster lensing profiles at large radii and the impact on cluster weak lensing studies",
+      "authors": [
+        "M Oguri",
+        "T Hamana"
+      ],
+      "abstract": "We have also examined the effect of the outer lensing profile on the signal-to-noise ratio ν  of weak lensing mass peaks. We have considered two different filters, and found that ν can be",
+      "doi": null,
+      "year": 2011,
+      "url": "https://academic.oup.com/mnras/article-abstract/414/3/1851/1034521",
+      "source": "scholar",
+      "rank": 15,
+      "citation_count": 202,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Strong and weak lensing united-I. The combined strong and weak lensing cluster mass reconstruction method",
+      "authors": [
+        "M Bradač",
+        "P Schneider",
+        "M Lombardi"
+      ],
+      "abstract": "weak and strong lensing information on common scales and can, as a consequence, break  the mass-sheet degeneracy. We extend the weak lensing  used for weak and strong lensing",
+      "doi": null,
+      "year": 2005,
+      "url": "https://www.aanda.org/articles/aa/abs/2005/25/aa2233-04/aa2233-04.html",
+      "source": "scholar",
+      "rank": 16,
+      "citation_count": 178,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Cluster–galaxy weak lensing",
+      "authors": [
+        "K Umetsu"
+      ],
+      "abstract": "We begin by reviewing the theoretical foundations of gravitational lensing  weak gravitational  lensing. We summarize and discuss key findings from recent cluster–galaxy weak-lensing",
+      "doi": null,
+      "year": 2020,
+      "url": "https://link.springer.com/article/10.1007/s00159-020-00129-w",
+      "source": "scholar",
+      "rank": 17,
+      "citation_count": 133,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "COSMOS: three-dimensional weak lensing and the growth of structure",
+      "authors": [
+        "R Massey",
+        "J Rhodes",
+        "A Leauthaud"
+      ],
+      "abstract": "), the importance of weak lensing in future cosmological and  is particularly needed for weak  lensing because the shapes  fundamentally limits all weak-lensing measurements. Extensive",
+      "doi": null,
+      "year": 2007,
+      "url": "https://iopscience.iop.org/article/10.1086/516599/meta",
+      "source": "scholar",
+      "rank": 18,
+      "citation_count": 359,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Weak lensing of the CMB: A harmonic approach",
+      "authors": [
+        "W Hu"
+      ],
+      "abstract": "Weak lensing effects on the the temperature and polarization  However for weak lensing in  the CMB, correlation function  II C, we review the properties of weak lensing relevant for the",
+      "doi": null,
+      "year": 2000,
+      "url": "https://journals.aps.org/prd/abstract/10.1103/PhysRevD.62.043007",
+      "source": "scholar",
+      "rank": 19,
+      "citation_count": 565,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Subaru weak lensing measurements of four strong lensing clusters: are lensing clusters overconcentrated?",
+      "authors": [
+        "M Oguri",
+        "JF Hennawi",
+        "MD Gladders"
+      ],
+      "abstract": "with weak lensing shear measured from deep Subaru Suprime-cam images. Weak lensing   We demonstrate that adding strong lensing information with known arc redshifts significantly",
+      "doi": null,
+      "year": 2009,
+      "url": "https://iopscience.iop.org/article/10.1088/0004-637X/699/2/1038/meta",
+      "source": "scholar",
+      "rank": 20,
+      "citation_count": 132,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    }
+  ]
+}

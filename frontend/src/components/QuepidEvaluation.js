@@ -36,7 +36,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Link
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
@@ -128,21 +129,34 @@ const QuepidEvaluation = () => {
     setIsLoading(true);
     
     try {
+      console.log('Sending request:', evaluationRequest); // Debug log
       const response = await experimentService.evaluateWithQuepid(evaluationRequest);
+      console.log('API Response:', response); // Debug log
       
       if (response.error) {
         setError(response.message || 'Error evaluating search results');
       } else {
         setResults(response);
-        setSuccessMessage('Evaluation completed successfully');
+        if (!response.source_results || response.source_results.length === 0) {
+          // More detailed error message based on available information
+          let errorMessage = 'No search results were returned. ';
+          if (response.total_judged > 0) {
+            errorMessage += `Found ${response.total_judged} judged documents in the case. `;
+          }
+          if (response.available_queries && response.available_queries.length > 0) {
+            errorMessage += 'Available queries in this case: ' + response.available_queries.join(', ');
+          }
+          setError(errorMessage);
+        } else {
+          setSuccessMessage('Evaluation completed successfully');
+        }
       }
     } catch (error) {
-      // Handle different types of error objects
+      console.error('Quepid evaluation error:', error);
       const errorMessage = error.response?.data?.detail || 
                           error.message || 
                           'Error connecting to the server';
       setError(errorMessage);
-      console.error('Quepid evaluation error:', error);
     } finally {
       setIsLoading(false);
     }
@@ -152,131 +166,167 @@ const QuepidEvaluation = () => {
   const renderResults = () => {
     if (!results) return null;
     
+    console.log('Rendering results:', results); // Debug log
+    
     return (
-      <Box mt={4}>
+      <Box sx={{ mt: 4 }}>
         <Typography variant="h5" gutterBottom>
-          Evaluation Results for "{results.query}"
+          Evaluation Results
         </Typography>
-        
-        <Box mb={2}>
-          <Chip 
-            label={`Case: ${results.case_name || 'N/A'}`} 
-            color="primary" 
-            variant="outlined" 
-            sx={{ marginRight: 1 }}
-          />
-          <Chip 
-            label={`Total judged: ${results.total_judged || 0}`} 
-            color="primary" 
-            variant="outlined" 
-            sx={{ marginRight: 1 }}
-          />
-          <Chip 
-            label={`Total relevant: ${results.total_relevant || 0}`} 
-            color="primary" 
-            variant="outlined"
-          />
-        </Box>
-        
-        {results.available_queries && results.available_queries.length > 0 && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <Typography variant="body2">
-              Note: The exact query was not found. Here are some available queries in this case:
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-              {results.available_queries.map((q, i) => (
-                <Chip 
-                  key={i} 
-                  label={q}
-                  size="small"
-                  onClick={() => setQuery(q)}
-                  color="primary"
-                />
-              ))}
-            </Box>
-          </Alert>
-        )}
-        
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Source</TableCell>
-                <TableCell>nDCG@10</TableCell>
-                <TableCell>Precision@10</TableCell>
-                <TableCell>Recall</TableCell>
-                <TableCell>Judged/Relevant</TableCell>
-                <TableCell>Improvement</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {results.source_results?.map((sourceResult) => {
-                // Find metrics
-                const ndcg10 = sourceResult.metrics?.find(m => m.name === 'ndcg@10');
-                const precision10 = sourceResult.metrics?.find(m => m.name === 'p@10');
-                const recall = sourceResult.metrics?.find(m => m.name === 'recall');
+
+        {/* Metrics Display */}
+        <Grid container spacing={4}>
+          {results.source_results?.map((sourceResult, index) => (
+            <Grid item xs={12} key={index}>
+              <Paper elevation={2} sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  {sourceResult.source.toUpperCase()} Results
+                </Typography>
                 
-                return (
-                  <TableRow key={sourceResult.source}>
-                    <TableCell>{sourceResult.source}</TableCell>
-                    <TableCell>{ndcg10 ? ndcg10.value.toFixed(3) : 'N/A'}</TableCell>
-                    <TableCell>{precision10 ? precision10.value.toFixed(3) : 'N/A'}</TableCell>
-                    <TableCell>{recall ? recall.value.toFixed(3) : 'N/A'}</TableCell>
-                    <TableCell>
-                      {sourceResult.judged_retrieved || 0}/{sourceResult.relevant_retrieved || 0} of {sourceResult.results_count || 0}
-                    </TableCell>
-                    <TableCell>
-                      {sourceResult.improvement ? (
-                        <Typography
-                          color={sourceResult.improvement >= 0 ? 'success.main' : 'error.main'}
-                        >
-                          {sourceResult.improvement > 0 ? '↑' : '↓'} 
-                          {Math.abs(sourceResult.improvement).toFixed(3)}
+                {/* Metrics Grid */}
+                <Grid container spacing={2}>
+                  {sourceResult.metrics.map((metric, idx) => (
+                    <Grid item xs={12} sm={6} md={4} key={idx}>
+                      <Paper elevation={1} sx={{ p: 2, bgcolor: 'grey.50' }}>
+                        <Typography variant="h6">
+                          {metric.value.toFixed(3)}
                         </Typography>
-                      ) : 'N/A'}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        <Box mt={4}>
-          <Typography variant="h6" gutterBottom>
-            Detailed Metrics
-          </Typography>
-          
-          {results.source_results?.map((sourceResult) => (
-            <Accordion key={sourceResult.source}>
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>{sourceResult.source}</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Metric</TableCell>
-                        <TableCell>Value</TableCell>
-                        <TableCell>Description</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {sourceResult.metrics?.map((metric, idx) => (
-                        <TableRow key={idx}>
-                          <TableCell>{metric.name}</TableCell>
-                          <TableCell>{metric.value.toFixed(3)}</TableCell>
-                          <TableCell>{metric.description}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </AccordionDetails>
-            </Accordion>
+                        <Typography variant="caption" color="text.secondary">
+                          {metric.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          {metric.description}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+
+                {/* Judged Titles Section */}
+                {results.judged_titles && results.judged_titles.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Judged Documents ({results.judged_titles.length})
+                    </Typography>
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Title</TableCell>
+                            <TableCell>Rating</TableCell>
+                            <TableCell>Found in Results</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {results.judged_titles.map((judged, idx) => {
+                            const foundInResults = sourceResult.results.some(
+                              r => r.clean_title === judged.clean_title
+                            );
+                            return (
+                              <TableRow key={idx}>
+                                <TableCell>
+                                  <Typography variant="body2">
+                                    {judged.title}
+                                  </Typography>
+                                  {judged.bibcode && (
+                                    <Typography variant="caption" color="primary">
+                                      <a href={`https://ui.adsabs.harvard.edu/abs/${judged.bibcode}/abstract`} 
+                                         target="_blank" 
+                                         rel="noopener noreferrer">
+                                        View in ADS
+                                      </a>
+                                    </Typography>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Chip 
+                                    label={`${judged.rating}`}
+                                    color={judged.rating > 0 ? 'success' : 'default'}
+                                    size="small"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Chip 
+                                    label={foundInResults ? 'Found' : 'Not Found'}
+                                    color={foundInResults ? 'success' : 'error'}
+                                    size="small"
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+                {/* Search Results Table */}
+                {sourceResult.results && sourceResult.results.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Top {sourceResult.results.length} Search Results
+                    </Typography>
+                    <TableContainer>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Rank</TableCell>
+                            <TableCell>Title</TableCell>
+                            <TableCell>Authors</TableCell>
+                            <TableCell>Year</TableCell>
+                            <TableCell>Citations</TableCell>
+                            <TableCell>Type</TableCell>
+                            <TableCell>Judgment</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {sourceResult.results.map((result, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{idx + 1}</TableCell>
+                              <TableCell>
+                                <Link 
+                                  href={result.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                >
+                                  {result.title}
+                                </Link>
+                              </TableCell>
+                              <TableCell>{result.authors?.join(', ')}</TableCell>
+                              <TableCell>{result.year}</TableCell>
+                              <TableCell>{result.citation_count}</TableCell>
+                              <TableCell>{result.doc_type}</TableCell>
+                              <TableCell>
+                                <Chip 
+                                  label={result.has_judgment ? 
+                                    `Relevant (${result.judgment})` : 
+                                    'Not Judged'}
+                                  color={result.has_judgment ? 'success' : 'default'}
+                                  size="small"
+                                />
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+                {/* Summary Stats */}
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Documents judged: {results.total_judged} | 
+                    Documents retrieved: {sourceResult.results_count} | 
+                    Judged documents found: {sourceResult.judged_retrieved} | 
+                    Relevant documents found: {sourceResult.relevant_retrieved}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Grid>
           ))}
-        </Box>
+        </Grid>
       </Box>
     );
   };
@@ -424,6 +474,75 @@ const QuepidEvaluation = () => {
         </Card>
         
         {renderResults()}
+        
+        {/* Original Results Display */}
+        {results && results.comparison_results?.[0]?.original_results && (
+          <Box mt={4}>
+            <Typography variant="h5" gutterBottom>
+              Original Search Results
+            </Typography>
+            
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Rank</TableCell>
+                    <TableCell>Title</TableCell>
+                    <TableCell>Authors</TableCell>
+                    <TableCell>Year</TableCell>
+                    <TableCell>Citations</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Judgment</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {results.comparison_results[0].original_results.map((result, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {result.title}
+                        </Typography>
+                        {result.bibcode && (
+                          <Typography variant="caption" color="primary">
+                            <a href={`https://ui.adsabs.harvard.edu/abs/${result.bibcode}/abstract`} 
+                               target="_blank" 
+                               rel="noopener noreferrer">
+                              View
+                            </a>
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {result.authors?.join(', ')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{result.year}</TableCell>
+                      <TableCell>{result.citation_count || 0}</TableCell>
+                      <TableCell>{result.doc_type || 'N/A'}</TableCell>
+                      <TableCell>
+                        {result.has_judgment ? (
+                          <Chip 
+                            label={`Rating: ${result.judgment}`}
+                            color={result.judgment >= 2 ? 'success' : 'default'}
+                            size="small"
+                          />
+                        ) : (
+                          <Chip 
+                            label="Not Judged"
+                            color="default"
+                            size="small"
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
       </Box>
     </Container>
   );

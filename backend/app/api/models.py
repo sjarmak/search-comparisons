@@ -209,21 +209,23 @@ class QuepidEvaluationSourceResult(BaseModel):
     Model representing evaluation results for a single source.
     
     Attributes:
-        source: The search engine source name
-        metrics: List of metric results
-        judged_retrieved: Number of judged documents retrieved
-        relevant_retrieved: Number of relevant documents retrieved
-        results_count: Total number of results returned
-        improvement: Improvement in nDCG@10 compared to base results
-        config: The boost configuration used
+        source: The search source name
+        metrics: List of evaluation metrics
+        judged_retrieved: Number of judged documents found in results
+        relevant_retrieved: Number of relevant documents found in results
+        results_count: Total number of results
+        results: List of search results
+        config: Boost configuration used
+        judged_titles: List of judged documents with their titles
     """
     source: str
     metrics: List[MetricResult]
     judged_retrieved: int
     relevant_retrieved: int
     results_count: int
-    improvement: Optional[float] = None
-    config: Optional[BoostConfig] = None
+    results: List[SearchResult]
+    config: BoostConfig
+    judged_titles: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class QuepidEvaluationResponse(BaseModel):
