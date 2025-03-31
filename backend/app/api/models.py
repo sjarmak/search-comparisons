@@ -32,19 +32,18 @@ class SearchRequest(BaseModel):
 
 
 class BoostConfig(BaseModel):
-    """Configuration for search result boosting.
+    """
+    Model representing boost configuration for search results.
     
     Attributes:
-        citation_boost: Factor to boost results based on citation count
-        min_citations: Minimum citation count required for citation boost
-        recency_boost: Factor to boost results based on publication year
-        reference_year: Year to use as reference for recency boost
-        doctype_boosts: Dictionary mapping document types to their boost values
+        name: Name of the boost configuration
+        citation_boost: Boost factor for citation count
+        recency_boost: Boost factor for publication recency
+        doctype_boosts: Dictionary mapping document types to boost factors
     """
-    citation_boost: float = 0.0
-    min_citations: int = 0
-    recency_boost: float = 0.0
-    reference_year: Optional[int] = None
+    name: str
+    citation_boost: float = Field(default=0.0, ge=0.0)
+    recency_boost: float = Field(default=0.0, ge=0.0)
     doctype_boosts: Dict[str, float] = Field(default_factory=dict)
 
 
@@ -195,12 +194,14 @@ class QuepidEvaluationRequest(BaseModel):
         case_id: The Quepid case ID containing judgments
         fields: List of fields to include in the search (optional)
         max_results: Maximum number of results to return (optional)
+        boost_configs: List of boost configurations to evaluate (optional)
     """
     query: str
     sources: List[str]
     case_id: int = Field(gt=0)
     fields: Optional[List[str]] = None
     max_results: Optional[int] = Field(default=20, ge=1, le=1000)
+    boost_configs: Optional[List[BoostConfig]] = None
 
 
 class QuepidEvaluationSourceResult(BaseModel):
@@ -213,12 +214,16 @@ class QuepidEvaluationSourceResult(BaseModel):
         judged_retrieved: Number of judged documents retrieved
         relevant_retrieved: Number of relevant documents retrieved
         results_count: Total number of results returned
+        improvement: Improvement in nDCG@10 compared to base results
+        config: The boost configuration used
     """
     source: str
     metrics: List[MetricResult]
     judged_retrieved: int
     relevant_retrieved: int
     results_count: int
+    improvement: Optional[float] = None
+    config: Optional[BoostConfig] = None
 
 
 class QuepidEvaluationResponse(BaseModel):

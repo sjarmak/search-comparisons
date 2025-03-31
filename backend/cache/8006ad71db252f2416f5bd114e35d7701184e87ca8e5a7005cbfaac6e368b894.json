@@ -1,5 +1,5 @@
 {
-  "timestamp": 1743281729.0592,
+  "timestamp": 1743443715.945858,
   "expiry": 86400,
   "results": [
     {
@@ -18,10 +18,10 @@
       "citation_count": 15,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -39,10 +39,10 @@
       "citation_count": 23,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -61,10 +61,10 @@
       "citation_count": 26,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -83,10 +83,10 @@
       "citation_count": 46,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -101,10 +101,10 @@
       "citation_count": 0,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -123,10 +123,10 @@
       "citation_count": 29,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -145,10 +145,10 @@
       "citation_count": 16,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -167,10 +167,10 @@
       "citation_count": 39,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -189,10 +189,10 @@
       "citation_count": 0,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -211,30 +211,10 @@
       "citation_count": 1,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
-      "boost_factors": null
-    },
-    {
-      "title": "Response to reviews of Interaction of katabatic wind and local surface mass balance at Scharffenbergbotnen Blue Ice Area, Antarctica",
-      "authors": [
-        "M. Broeke"
-      ],
-      "abstract": null,
-      "doi": null,
-      "year": 2015,
-      "url": "https://www.semanticscholar.org/paper/2e079f999a960847319a6cceaf95ae05f8b01b63",
-      "source": "semanticScholar",
-      "rank": 11,
-      "citation_count": 0,
-      "doctype": null,
-      "property": null,
-      "original_rank": null,
-      "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -249,14 +229,34 @@
       "year": 2015,
       "url": "https://www.semanticscholar.org/paper/16019d6bda0398d8689397394373944be67cf1e0",
       "source": "semanticScholar",
+      "rank": 11,
+      "citation_count": 0,
+      "doctype": null,
+      "property": null,
+      "boosted_score": null,
+      "original_score": null,
+      "original_rank": null,
+      "rank_change": null,
+      "boost_factors": null
+    },
+    {
+      "title": "Response to reviews of Interaction of katabatic wind and local surface mass balance at Scharffenbergbotnen Blue Ice Area, Antarctica",
+      "authors": [
+        "M. Broeke"
+      ],
+      "abstract": null,
+      "doi": null,
+      "year": 2015,
+      "url": "https://www.semanticscholar.org/paper/2e079f999a960847319a6cceaf95ae05f8b01b63",
+      "source": "semanticScholar",
       "rank": 12,
       "citation_count": 0,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -274,10 +274,10 @@
       "citation_count": 5,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -296,10 +296,10 @@
       "citation_count": 21,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -318,10 +318,10 @@
       "citation_count": 74,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -338,10 +338,10 @@
       "citation_count": 0,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -359,10 +359,10 @@
       "citation_count": 23,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -379,10 +379,10 @@
       "citation_count": 6,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -401,10 +401,10 @@
       "citation_count": 0,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -423,10 +423,10 @@
       "citation_count": 21,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     }
   ]

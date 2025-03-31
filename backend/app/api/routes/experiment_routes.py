@@ -107,6 +107,62 @@ class BoostResult(BaseModel):
     stats: Dict[str, Any]
 
 
+def find_closest_query(query: str, available_queries: List[str]) -> Optional[str]:
+    """
+    Find the closest matching query in a list of available queries.
+    
+    Args:
+        query: The query to match
+        available_queries: List of available queries to match against
+    
+    Returns:
+        Optional[str]: The closest matching query, or None if no matches
+    """
+    if not available_queries:
+        return None
+    
+    # Normalize queries for comparison
+    norm_query = query.lower().strip()
+    norm_available = [q.lower().strip() for q in available_queries]
+    
+    # Check for exact match after normalization
+    if norm_query in norm_available:
+        idx = norm_available.index(norm_query)
+        return available_queries[idx]
+    
+    # Check for queries that contain all words from the input query
+    query_words = set(norm_query.split())
+    
+    matches = []
+    for i, q in enumerate(norm_available):
+        q_words = set(q.split())
+        # Check if all words from the input query are in the available query
+        if query_words.issubset(q_words):
+            matches.append((i, len(q_words.intersection(query_words))))
+        # Also check if the available query is a subset of the input query
+        elif q_words.issubset(query_words):
+            matches.append((i, len(q_words.intersection(query_words))))
+    
+    # Sort by number of matching words, descending
+    matches.sort(key=lambda x: x[1], reverse=True)
+    
+    if matches:
+        return available_queries[matches[0][0]]
+    
+    # If no matches found, try fuzzy matching
+    from difflib import SequenceMatcher
+    best_ratio = 0
+    best_query = None
+    
+    for q in available_queries:
+        ratio = SequenceMatcher(None, norm_query, q.lower()).ratio()
+        if ratio > best_ratio and ratio > 0.8:  # Only consider matches with >80% similarity
+            best_ratio = ratio
+            best_query = q
+    
+    return best_query
+
+
 @router.post("/boost", response_model=BoostResult)
 async def boost_search_results(
     request: Request,
@@ -580,18 +636,7 @@ async def evaluate_search_with_quepid(request: QuepidEvaluationRequest) -> Quepi
         available_queries = case.queries
         
         if request.query not in case.judgments:
-            closest_query = None
-            # Find query with most overlapping terms
-            query_terms = set(request.query.lower().split())
-            
-            max_overlap = 0
-            for q in case.queries:
-                q_terms = set(q.lower().split())
-                overlap = len(query_terms & q_terms)
-                if overlap > max_overlap:
-                    max_overlap = overlap
-                    closest_query = q
-            
+            closest_query = find_closest_query(request.query, case.queries)
             if closest_query:
                 logger.info(f"Using closest query match: '{closest_query}' instead of '{request.query}'")
                 query_to_use = closest_query
@@ -629,6 +674,8 @@ async def evaluate_search_with_quepid(request: QuepidEvaluationRequest) -> Quepi
         
         # Get search results for each source
         source_results = []
+        base_results = {}  # Store base results for each source
+        
         for source in request.sources:
             try:
                 # Get results from the source
@@ -639,43 +686,111 @@ async def evaluate_search_with_quepid(request: QuepidEvaluationRequest) -> Quepi
                     num_results=request.max_results
                 )
                 
-                # Evaluate results against judgments
-                eval_result = await evaluate_search_results(
+                # Store base results
+                base_results[source] = results
+                
+                # Evaluate base results
+                base_eval = await evaluate_search_results(
                     query=query_to_use,
                     search_results=results,
                     case_id=request.case_id
                 )
                 
-                # Format metrics for response
-                metrics = []
-                for name, value in eval_result.get("ndcg", {}).items():
-                    metrics.append(MetricResult(
+                # Format base metrics
+                base_metrics = []
+                for name, value in base_eval.get("ndcg", {}).items():
+                    base_metrics.append(MetricResult(
                         name=name,
                         value=value,
                         description=f"Normalized Discounted Cumulative Gain at {name.split('@')[1]}"
                     ))
                 
-                for name, value in eval_result.get("precision", {}).items():
-                    metrics.append(MetricResult(
+                for name, value in base_eval.get("precision", {}).items():
+                    base_metrics.append(MetricResult(
                         name=name,
                         value=value,
                         description=f"Precision at {name.split('@')[1]}"
                     ))
                 
-                metrics.append(MetricResult(
+                base_metrics.append(MetricResult(
                     name="recall",
-                    value=eval_result.get("recall", 0.0),
+                    value=base_eval.get("recall", 0.0),
                     description="Recall (relevant retrieved / total relevant)"
                 ))
                 
-                # Add to source results
+                # Add base results
                 source_results.append(QuepidEvaluationSourceResult(
                     source=source,
-                    metrics=metrics,
-                    judged_retrieved=eval_result.get("judged_retrieved", 0),
-                    relevant_retrieved=eval_result.get("relevant_retrieved", 0),
-                    results_count=eval_result.get("results_count", 0)
+                    metrics=base_metrics,
+                    judged_retrieved=base_eval.get("judged_retrieved", 0),
+                    relevant_retrieved=base_eval.get("relevant_retrieved", 0),
+                    results_count=base_eval.get("results_count", 0),
+                    config=BoostConfig(
+                        name="Base Results",
+                        citation_boost=0.0,
+                        recency_boost=0.0,
+                        doctype_boosts={}
+                    )
                 ))
+                
+                # Evaluate with boost configurations if provided
+                if request.boost_configs:
+                    for boost_config in request.boost_configs:
+                        try:
+                            # Apply boosts to results
+                            boosted_results = await apply_all_boosts(
+                                results,
+                                boost_config.dict()
+                            )
+                            
+                            # Evaluate boosted results
+                            boost_eval = await evaluate_search_results(
+                                query=query_to_use,
+                                search_results=boosted_results,
+                                case_id=request.case_id
+                            )
+                            
+                            # Calculate improvement
+                            base_ndcg = base_eval.get("ndcg", {}).get("ndcg@10", 0.0)
+                            boost_ndcg = boost_eval.get("ndcg", {}).get("ndcg@10", 0.0)
+                            improvement = boost_ndcg - base_ndcg
+                            
+                            # Format boost metrics
+                            boost_metrics = []
+                            for name, value in boost_eval.get("ndcg", {}).items():
+                                boost_metrics.append(MetricResult(
+                                    name=name,
+                                    value=value,
+                                    description=f"Normalized Discounted Cumulative Gain at {name.split('@')[1]}"
+                                ))
+                            
+                            for name, value in boost_eval.get("precision", {}).items():
+                                boost_metrics.append(MetricResult(
+                                    name=name,
+                                    value=value,
+                                    description=f"Precision at {name.split('@')[1]}"
+                                ))
+                            
+                            boost_metrics.append(MetricResult(
+                                name="recall",
+                                value=boost_eval.get("recall", 0.0),
+                                description="Recall (relevant retrieved / total relevant)"
+                            ))
+                            
+                            # Add boosted results
+                            source_results.append(QuepidEvaluationSourceResult(
+                                source=source,
+                                metrics=boost_metrics,
+                                judged_retrieved=boost_eval.get("judged_retrieved", 0),
+                                relevant_retrieved=boost_eval.get("relevant_retrieved", 0),
+                                results_count=boost_eval.get("results_count", 0),
+                                improvement=improvement,
+                                config=boost_config
+                            ))
+                            
+                        except Exception as boost_error:
+                            logger.error(f"Error applying boost config {boost_config.name}: {str(boost_error)}", exc_info=True)
+                            continue
                 
             except Exception as e:
                 logger.error(f"Error evaluating {source} results: {str(e)}", exc_info=True)

@@ -68,6 +68,8 @@ class Settings(BaseSettings):
         SEMANTIC_SCHOLAR_ENDPOINT: Semantic Scholar API endpoint
         WEB_OF_SCIENCE_API_KEY: API key for Web of Science
         WEB_OF_SCIENCE_ENDPOINT: Web of Science API endpoint
+        QUEPID_API_KEY: API key for Quepid
+        QUEPID_API_URL: Base URL for Quepid API
         CACHE_EXPIRY: Cache expiration time in seconds
         CACHE_DIR: Directory for cache files
         NUM_RESULTS: Default number of results to return
@@ -110,6 +112,10 @@ class Settings(BaseSettings):
     # API settings - Web of Science
     WEB_OF_SCIENCE_API_KEY: Optional[str] = None
     WEB_OF_SCIENCE_ENDPOINT: str = "https://wos-api.clarivate.com/api/woslite/v1"
+    
+    # API settings - Quepid
+    QUEPID_API_KEY: Optional[str] = None
+    QUEPID_API_URL: str = "https://app.quepid.com/api/"
     
     # General settings
     NUM_RESULTS: int = 10

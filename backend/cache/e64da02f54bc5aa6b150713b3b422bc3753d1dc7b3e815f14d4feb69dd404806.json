@@ -1,5 +1,5 @@
 {
-  "timestamp": 1743281728.324067,
+  "timestamp": 1743443715.196386,
   "expiry": 86400,
   "results": [
     {
@@ -16,10 +16,10 @@
       "citation_count": 271,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -37,10 +37,10 @@
       "citation_count": 255,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -58,10 +58,10 @@
       "citation_count": 146,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -78,10 +78,10 @@
       "citation_count": 206,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -99,10 +99,10 @@
       "citation_count": 175,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -120,10 +120,10 @@
       "citation_count": 247,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -141,10 +141,10 @@
       "citation_count": 44,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -162,10 +162,10 @@
       "citation_count": 268,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -183,10 +183,10 @@
       "citation_count": 107,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -203,10 +203,10 @@
       "citation_count": 153,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -224,10 +224,10 @@
       "citation_count": 148,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -244,10 +244,10 @@
       "citation_count": 108,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -266,10 +266,10 @@
       "citation_count": 60,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -288,10 +288,10 @@
       "citation_count": 90,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -308,10 +308,10 @@
       "citation_count": 93,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -329,10 +329,10 @@
       "citation_count": 62,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -350,10 +350,10 @@
       "citation_count": 115,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -371,10 +371,10 @@
       "citation_count": 93,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -393,10 +393,10 @@
       "citation_count": 57,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     },
     {
@@ -414,10 +414,10 @@
       "citation_count": 227,
       "doctype": null,
       "property": null,
+      "boosted_score": null,
+      "original_score": null,
       "original_rank": null,
       "rank_change": null,
-      "original_score": null,
-      "boosted_score": null,
       "boost_factors": null
     }
   ]

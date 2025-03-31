@@ -1,173 +1,149 @@
-"""Service module for handling various types of boosts in search results."""
-from typing import Dict, List, Optional
+"""
+Service module for applying boost factors to search results.
+
+This module provides functionality to apply various boost factors to search results,
+including citation count, publication recency, and document type boosts.
+"""
+import logging
+from typing import List, Dict, Any, Optional
 from datetime import datetime
+from copy import deepcopy
+import math
+
 from ..api.models import SearchResult
+
+# Setup logging
+logger = logging.getLogger(__name__)
+
+
+async def apply_all_boosts(
+    results: List[SearchResult],
+    boost_config: Dict[str, Any]
+) -> List[SearchResult]:
+    """
+    Apply all configured boost factors to search results.
+    
+    Args:
+        results: List of search results to boost
+        boost_config: Dictionary containing boost configuration
+        
+    Returns:
+        List[SearchResult]: Boosted search results
+    """
+    if not results:
+        return []
+    
+    # Create a deep copy to avoid modifying originals
+    boosted_results = deepcopy(results)
+    
+    try:
+        # Apply citation boost
+        if boost_config.get("citation_boost", 0.0) > 0:
+            boosted_results = apply_citation_boost(
+                boosted_results,
+                boost_config["citation_boost"]
+            )
+        
+        # Apply recency boost
+        if boost_config.get("recency_boost", 0.0) > 0:
+            boosted_results = apply_recency_boost(
+                boosted_results,
+                boost_config["recency_boost"]
+            )
+        
+        # Apply document type boosts
+        doctype_boosts = boost_config.get("doctype_boosts", {})
+        if doctype_boosts:
+            boosted_results = apply_doctype_boosts(
+                boosted_results,
+                doctype_boosts
+            )
+        
+        # Sort results by boosted score
+        boosted_results.sort(key=lambda x: x._score, reverse=True)
+        
+        return boosted_results
+        
+    except Exception as e:
+        logger.error(f"Error applying boosts: {str(e)}", exc_info=True)
+        return results
 
 
 def apply_citation_boost(
     results: List[SearchResult],
-    boost_factor: float = 1.0,
-    min_citations: int = 0
+    boost_factor: float
 ) -> List[SearchResult]:
-    """Apply citation-based boosting to search results.
-
-    Args:
-        results: List of search results to boost
-        boost_factor: Factor to multiply citation counts by
-        min_citations: Minimum number of citations required for boosting
-
-    Returns:
-        List[SearchResult]: Results with citation-based boosting applied
     """
-    boosted_results = []
+    Apply citation count boost to search results.
+    
+    Args:
+        results: List of search results
+        boost_factor: Factor to boost citation counts by
+        
+    Returns:
+        List[SearchResult]: Results with citation boost applied
+    """
     for result in results:
-        if result.citation_count is not None and result.citation_count >= min_citations:
-            # Store original score if not already stored
-            if result.boosted_score is None:
-                result.boosted_score = 1.0
-                result.original_score = 1.0
-            
-            # Apply citation boost
-            citation_boost = 1.0 + (result.citation_count * boost_factor)
-            result.boosted_score *= citation_boost
-            
-            # Store boost factors
-            if result.boost_factors is None:
-                result.boost_factors = {}
-            result.boost_factors['citations'] = citation_boost
-            
-        boosted_results.append(result)
-    return boosted_results
+        citation_count = getattr(result, 'citation_count', 0)
+        if citation_count > 0:
+            # Apply logarithmic boost to avoid extreme values
+            boost = 1 + (boost_factor * (1 + math.log2(1 + citation_count)))
+            result._score *= boost
+    
+    return results
 
 
 def apply_recency_boost(
     results: List[SearchResult],
-    boost_factor: float = 1.0,
-    reference_year: Optional[int] = None
+    boost_factor: float
 ) -> List[SearchResult]:
-    """Apply recency-based boosting to search results.
-
-    Args:
-        results: List of search results to boost
-        boost_factor: Factor to multiply recency boost by
-        reference_year: Year to use as reference (defaults to current year)
-
-    Returns:
-        List[SearchResult]: Results with recency-based boosting applied
     """
-    if reference_year is None:
-        reference_year = datetime.now().year
-
-    boosted_results = []
+    Apply publication recency boost to search results.
+    
+    Args:
+        results: List of search results
+        boost_factor: Factor to boost recent publications by
+        
+    Returns:
+        List[SearchResult]: Results with recency boost applied
+    """
+    current_year = datetime.now().year
+    
     for result in results:
-        if result.year is not None:
-            # Store original score if not already stored
-            if result.boosted_score is None:
-                result.boosted_score = 1.0
-                result.original_score = 1.0
-            
-            # Calculate recency boost (exponential decay)
-            years_old = reference_year - result.year
-            recency_boost = 1.0 + (boost_factor * (1.0 / (1.0 + years_old)))
-            result.boosted_score *= recency_boost
-            
-            # Store boost factors
-            if result.boost_factors is None:
-                result.boost_factors = {}
-            result.boost_factors['recency'] = recency_boost
-            
-        boosted_results.append(result)
-    return boosted_results
+        year = getattr(result, 'year', None)
+        if year and isinstance(year, (int, str)):
+            try:
+                year = int(year)
+                if 1900 <= year <= current_year:
+                    # Calculate years since publication
+                    years_old = current_year - year
+                    # Apply exponential decay boost
+                    boost = 1 + (boost_factor * math.exp(-years_old / 10))
+                    result._score *= boost
+            except (ValueError, TypeError):
+                continue
+    
+    return results
 
 
-def apply_doctype_boost(
+def apply_doctype_boosts(
     results: List[SearchResult],
     doctype_boosts: Dict[str, float]
 ) -> List[SearchResult]:
-    """Apply document type-based boosting to search results.
-
-    Args:
-        results: List of search results to boost
-        doctype_boosts: Dictionary mapping document types to their boost values
-
-    Returns:
-        List[SearchResult]: Results with document type-based boosting applied
     """
-    boosted_results = []
+    Apply document type boosts to search results.
+    
+    Args:
+        results: List of search results
+        doctype_boosts: Dictionary mapping document types to boost factors
+        
+    Returns:
+        List[SearchResult]: Results with document type boosts applied
+    """
     for result in results:
-        if result.doctype and result.doctype in doctype_boosts:
-            # Store original score if not already stored
-            if result.boosted_score is None:
-                result.boosted_score = 1.0
-                result.original_score = 1.0
-            
-            # Apply document type boost
-            doctype_boost = doctype_boosts[result.doctype]
-            result.boosted_score *= doctype_boost
-            
-            # Store boost factors
-            if result.boost_factors is None:
-                result.boost_factors = {}
-            result.boost_factors['doctype'] = doctype_boost
-            
-        boosted_results.append(result)
-    return boosted_results
-
-
-def apply_all_boosts(
-    results: List[SearchResult],
-    citation_boost: Optional[float] = None,
-    min_citations: Optional[int] = None,
-    recency_boost: Optional[float] = None,
-    reference_year: Optional[int] = None,
-    doctype_boosts: Optional[Dict[str, float]] = None
-) -> List[SearchResult]:
-    """Apply all types of boosts to search results.
-
-    Args:
-        results: List of search results to boost
-        citation_boost: Factor to multiply citation counts by
-        min_citations: Minimum number of citations required for boosting
-        recency_boost: Factor to multiply recency boost by
-        reference_year: Year to use as reference for recency
-        doctype_boosts: Dictionary mapping document types to their boost values
-
-    Returns:
-        List[SearchResult]: Results with all boosts applied
-    """
-    boosted_results = results.copy()
-
-    # Apply citation boost if configured
-    if citation_boost is not None:
-        boosted_results = apply_citation_boost(
-            boosted_results,
-            boost_factor=citation_boost,
-            min_citations=min_citations or 0
-        )
-
-    # Apply recency boost if configured
-    if recency_boost is not None:
-        boosted_results = apply_recency_boost(
-            boosted_results,
-            boost_factor=recency_boost,
-            reference_year=reference_year
-        )
-
-    # Apply document type boost if configured
-    if doctype_boosts:
-        boosted_results = apply_doctype_boost(
-            boosted_results,
-            doctype_boosts
-        )
-
-    # Sort results by boosted score
-    boosted_results.sort(key=lambda x: x.boosted_score or 0, reverse=True)
-
-    # Update ranks based on boosted scores
-    for i, result in enumerate(boosted_results):
-        if result.original_rank is None:
-            result.original_rank = result.rank
-        result.rank = i + 1
-        result.rank_change = result.original_rank - result.rank
-
-    return boosted_results 
+        doctype = getattr(result, 'doctype', '').lower()
+        if doctype in doctype_boosts:
+            boost = 1 + doctype_boosts[doctype]
+            result._score *= boost
+    
+    return results 

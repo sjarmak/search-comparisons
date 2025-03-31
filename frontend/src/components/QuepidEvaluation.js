@@ -4,7 +4,7 @@
  * This component provides UI for evaluating search results against
  * Quepid judgments, calculating metrics like nDCG@10.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { experimentService } from '../services/api';
 import {
   Container,
@@ -15,9 +15,6 @@ import {
   Card,
   CardContent,
   Chip,
-  FormGroup,
-  FormControlLabel,
-  Checkbox,
   Grid,
   List,
   ListItem,
@@ -34,16 +31,23 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Divider
+  Divider,
+  Slider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
-// Available search sources
-const AVAILABLE_SOURCES = [
-  { id: 'ads', name: 'ADS/SciX' },
-  { id: 'scholar', name: 'Google Scholar' },
-  { id: 'semantic_scholar', name: 'Semantic Scholar' },
-  { id: 'web_of_science', name: 'Web of Science' }
+// Available document types for boosting
+const DOC_TYPES = [
+  'article',
+  'refereed',
+  'proceedings',
+  'book',
+  'thesis',
+  'other'
 ];
 
 const QuepidEvaluation = () => {
@@ -51,7 +55,14 @@ const QuepidEvaluation = () => {
   const [query, setQuery] = useState('');
   const [caseId, setCaseId] = useState('');
   const [maxResults, setMaxResults] = useState(20);
-  const [selectedSources, setSelectedSources] = useState(['ads', 'scholar', 'semantic_scholar']);
+  
+  // State for boost configuration
+  const [boostConfig, setBoostConfig] = useState({
+    name: "Boosted Results",
+    citation_boost: 1.0,
+    recency_boost: 1.0,
+    doctype_boosts: {}
+  });
   
   // State for UI
   const [isLoading, setIsLoading] = useState(false);
@@ -59,13 +70,23 @@ const QuepidEvaluation = () => {
   const [successMessage, setSuccessMessage] = useState(null);
   const [results, setResults] = useState(null);
   
-  // Function to toggle a search source
-  const toggleSource = (sourceId) => {
-    if (selectedSources.includes(sourceId)) {
-      setSelectedSources(selectedSources.filter(id => id !== sourceId));
-    } else {
-      setSelectedSources([...selectedSources, sourceId]);
-    }
+  // Function to update boost configuration
+  const updateBoostConfig = (field, value) => {
+    setBoostConfig(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+  
+  // Function to update doctype boost
+  const updateDoctypeBoost = (doctype, value) => {
+    setBoostConfig(prev => ({
+      ...prev,
+      doctype_boosts: {
+        ...prev.doctype_boosts,
+        [doctype]: value
+      }
+    }));
   };
   
   // Function to evaluate search results with Quepid
@@ -86,17 +107,21 @@ const QuepidEvaluation = () => {
       return;
     }
     
-    if (selectedSources.length === 0) {
-      setError('Please select at least one search source');
-      return;
-    }
-    
     // Prepare the evaluation request
     const evaluationRequest = {
       query: query.trim(),
-      sources: selectedSources,
       case_id: parseInt(caseId),
-      max_results: maxResults
+      max_results: maxResults,
+      sources: ['ads'],  // Always use ADS
+      boost_configs: [
+        {
+          name: "Base Results",
+          citation_boost: 0.0,
+          recency_boost: 0.0,
+          doctype_boosts: {}
+        },
+        boostConfig
+      ]
     };
     
     // Call the API
@@ -112,7 +137,11 @@ const QuepidEvaluation = () => {
         setSuccessMessage('Evaluation completed successfully');
       }
     } catch (error) {
-      setError('Error connecting to the server');
+      // Handle different types of error objects
+      const errorMessage = error.response?.data?.detail || 
+                          error.message || 
+                          'Error connecting to the server';
+      setError(errorMessage);
       console.error('Quepid evaluation error:', error);
     } finally {
       setIsLoading(false);
@@ -131,19 +160,19 @@ const QuepidEvaluation = () => {
         
         <Box mb={2}>
           <Chip 
-            label={`Case: ${results.case_name}`} 
+            label={`Case: ${results.case_name || 'N/A'}`} 
             color="primary" 
             variant="outlined" 
             sx={{ marginRight: 1 }}
           />
           <Chip 
-            label={`Total judged: ${results.total_judged}`} 
+            label={`Total judged: ${results.total_judged || 0}`} 
             color="primary" 
             variant="outlined" 
             sx={{ marginRight: 1 }}
           />
           <Chip 
-            label={`Total relevant: ${results.total_relevant}`} 
+            label={`Total relevant: ${results.total_relevant || 0}`} 
             color="primary" 
             variant="outlined"
           />
@@ -177,23 +206,34 @@ const QuepidEvaluation = () => {
                 <TableCell>Precision@10</TableCell>
                 <TableCell>Recall</TableCell>
                 <TableCell>Judged/Relevant</TableCell>
+                <TableCell>Improvement</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {results.source_results.map((sourceResult) => {
+              {results.source_results?.map((sourceResult) => {
                 // Find metrics
-                const ndcg10 = sourceResult.metrics.find(m => m.name === 'ndcg@10');
-                const precision10 = sourceResult.metrics.find(m => m.name === 'p@10');
-                const recall = sourceResult.metrics.find(m => m.name === 'recall');
+                const ndcg10 = sourceResult.metrics?.find(m => m.name === 'ndcg@10');
+                const precision10 = sourceResult.metrics?.find(m => m.name === 'p@10');
+                const recall = sourceResult.metrics?.find(m => m.name === 'recall');
                 
                 return (
                   <TableRow key={sourceResult.source}>
-                    <TableCell>{getSourceName(sourceResult.source)}</TableCell>
+                    <TableCell>{sourceResult.source}</TableCell>
                     <TableCell>{ndcg10 ? ndcg10.value.toFixed(3) : 'N/A'}</TableCell>
                     <TableCell>{precision10 ? precision10.value.toFixed(3) : 'N/A'}</TableCell>
                     <TableCell>{recall ? recall.value.toFixed(3) : 'N/A'}</TableCell>
                     <TableCell>
-                      {sourceResult.judged_retrieved}/{sourceResult.relevant_retrieved} of {sourceResult.results_count}
+                      {sourceResult.judged_retrieved || 0}/{sourceResult.relevant_retrieved || 0} of {sourceResult.results_count || 0}
+                    </TableCell>
+                    <TableCell>
+                      {sourceResult.improvement ? (
+                        <Typography
+                          color={sourceResult.improvement >= 0 ? 'success.main' : 'error.main'}
+                        >
+                          {sourceResult.improvement > 0 ? '↑' : '↓'} 
+                          {Math.abs(sourceResult.improvement).toFixed(3)}
+                        </Typography>
+                      ) : 'N/A'}
                     </TableCell>
                   </TableRow>
                 );
@@ -207,10 +247,10 @@ const QuepidEvaluation = () => {
             Detailed Metrics
           </Typography>
           
-          {results.source_results.map((sourceResult) => (
+          {results.source_results?.map((sourceResult) => (
             <Accordion key={sourceResult.source}>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography>{getSourceName(sourceResult.source)}</Typography>
+                <Typography>{sourceResult.source}</Typography>
               </AccordionSummary>
               <AccordionDetails>
                 <TableContainer>
@@ -223,7 +263,7 @@ const QuepidEvaluation = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {sourceResult.metrics.map((metric, idx) => (
+                      {sourceResult.metrics?.map((metric, idx) => (
                         <TableRow key={idx}>
                           <TableCell>{metric.name}</TableCell>
                           <TableCell>{metric.value.toFixed(3)}</TableCell>
@@ -241,19 +281,13 @@ const QuepidEvaluation = () => {
     );
   };
   
-  // Helper function to get source display name
-  const getSourceName = (sourceId) => {
-    const source = AVAILABLE_SOURCES.find(s => s.id === sourceId);
-    return source ? source.name : sourceId;
-  };
-  
   return (
     <Container maxWidth="lg">
       <Box my={4}>
         <Typography variant="h4" component="h1" gutterBottom>
           Quepid Evaluation
         </Typography>
-        
+
         <Typography variant="body1" paragraph>
           Evaluate search results against Quepid relevance judgments to measure the effectiveness of search algorithms.
         </Typography>
@@ -299,28 +333,70 @@ const QuepidEvaluation = () => {
                   type="number"
                 />
               </Grid>
-              
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Search Sources
+
+              {/* Boost Configuration */}
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+                  Boost Configuration
                 </Typography>
-                <FormGroup>
-                  {AVAILABLE_SOURCES.map((source) => (
-                    <FormControlLabel
-                      key={source.id}
-                      control={
-                        <Checkbox
-                          checked={selectedSources.includes(source.id)}
-                          onChange={() => toggleSource(source.id)}
-                        />
-                      }
-                      label={source.name}
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={4}>
+                    <Typography gutterBottom>Citation Boost</Typography>
+                    <Slider
+                      value={boostConfig.citation_boost}
+                      onChange={(_, value) => updateBoostConfig('citation_boost', value)}
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      marks
                     />
-                  ))}
-                </FormGroup>
+                    <Typography variant="caption" color="text.secondary">
+                      {boostConfig.citation_boost.toFixed(1)}
+                    </Typography>
+                  </Grid>
+                  
+                  <Grid item xs={12} md={4}>
+                    <Typography gutterBottom>Recency Boost</Typography>
+                    <Slider
+                      value={boostConfig.recency_boost}
+                      onChange={(_, value) => updateBoostConfig('recency_boost', value)}
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      marks
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {boostConfig.recency_boost.toFixed(1)}
+                    </Typography>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography gutterBottom>Document Type Boosts</Typography>
+                    <Grid container spacing={2}>
+                      {DOC_TYPES.map((doctype) => (
+                        <Grid item xs={12} sm={6} md={4} key={doctype}>
+                          <Typography variant="caption" display="block">
+                            {doctype.charAt(0).toUpperCase() + doctype.slice(1)}
+                          </Typography>
+                          <Slider
+                            value={boostConfig.doctype_boosts[doctype] || 1.0}
+                            onChange={(_, value) => updateDoctypeBoost(doctype, value)}
+                            min={0}
+                            max={2}
+                            step={0.1}
+                            marks
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {(boostConfig.doctype_boosts[doctype] || 1.0).toFixed(1)}
+                          </Typography>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Grid>
+                </Grid>
               </Grid>
             </Grid>
-            
+
             <Box mt={3} textAlign="center">
               <Button
                 variant="contained"
@@ -335,7 +411,7 @@ const QuepidEvaluation = () => {
             
             {error && (
               <Alert severity="error" sx={{ mt: 2 }}>
-                {error}
+                {typeof error === 'string' ? error : 'An error occurred while evaluating results'}
               </Alert>
             )}
             
@@ -353,4 +429,4 @@ const QuepidEvaluation = () => {
   );
 };
 
-export default QuepidEvaluation; 
+export default QuepidEvaluation;

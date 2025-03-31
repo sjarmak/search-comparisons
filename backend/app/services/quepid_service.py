@@ -151,84 +151,66 @@ async def get_case_judgments(case_id: int) -> Dict[str, Any]:
 
 async def load_case_with_judgments(case_id: int) -> Optional[QuepidCase]:
     """
-    Load a Quepid case with all its judgments and queries.
+    Load a Quepid case with its judgments.
     
     Args:
-        case_id: The Quepid case ID to retrieve
+        case_id: The ID of the Quepid case to load
     
     Returns:
-        Optional[QuepidCase]: The case with judgments, or None if not found
+        Optional[QuepidCase]: The loaded case with judgments, or None if not found
     """
     try:
         # Get case details
         async with httpx.AsyncClient() as client:
-            headers = {
-                "Authorization": f"Bearer {QUEPID_API_KEY}",
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-            
-            url = urljoin(QUEPID_API_URL, f"cases/{case_id}")
-            logger.info(f"Getting case details for {case_id} from Quepid: {url}")
-            
-            case_data = await safe_api_request(
-                client,
-                "GET",
-                url,
-                headers=headers,
-                timeout=TIMEOUT_SECONDS
+            response = await client.get(
+                f"{QUEPID_API_URL}cases/{case_id}",
+                headers={"Authorization": f"Bearer {QUEPID_API_KEY}"}
             )
+            response.raise_for_status()
+            case_data = response.json()
             
-            if not case_data:
-                logger.warning(f"Case {case_id} not found or empty")
-                return None
+            # Get judgments using the export endpoint
+            judgments_response = await client.get(
+                f"{QUEPID_API_URL}export/ratings/{case_id}",
+                headers={"Authorization": f"Bearer {QUEPID_API_KEY}"}
+            )
+            judgments_response.raise_for_status()
+            judgments_data = judgments_response.json()
             
-            # Get judgments
-            judgments_data = await get_case_judgments(case_id)
+            # Log available queries
+            queries = set()
+            for query_data in judgments_data.get('queries', []):
+                queries.add(query_data['query'])
+            logger.info(f"Available queries in case {case_id}: {sorted(list(queries))}")
             
-            if not judgments_data:
-                logger.warning(f"No judgments found for case {case_id}")
-                return QuepidCase(
-                    case_id=case_id,
-                    name=case_data.get("name", f"Case {case_id}"),
-                    queries=[]
-                )
+            # Create case object with case_id as name if name not available
+            case = QuepidCase(
+                case_id=case_id,
+                name=case_data.get("case_name", f"Case {case_id}"),
+                queries=[]
+            )
             
             # Process judgments
-            queries = []
-            judgments_by_query = {}
+            for query_data in judgments_data.get('queries', []):
+                query = query_data['query']
+                if query not in case.queries:
+                    case.queries.append(query)
+                
+                if query not in case.judgments:
+                    case.judgments[query] = []
+                
+                # Process ratings for this query
+                for doc_id, rating in query_data.get('ratings', {}).items():
+                    case.judgments[query].append(QuepidJudgment(
+                        query_text=query,
+                        doc_id=doc_id,
+                        rating=rating
+                    ))
             
-            for rating_data in judgments_data.get("ratings", []):
-                query_text = rating_data.get("query_text", "")
-                doc_id = rating_data.get("doc_id", "")
-                rating = int(rating_data.get("rating", 0))
-                
-                if not query_text or not doc_id:
-                    continue
-                
-                if query_text not in queries:
-                    queries.append(query_text)
-                    judgments_by_query[query_text] = []
-                
-                judgment = QuepidJudgment(
-                    query_text=query_text,
-                    doc_id=doc_id,
-                    rating=rating,
-                    metadata={k: v for k, v in rating_data.items() 
-                             if k not in ["query_text", "doc_id", "rating"]}
-                )
-                
-                judgments_by_query[query_text].append(judgment)
+            return case
             
-            return QuepidCase(
-                case_id=case_id,
-                name=case_data.get("name", f"Case {case_id}"),
-                queries=queries,
-                judgments=judgments_by_query
-            )
-    
     except Exception as e:
-        logger.error(f"Error loading case {case_id} with judgments: {str(e)}")
+        logger.error(f"Error loading Quepid case {case_id}: {str(e)}", exc_info=True)
         return None
 
 
