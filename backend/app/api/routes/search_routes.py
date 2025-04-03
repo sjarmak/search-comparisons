@@ -98,13 +98,17 @@ async def compare_search_engines(
             logger.info(f"Applying boosts with config: {search_request.boost_config.model_dump_json()}")
             for source, source_results in results.items():
                 if source_results:
-                    boosted_results = apply_all_boosts(
+                    # Create a boost config dictionary from the BoostConfig model
+                    boost_config = {
+                        "citation_boost": search_request.boost_config.citation_boost,
+                        "min_citations": search_request.boost_config.min_citations,
+                        "recency_boost": search_request.boost_config.recency_boost,
+                        "reference_year": search_request.boost_config.reference_year,
+                        "doctype_boosts": search_request.boost_config.doctype_boosts
+                    }
+                    boosted_results = await apply_all_boosts(
                         source_results,
-                        citation_boost=search_request.boost_config.citation_boost,
-                        min_citations=search_request.boost_config.min_citations,
-                        recency_boost=search_request.boost_config.recency_boost,
-                        reference_year=search_request.boost_config.reference_year,
-                        doctype_boosts=search_request.boost_config.doctype_boosts
+                        boost_config
                     )
                     results[source] = boosted_results
                     logger.info(f"Retrieved {len(boosted_results)} results from {source}")
@@ -149,13 +153,17 @@ async def search(request: SearchRequestWithBoosts) -> SearchResponse:
         
         # Apply boosts if configured
         if request.boost_config:
-            results = apply_all_boosts(
+            # Create a boost config dictionary from the BoostConfig model
+            boost_config = {
+                "citation_boost": request.boost_config.citation_boost,
+                "min_citations": request.boost_config.min_citations,
+                "recency_boost": request.boost_config.recency_boost,
+                "reference_year": request.boost_config.reference_year,
+                "doctype_boosts": request.boost_config.doctype_boosts
+            }
+            results = await apply_all_boosts(
                 results,
-                citation_boost=request.boost_config.citation_boost,
-                min_citations=request.boost_config.min_citations,
-                recency_boost=request.boost_config.recency_boost,
-                reference_year=request.boost_config.reference_year,
-                doctype_boosts=request.boost_config.doctype_boosts
+                boost_config
             )
         
         return SearchResponse(results=results)

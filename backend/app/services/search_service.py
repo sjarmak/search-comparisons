@@ -169,6 +169,16 @@ async def get_results_with_fallback(
     """
     results: Dict[str, List[SearchResult]] = {}
     
+    # Convert query to string if it's a list
+    if isinstance(query, list):
+        query = " ".join(str(item) for item in query)
+        logger.warning(f"Query was a list, converted to string: {query}")
+        
+    # Convert original_query to string if it's a list
+    if original_query is not None and isinstance(original_query, list):
+        original_query = " ".join(str(item) for item in original_query)
+        logger.warning(f"Original query was a list, converted to string: {original_query}")
+    
     # Use default if max_results is not specified
     num_results = max_results if max_results is not None else DEFAULT_NUM_RESULTS
     logger.info(f"Fetching up to {num_results} results per source")
@@ -507,11 +517,27 @@ def compare_results(
                     # Also calculate field-specific Jaccard similarities
                     for field in fields:
                         # Extract values from results
-                        values1 = set(getattr(r, field, "") or "" for r in results1)
-                        values1 = {str(v).lower().strip() for v in values1 if v}
+                        values1 = []
+                        for r in results1:
+                            value = getattr(r, field, "") or ""
+                            # Convert list to tuple if necessary (lists are unhashable)
+                            if isinstance(value, list):
+                                for item in value:
+                                    values1.append(str(item).lower().strip())
+                            else:
+                                values1.append(str(value).lower().strip())
+                        values1 = {v for v in values1 if v}
                         
-                        values2 = set(getattr(r, field, "") or "" for r in results2)
-                        values2 = {str(v).lower().strip() for v in values2 if v}
+                        values2 = []
+                        for r in results2:
+                            value = getattr(r, field, "") or ""
+                            # Convert list to tuple if necessary (lists are unhashable)
+                            if isinstance(value, list):
+                                for item in value:
+                                    values2.append(str(item).lower().strip())
+                            else:
+                                values2.append(str(value).lower().strip())
+                        values2 = {v for v in values2 if v}
                         
                         # Calculate Jaccard similarity for this field
                         field_sim = calculate_jaccard_similarity(values1, values2)

@@ -356,7 +356,7 @@ const SimilarityTests = () => {
         Similarity Tests
       </Typography>
       <Typography paragraph>
-        Compare similarity results from ADS operator with LLM-judged similar papers. 
+        Compare similarity results from ADS similar() operator with an embeddings approach. 
         Enter a bibcode to see the comparison data.
       </Typography>
       

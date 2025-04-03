@@ -36,14 +36,18 @@ class BoostConfig(BaseModel):
     Model representing boost configuration for search results.
     
     Attributes:
-        name: Name of the boost configuration
+        name: Name of the boost configuration (optional)
         citation_boost: Boost factor for citation count
+        min_citations: Minimum citation count for boosting (optional)
         recency_boost: Boost factor for publication recency
+        reference_year: Reference year for recency calculations (optional)
         doctype_boosts: Dictionary mapping document types to boost factors
     """
-    name: str
+    name: Optional[str] = "Default Boost Config"
     citation_boost: float = Field(default=0.0, ge=0.0)
+    min_citations: Optional[int] = Field(default=1, ge=0)
     recency_boost: float = Field(default=0.0, ge=0.0)
+    reference_year: Optional[int] = None
     doctype_boosts: Dict[str, float] = Field(default_factory=dict)
 
 

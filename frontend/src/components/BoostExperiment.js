@@ -400,12 +400,13 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
         body: JSON.stringify({
           query: transformedQuery,
           originalQuery: query,
-          sources: ['semanticScholar', 'scholar', 'ads'],
+          sources: ['ads'],
           metrics: ['ndcg@10', 'precision@10', 'recall@10'],
           fields: ['title', 'abstract', 'authors', 'year', 'citation_count', 'doctype'],
           max_results: 20,
           useTransformedQuery: true,
           boost_config: {
+            name: "Boosted Results",
             citation_boost: parseFloat(boostConfig.citationBoost),
             recency_boost: parseFloat(boostConfig.recencyBoost),
             reference_year: parseInt(boostConfig.referenceYear),
@@ -477,7 +478,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
   // Format boost factor display
   const formatBoostFactor = (value) => {
     if (value === undefined || value === null) return '—';
-    return value.toFixed(2);
+    return typeof value === 'number' ? value.toFixed(2) : String(value);
   };
   
   // Enhanced debug component to inspect fields and values
@@ -1015,7 +1016,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                                       <strong>Rank Change:</strong> {rankChange > 0 ? '+' : ''}{rankChange}
                                     </Typography>
                                     <Typography variant="body2">
-                                      <strong>Boost Score:</strong> {result.boosted_score ? result.boosted_score.toFixed(2) : 'N/A'}
+                                      <strong>Boost Score:</strong> {result.boosted_score !== undefined && result.boosted_score !== null ? result.boosted_score.toFixed(2) : 'N/A'}
                                     </Typography>
                                     <Typography variant="body2">
                                       <strong>Applied Boosts:</strong>
@@ -1023,7 +1024,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                                     <Box component="ul" sx={{ mt: 0.5, pl: 2 }}>
                                       {result.boost_factors && Object.entries(result.boost_factors).map(([key, value]) => (
                                         <Typography component="li" variant="caption" key={key}>
-                                          {key}: {value && value.toFixed ? value.toFixed(2) : value}
+                                          {key}: {value !== undefined && value !== null && typeof value === 'number' ? value.toFixed(2) : value}
                                         </Typography>
                                       ))}
                                     </Box>
@@ -1079,7 +1080,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                                                 sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
                                               />
                                             )}
-                                            {result.boosted_score !== undefined && (
+                                            {result.boosted_score !== undefined && result.boosted_score !== null && (
                                               <Chip 
                                                 label={`Boost: ${result.boosted_score.toFixed(1)}`} 
                                                 size="small"

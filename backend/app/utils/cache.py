@@ -39,6 +39,10 @@ def get_cache_key(source: str, query: str, fields: List[str], num_results: Optio
     Returns:
         str: A unique cache key as a hex string
     """
+    # Handle the case when query is a list by converting it to a string
+    if isinstance(query, list):
+        query = " ".join(str(item) for item in query)
+    
     # Create a string to hash, include num_results if provided
     results_str = f":{num_results}" if num_results is not None else ""
     hash_input = f"{source}:{query}:{':'.join(sorted(fields))}{results_str}"

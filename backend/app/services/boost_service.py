@@ -25,7 +25,12 @@ async def apply_all_boosts(
     
     Args:
         results: List of search results to boost
-        boost_config: Dictionary containing boost configuration
+        boost_config: Dictionary containing boost configuration:
+            citation_boost: Factor to boost citation counts
+            min_citations: Minimum number of citations to apply boost (optional)
+            recency_boost: Factor to boost recent publications
+            reference_year: Reference year for calculating recency (optional)
+            doctype_boosts: Dictionary mapping document types to boost factors
         
     Returns:
         List[SearchResult]: Boosted search results
@@ -39,16 +44,20 @@ async def apply_all_boosts(
     try:
         # Apply citation boost
         if boost_config.get("citation_boost", 0.0) > 0:
+            min_citations = boost_config.get("min_citations", 0)
             boosted_results = apply_citation_boost(
                 boosted_results,
-                boost_config["citation_boost"]
+                boost_config["citation_boost"],
+                min_citations=min_citations
             )
         
         # Apply recency boost
         if boost_config.get("recency_boost", 0.0) > 0:
+            reference_year = boost_config.get("reference_year")
             boosted_results = apply_recency_boost(
                 boosted_results,
-                boost_config["recency_boost"]
+                boost_config["recency_boost"],
+                reference_year=reference_year
             )
         
         # Apply document type boosts
@@ -59,6 +68,13 @@ async def apply_all_boosts(
                 doctype_boosts
             )
         
+        # Sort results by boosted score
+        for i, result in enumerate(boosted_results):
+            # Make sure each result has a _score attribute
+            if not hasattr(result, '_score') or result._score is None:
+                # If no score exists, use 1.0 as default and adjust based on rank
+                result._score = 1.0 - (i / len(boosted_results))
+                
         # Sort results by boosted score
         boosted_results.sort(key=lambda x: x._score, reverse=True)
         
@@ -71,7 +87,8 @@ async def apply_all_boosts(
 
 def apply_citation_boost(
     results: List[SearchResult],
-    boost_factor: float
+    boost_factor: float,
+    min_citations: int = 0
 ) -> List[SearchResult]:
     """
     Apply citation count boost to search results.
@@ -79,13 +96,18 @@ def apply_citation_boost(
     Args:
         results: List of search results
         boost_factor: Factor to boost citation counts by
+        min_citations: Minimum citations to apply boost
         
     Returns:
         List[SearchResult]: Results with citation boost applied
     """
     for result in results:
-        citation_count = getattr(result, 'citation_count', 0)
-        if citation_count > 0:
+        citation_count = getattr(result, 'citation_count', 0) or 0
+        if citation_count >= min_citations:
+            # Make sure _score exists
+            if not hasattr(result, '_score') or result._score is None:
+                result._score = 1.0
+                
             # Apply logarithmic boost to avoid extreme values
             boost = 1 + (boost_factor * (1 + math.log2(1 + citation_count)))
             result._score *= boost
@@ -95,7 +117,8 @@ def apply_citation_boost(
 
 def apply_recency_boost(
     results: List[SearchResult],
-    boost_factor: float
+    boost_factor: float,
+    reference_year: Optional[int] = None
 ) -> List[SearchResult]:
     """
     Apply publication recency boost to search results.
@@ -103,11 +126,13 @@ def apply_recency_boost(
     Args:
         results: List of search results
         boost_factor: Factor to boost recent publications by
+        reference_year: Year to use as reference point (defaults to current year)
         
     Returns:
         List[SearchResult]: Results with recency boost applied
     """
-    current_year = datetime.now().year
+    # Use current year if reference_year is not provided
+    current_year = reference_year or datetime.now().year
     
     for result in results:
         year = getattr(result, 'year', None)
@@ -115,6 +140,10 @@ def apply_recency_boost(
             try:
                 year = int(year)
                 if 1900 <= year <= current_year:
+                    # Make sure _score exists
+                    if not hasattr(result, '_score') or result._score is None:
+                        result._score = 1.0
+                        
                     # Calculate years since publication
                     years_old = current_year - year
                     # Apply exponential decay boost
@@ -143,6 +172,10 @@ def apply_doctype_boosts(
     for result in results:
         doctype = getattr(result, 'doctype', '').lower()
         if doctype in doctype_boosts:
+            # Make sure _score exists
+            if not hasattr(result, '_score') or result._score is None:
+                result._score = 1.0
+                
             boost = 1 + doctype_boosts[doctype]
             result._score *= boost
     
