@@ -1,14 +1,14 @@
 """
-Query Intent API routes.
+Query intent API routes.
 
-This module defines the FastAPI routes for the query intent service,
-which provides endpoints for query transformation and intent analysis.
+This module defines routes for query intent detection and transformation services.
 """
 import logging
-from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, HTTPException, Depends, Request, Query
+import os
+from typing import Dict, Any, List, Optional
+from fastapi import APIRouter, HTTPException, Depends, Query
 
-from ...services.llm.agent import QueryAgent
+from ...services.query_intent import QueryAgent
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -20,20 +20,27 @@ router = APIRouter(
     responses={404: {"description": "Not found"}}
 )
 
-# Singleton instance of the query agent
+# Singleton instance of QueryAgent
 _query_agent: Optional[QueryAgent] = None
 
 
 def get_query_agent() -> QueryAgent:
     """
-    Get or create the singleton query agent instance.
+    Get or create a singleton QueryAgent instance.
     
     Returns:
-        QueryAgent: Query transformation agent
+        QueryAgent: Query transformation agent instance
     """
     global _query_agent
     if _query_agent is None:
-        _query_agent = QueryAgent()
+        # Check if LLM should be enabled
+        use_llm = os.getenv("USE_LLM", "false").lower() in ("true", "1", "t", "yes")
+        llm_endpoint = os.getenv("LLM_ENDPOINT", "http://localhost:11434/api/generate")
+        llm_model = os.getenv("LLM_MODEL", "mistral:7b-instruct-v0.2")
+        
+        _query_agent = QueryAgent(use_llm=use_llm, llm_endpoint=llm_endpoint, llm_model=llm_model)
+        logger.info(f"Initialized QueryAgent with use_llm={use_llm}")
+    
     return _query_agent
 
 
