@@ -1,9 +1,8 @@
 """
-Service modules for the search-comparisons application.
+Services package for the query intent application.
 
-This package contains service modules that handle interactions with
-external APIs and data sources, including search engines and other
-academic data providers.
+This package contains various service modules that implement 
+the core business logic of the application.
 """
 
 # Import and expose all service modules for convenience

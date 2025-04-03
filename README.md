@@ -80,6 +80,25 @@ Example response:
 }
 ```
 
+## New: LLM-Based Query Intent Service
+
+The repository now includes a new feature that uses lightweight open-source LLMs to interpret user search queries, detect intent, and transform queries to be more effective. This feature is accessible through the "Query Intent" tab in the UI.
+
+### Key Features
+
+- Query analysis using local LLM models via Ollama
+- Automatic query transformation based on detected intent
+- Support for multiple lightweight models (Llama 2, Mistral, Gemma)
+- Rule-based fallbacks when intent is clear
+- Docker Compose setup for easy deployment
+
+To use this feature:
+
+1. Set up the backend service following instructions in `backend/README.md`
+2. Use the "Query Intent" tab in the UI for semantic query transformation
+
+For details, see the [backend documentation](./backend/README.md).
+
 ## Project Structure
 
 The project is structured as follows:
