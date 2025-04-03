@@ -102,6 +102,22 @@ const searchService = {
   },
   
   /**
+   * Get search results from a specific source with fields
+   */
+  getSearchResults: async (source, query, fields = [], max_results = 10) => {
+    try {
+      const response = await apiClient.post(`/api/search/${source}`, { 
+        query,
+        fields,
+        max_results
+      });
+      return response.data.results || [];
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+  
+  /**
    * Get paper details by DOI
    */
   getPaperDetails: async (doi, sources = []) => {

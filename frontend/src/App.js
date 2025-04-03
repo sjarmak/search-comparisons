@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Container, Box, Typography, TextField, Button, 
   Checkbox, FormControlLabel, FormGroup, Grid, 
@@ -10,21 +10,19 @@ import {
   Menu, MenuItem
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
-import BugReportIcon from '@mui/icons-material/BugReport';
 import ScienceIcon from '@mui/icons-material/Science';
 import SearchIcon from '@mui/icons-material/Search';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import LaunchIcon from '@mui/icons-material/Launch';
-import NetworkCheckIcon from '@mui/icons-material/NetworkCheck';
-import CheckIcon from '@mui/icons-material/Check';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 
-import { searchService, experimentService, debugService } from './services/api';
+import { searchService, experimentService } from './services/api';
 import BoostExperiment from './components/BoostExperiment';
 import QuepidEvaluation from './components/QuepidEvaluation';
+import SimilarityTests from './components/SimilarityTests';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import StableInput from './components/StableInput';
@@ -32,7 +30,6 @@ import { useAuth, DEFAULT_PASSWORD } from './contexts/AuthContext';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const APP_VERSION = "1.0.0";
-const DEBUG = process.env.REACT_APP_DEBUG === 'true';
 
 /**
  * Main application component
@@ -55,8 +52,6 @@ function App() {
   const [error, setError] = useState(null);
   const [mainTab, setMainTab] = useState(0);
   const [experimentTab, setExperimentTab] = useState(0);
-  const [debugTab, setDebugTab] = useState(0);
-  const [environmentInfo, setEnvironmentInfo] = useState(null);
   
   // State for source selection
   const [sources, setSources] = useState({
@@ -69,18 +64,16 @@ function App() {
   // State for similarity metrics selection
   const [metrics, setMetrics] = useState({
     jaccard: true,
-    rankBiased: true,
-    cosine: false,
-    euclidean: false
+    rankBiased: true
   });
   
   // State for metadata fields to compare
   const [fields, setFields] = useState({
     title: true,
     abstract: true,
-    authors: false,
+    authors: true,
     doi: true,
-    year: false,
+    year: true,
     citation_count: true
   });
 
@@ -95,38 +88,12 @@ function App() {
     max_boost: 1.5
   });
   
-  // A/B test state
-  const [abTestVariation, setAbTestVariation] = useState('B');
-
-  // Debug state
-  const [sourcesList, setSourcesList] = useState(null);
-  const [pingResults, setPingResults] = useState({});
-  const [testSearchResults, setTestSearchResults] = useState(null);
-
   // Result tab state
   const [resultTab, setResultTab] = useState(0);
   const [filterText, setFilterText] = useState('');
 
   // Active source for detailed results
   const [activeSource, setActiveSource] = useState(null);
-
-  // Load environment info on startup
-  useEffect(() => {
-    const fetchEnvironmentInfo = async () => {
-      try {
-        const envInfo = await debugService.getEnvironmentInfo();
-        if (!envInfo.error) {
-          setEnvironmentInfo(envInfo);
-        }
-      } catch (error) {
-        console.error("Failed to fetch environment info:", error);
-      }
-    };
-
-    if (DEBUG) {
-      fetchEnvironmentInfo();
-    }
-  }, []);
 
   // Handle user menu open
   const handleMenuClick = (event) => {
@@ -175,11 +142,8 @@ function App() {
   };
 
   const handleExperimentTabChange = (event, newValue) => {
+    console.log('Experiment tab changed to:', newValue);
     setExperimentTab(newValue);
-  };
-
-  const handleDebugTabChange = (event, newValue) => {
-    setDebugTab(newValue);
   };
 
   // Submit the search query
@@ -201,27 +165,16 @@ function App() {
       const selectedSources = Object.keys(sources).filter(key => sources[key]);
       const selectedMetrics = Object.keys(metrics).filter(key => metrics[key]);
       
-      // Always include these fields for proper display
-      const selectedFields = [
-        ...Object.keys(fields).filter(key => fields[key]),
-        'abstract',  // Always include abstract
-        'citation_count'  // Always include citation_count
-      ];
-      
-      // Remove duplicates
-      const uniqueFields = Array.from(new Set(selectedFields));
+      // Always include all fields since we removed the fields selection UI
+      const selectedFields = ['title', 'abstract', 'authors', 'doi', 'year', 'citation_count'];
       
       const requestBody = {
         query,
         sources: selectedSources,
         metrics: selectedMetrics,
-        fields: uniqueFields
+        fields: selectedFields
       };
 
-      if (DEBUG) {
-        console.log('Making search request:', requestBody);
-      }
-      
       const response = await searchService.compareSearchResults(requestBody);
       
       if (response.error) {
@@ -248,10 +201,6 @@ function App() {
     setError(null);
     
     try {
-      if (DEBUG) {
-        console.log('Running boost experiment with config:', boostConfig);
-      }
-      
       const response = await experimentService.runBoostExperiment(boostConfig);
       
       if (response.error) {
@@ -271,146 +220,19 @@ function App() {
     }
   };
 
-  // Run A/B test
-  const handleRunAbTest = async () => {
-    if (!query.trim()) {
-      setError("Please enter a search query for the A/B test");
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const selectedSources = Object.keys(sources).filter(key => sources[key]);
-      const selectedMetrics = Object.keys(metrics).filter(key => metrics[key]);
-      const selectedFields = Object.keys(fields).filter(key => fields[key]);
-      
-      const requestBody = {
-        query,
-        sources: selectedSources,
-        metrics: selectedMetrics,
-        fields: selectedFields
-      };
-
-      if (DEBUG) {
-        console.log('Running A/B test with config:', requestBody, 'Variation:', abTestVariation);
-      }
-      
-      const response = await experimentService.runAbTest(requestBody, abTestVariation);
-      
-      if (response.error) {
-        setError(response.message);
-      } else {
-        // Set results in a format that can be displayed
-        setResults({
-          type: 'abTest',
-          ...response
-        });
-      }
-    } catch (err) {
-      console.error('A/B test error:', err);
-      setError(`Failed to run A/B test: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // List sources for debug
-  const handleListSources = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await debugService.listSources();
-      
-      if (response.error) {
-        setError(response.message);
-      } else {
-        setSourcesList(response);
-      }
-    } catch (err) {
-      console.error('List sources error:', err);
-      setError(`Failed to list sources: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Ping source for debug
-  const handlePingSource = async (source) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      setPingResults({
-        ...pingResults,
-        [source]: { loading: true }
-      });
-      
-      const response = await debugService.pingSource(source);
-      
-      if (response.error) {
-        setPingResults({
-          ...pingResults,
-          [source]: { error: response.message }
-        });
-      } else {
-        setPingResults({
-          ...pingResults,
-          [source]: response
-        });
-      }
-    } catch (err) {
-      console.error(`Ping source ${source} error:`, err);
-      setPingResults({
-        ...pingResults,
-        [source]: { error: err.message }
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Test search for debug
-  const handleTestSearch = async (source) => {
-    if (!query.trim()) {
-      setError("Please enter a search query for testing");
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await debugService.testSearch(source, query);
-      
-      if (response.error) {
-        setError(response.message);
-      } else {
-        setTestSearchResults(response);
-      }
-    } catch (err) {
-      console.error('Test search error:', err);
-      setError(`Failed to test search: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Format source name for display
   const formatSourceName = (source) => {
     switch(source) {
       case 'ads':
-        return 'ADS/SciX';
+        return 'NASA ADS / SciX';
       case 'scholar':
         return 'Google Scholar';
-      case 'webOfScience':
-        return 'Web of Science';
       case 'semanticScholar':
         return 'Semantic Scholar';
+      case 'webOfScience':
+        return 'Web of Science';
       default:
-        return source.charAt(0).toUpperCase() + source.slice(1);
+        return source;
     }
   };
 
@@ -468,15 +290,8 @@ function App() {
       const selectedSources = Object.keys(sources).filter(key => sources[key]);
       const selectedMetrics = Object.keys(metrics).filter(key => metrics[key]);
       
-      // Always include these fields for proper display
-      const selectedFields = [
-        ...Object.keys(fields).filter(key => fields[key]),
-        'abstract',  // Always include abstract
-        'citation_count'  // Always include citation_count
-      ];
-      
-      // Remove duplicates
-      const uniqueFields = Array.from(new Set(selectedFields));
+      // Always include all fields since we removed the fields selection UI
+      const selectedFields = ['title', 'abstract', 'authors', 'doi', 'year', 'citation_count'];
       
       // Clean the transformedQuery to make sure it doesn't get too complex on repeated applications
       let cleanQuery = transformedQuery;
@@ -490,15 +305,11 @@ function App() {
         query: cleanQuery, // Use the transformed query with field weights
         sources: selectedSources,
         metrics: selectedMetrics,
-        fields: uniqueFields,
+        fields: selectedFields,
         originalQuery: query, // Include the original query for reference
         useTransformedQuery: true // Flag to indicate this is a transformed query
       };
 
-      if (DEBUG) {
-        console.log('Making search request with transformed query:', requestBody);
-      }
-      
       const response = await searchService.compareSearchResults(requestBody);
       
       if (response.error) {
@@ -546,18 +357,20 @@ function App() {
 
   // Experiment Tabs rendering
   const renderExperimentTabs = () => {
+    console.log('renderExperimentTabs called, current tab:', experimentTab);
     return (
       <>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2, width: '100%' }}>
           <Tabs
             value={experimentTab}
             onChange={handleExperimentTabChange}
             aria-label="experiment tabs"
-            centered
+            variant="fullWidth"
+            sx={{ mb: 0 }}
           >
-            <Tab label="Boost Experiment" />
-            <Tab label="A/B Testing" />
-            <Tab label="Quepid Evaluation" />
+            <Tab label="Boost Experiment" value={0} />
+            <Tab label="Quepid Evaluation" value={1} />
+            <Tab label="Similarity Tests" value={2} />
           </Tabs>
         </Box>
         
@@ -581,19 +394,14 @@ function App() {
         )}
         
         {experimentTab === 1 && (
-          <Box>
-            <Typography variant="h5" gutterBottom>
-              A/B Testing
-            </Typography>
-            <Typography paragraph>
-              Run A/B tests to compare search result quality between different algorithms.
-            </Typography>
-            {/* A/B Testing UI here */}
-          </Box>
+          <QuepidEvaluation />
         )}
         
         {experimentTab === 2 && (
-          <QuepidEvaluation />
+          <>
+            {console.log('Attempting to render SimilarityTests component')}
+            <SimilarityTests />
+          </>
         )}
       </>
     );
@@ -646,7 +454,6 @@ function App() {
         >
           <Tab icon={<SearchIcon />} label="SEARCH" />
           <Tab icon={<ScienceIcon />} label="EXPERIMENTS" />
-          <Tab icon={<BugReportIcon />} label="DEBUG" />
           <Tab icon={<InfoIcon />} label="ABOUT" />
         </Tabs>
       </AppBar>
@@ -673,9 +480,6 @@ function App() {
                       value={query}
                       onChange={(e) => {
                         setQuery(e.target.value);
-                        if (DEBUG) {
-                          console.log('Search query updated:', e.target.value);
-                        }
                       }}
                       placeholder="Enter your academic search query"
                       debounceTime={500}
@@ -715,40 +519,6 @@ function App() {
                         control={<Checkbox checked={metrics.rankBiased} onChange={handleMetricsChange} name="rankBiased" />}
                         label="Rank-Biased Overlap"
                       />
-                      <FormControlLabel
-                        control={<Checkbox checked={metrics.cosine} onChange={handleMetricsChange} name="cosine" />}
-                        label="Cosine Similarity"
-                      />
-                    </FormGroup>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={4}>
-                    <Typography variant="subtitle1">Metadata Fields</Typography>
-                    <FormGroup>
-                      <FormControlLabel
-                        control={<Checkbox checked={fields.title} onChange={handleFieldsChange} name="title" />}
-                        label="Title"
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={fields.abstract} onChange={handleFieldsChange} name="abstract" />}
-                        label="Abstract"
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={fields.authors} onChange={handleFieldsChange} name="authors" />}
-                        label="Authors"
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={fields.doi} onChange={handleFieldsChange} name="doi" />}
-                        label="DOI"
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={fields.year} onChange={handleFieldsChange} name="year" />}
-                        label="Publication Year"
-                      />
-                      <FormControlLabel
-                        control={<Checkbox checked={fields.citation_count} onChange={handleFieldsChange} name="citation_count" />}
-                        label="Citation Count"
-                      />
                     </FormGroup>
                   </Grid>
                   
@@ -768,7 +538,7 @@ function App() {
             </Paper>
 
             {/* Display search results if available */}
-            {results && results.type !== 'boost' && results.type !== 'abTest' && (
+            {results && results.type !== 'boost' && (
               <Box mt={4}>
                 <Typography variant="h5" gutterBottom>
                   Search Results
@@ -810,9 +580,6 @@ function App() {
                                     value={filterText}
                                     onChange={(e) => {
                                       setFilterText(e.target.value);
-                                      if (DEBUG) {
-                                        console.log('Filter text updated:', e.target.value);
-                                      }
                                     }}
                                     sx={{ width: 250 }}
                                   />
@@ -1475,346 +1242,19 @@ function App() {
         {mainTab === 1 && (
           <Box my={4}>
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
+              <Typography variant="h5" gutterBottom color="primary">
+                Search Experiments
+              </Typography>
+              <Typography paragraph>
+                Select an experiment type from the tabs below:
+              </Typography>
               {renderExperimentTabs()}
             </Paper>
           </Box>
         )}
 
-        {/* Debug Tab */}
-        {mainTab === 2 && (
-          <Box my={4}>
-            <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
-              <Tabs
-                value={debugTab}
-                onChange={handleDebugTabChange}
-                variant="fullWidth"
-                textColor="primary"
-                indicatorColor="primary"
-              >
-                <Tab label="Environment" id="debug-tab-0" />
-                <Tab label="Sources" id="debug-tab-1" />
-                <Tab label="Test Search" id="debug-tab-2" />
-              </Tabs>
-
-              {/* Environment Info */}
-              {debugTab === 0 && (
-                <Box mt={2}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        const response = await debugService.getEnvironmentInfo();
-                        if (response.error) {
-                          setError(response.message);
-                        } else {
-                          setEnvironmentInfo(response);
-                        }
-                      } catch (err) {
-                        setError(`Failed to get environment info: ${err.message}`);
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    disabled={loading}
-                    sx={{ mb: 2 }}
-                  >
-                    {loading ? <CircularProgress size={24} /> : "Refresh Environment Info"}
-                  </Button>
-
-                  {environmentInfo && (
-                    <Paper elevation={2} sx={{ p: 2 }}>
-                      <Typography variant="h6" gutterBottom>
-                        Environment Information
-                      </Typography>
-                      <Grid container spacing={2}>
-                        {/* System Info */}
-                        <Grid item xs={12} md={6}>
-                          <Paper variant="outlined" sx={{ p: 2 }}>
-                            <Typography variant="subtitle1" gutterBottom>System</Typography>
-                            <TableContainer>
-                              <Table size="small">
-                                <TableBody>
-                                  <TableRow>
-                                    <TableCell><strong>Python Version</strong></TableCell>
-                                    <TableCell>{environmentInfo.python_version || 'N/A'}</TableCell>
-                                  </TableRow>
-                                  <TableRow>
-                                    <TableCell><strong>OS Platform</strong></TableCell>
-                                    <TableCell>{environmentInfo.platform || 'N/A'}</TableCell>
-                                  </TableRow>
-                                  <TableRow>
-                                    <TableCell><strong>Environment</strong></TableCell>
-                                    <TableCell>{environmentInfo.environment || 'development'}</TableCell>
-                                  </TableRow>
-                                  <TableRow>
-                                    <TableCell><strong>Debug Mode</strong></TableCell>
-                                    <TableCell>
-                                      <Chip 
-                                        label={environmentInfo.debug ? 'Enabled' : 'Disabled'} 
-                                        color={environmentInfo.debug ? 'warning' : 'default'}
-                                        size="small"
-                                      />
-                                    </TableCell>
-                                  </TableRow>
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
-                          </Paper>
-                        </Grid>
-                        
-                        {/* API Keys */}
-                        <Grid item xs={12} md={6}>
-                          <Paper variant="outlined" sx={{ p: 2 }}>
-                            <Typography variant="subtitle1" gutterBottom>API Configuration</Typography>
-                            <TableContainer>
-                              <Table size="small">
-                                <TableBody>
-                                  {Object.entries(environmentInfo.api_keys || {}).map(([key, value]) => (
-                                    <TableRow key={key}>
-                                      <TableCell><strong>{key}</strong></TableCell>
-                                      <TableCell>
-                                        <Chip 
-                                          label={value ? 'Configured' : 'Missing'} 
-                                          color={value ? 'success' : 'error'}
-                                          size="small"
-                                        />
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </TableContainer>
-                          </Paper>
-                        </Grid>
-                        
-                        {/* Dependencies */}
-                        {environmentInfo.dependencies && Object.keys(environmentInfo.dependencies).length > 0 && (
-                          <Grid item xs={12}>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                              <Typography variant="subtitle1" gutterBottom>Dependencies</Typography>
-                              <TableContainer sx={{ maxHeight: 300 }}>
-                                <Table size="small" stickyHeader>
-                                  <TableHead>
-                                    <TableRow>
-                                      <TableCell>Package</TableCell>
-                                      <TableCell>Version</TableCell>
-                                    </TableRow>
-                                  </TableHead>
-                                  <TableBody>
-                                    {Object.entries(environmentInfo.dependencies).map(([pkg, version]) => (
-                                      <TableRow key={pkg}>
-                                        <TableCell>{pkg}</TableCell>
-                                        <TableCell>{version}</TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              </TableContainer>
-                            </Paper>
-                          </Grid>
-                        )}
-                        
-                        {/* Raw Data (Collapsed) */}
-                        <Grid item xs={12}>
-                          <Accordion>
-                            <AccordionSummary expandIcon={<InfoIcon />}>
-                              <Typography>View Raw Environment Data</Typography>
-                            </AccordionSummary>
-                            <AccordionDetails>
-                              <pre style={{ maxHeight: '300px', overflow: 'auto' }}>
-                                {JSON.stringify(environmentInfo, null, 2)}
-                              </pre>
-                            </AccordionDetails>
-                          </Accordion>
-                        </Grid>
-                      </Grid>
-                    </Paper>
-                  )}
-                </Box>
-              )}
-
-              {/* Sources Info */}
-              {debugTab === 1 && (
-                <Box mt={2}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={handleListSources}
-                    disabled={loading}
-                    sx={{ mb: 2, mr: 2 }}
-                  >
-                    {loading ? <CircularProgress size={24} /> : "List Sources"}
-                  </Button>
-
-                  {/* Source Info */}
-                  {sourcesList && (
-                    <Grid item xs={12}>
-                      <Paper elevation={2} sx={{ p: 2 }}>
-                        <Typography variant="h6" gutterBottom>
-                          Available Search Sources
-                        </Typography>
-                        <List>
-                          {sourcesList.map(source => (
-                            <ListItem key={source.id}>
-                              <ListItemAvatar>
-                                <Avatar sx={{ 
-                                  bgcolor: 
-                                    source.id === 'ads' ? 'primary.main' :
-                                    source.id === 'scholar' ? 'error.main' :
-                                    source.id === 'semanticScholar' ? 'warning.main' : 'success.main' 
-                                }}>
-                                  <SearchIcon />
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText 
-                                primary={formatSourceName(source.id)} 
-                                secondary={`Status: ${source.status}, Max Results: ${source.max_results}`} 
-                              />
-                              <ListItemSecondaryAction>
-                                <Button 
-                                  size="small" 
-                                  onClick={() => handlePingSource(source.id)}
-                                  startIcon={<NetworkCheckIcon />}
-                                >
-                                  Ping
-                                </Button>
-                                <Button 
-                                  size="small" 
-                                  onClick={() => handleTestSearch(source.id)}
-                                  disabled={!query.trim()}
-                                  startIcon={<CheckIcon />}
-                                  sx={{ ml: 1 }}
-                                >
-                                  Test Search
-                                </Button>
-                              </ListItemSecondaryAction>
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Paper>
-                    </Grid>
-                  )}
-
-                  {/* Ping Results */}
-                  {Object.keys(pingResults).length > 0 && (
-                    <Grid item xs={12}>
-                      <Paper elevation={2} sx={{ p: 2 }}>
-                        <Typography variant="h6" gutterBottom>
-                          Ping Results
-                        </Typography>
-                        <List>
-                          {Object.entries(pingResults).map(([sourceId, result]) => (
-                            <ListItem key={sourceId}>
-                              <ListItemAvatar>
-                                <Avatar sx={{ 
-                                  bgcolor: 
-                                    sourceId === 'ads' ? 'primary.main' :
-                                    sourceId === 'scholar' ? 'error.main' :
-                                    sourceId === 'semanticScholar' ? 'warning.main' : 'success.main' 
-                                }}>
-                                  <SearchIcon />
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText 
-                                primary={formatSourceName(sourceId)} 
-                                secondary={
-                                  result.loading ? 'Pinging...' :
-                                  result.error ? `Error: ${result.error}` :
-                                  `Response time: ${result.response_time_ms}ms, Status: ${result.status}`
-                                } 
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </Paper>
-                    </Grid>
-                  )}
-                </Box>
-              )}
-
-              {/* Test Search */}
-              {debugTab === 2 && (
-                <Box mt={2}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                      <StableInput
-                        fullWidth
-                        label="Test Search Query"
-                        variant="outlined"
-                        value={query}
-                        onChange={(e) => {
-                          setQuery(e.target.value);
-                          if (DEBUG) {
-                            console.log('Test search query updated:', e.target.value);
-                          }
-                        }}
-                        placeholder="Enter query for testing"
-                        debounceTime={500}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12}>
-                      <Typography variant="subtitle1">Select Source to Test</Typography>
-                      <Box display="flex" flexWrap="wrap" gap={2} mt={1}>
-                        <Button
-                          variant="outlined"
-                          onClick={() => handleTestSearch('ads')}
-                          disabled={loading}
-                        >
-                          Test ADS/SciX
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          onClick={() => handleTestSearch('scholar')}
-                          disabled={loading}
-                        >
-                          Test Google Scholar
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          onClick={() => handleTestSearch('semanticScholar')}
-                          disabled={loading}
-                        >
-                          Test Semantic Scholar
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          onClick={() => handleTestSearch('webOfScience')}
-                          disabled={loading}
-                        >
-                          Test Web of Science
-                        </Button>
-                      </Box>
-                    </Grid>
-                  </Grid>
-
-                  {/* Test Search Results */}
-                  {testSearchResults && (
-                    <Box mt={4}>
-                      <Typography variant="h5" gutterBottom>
-                        Test Search Results for {testSearchResults.source}
-                      </Typography>
-                      <Paper elevation={2} sx={{ p: 2 }}>
-                        <Typography variant="subtitle1">
-                          Query: {testSearchResults.query} | 
-                          Results: {testSearchResults.count} | 
-                          Time: {testSearchResults.response_time_ms}ms
-                        </Typography>
-                        <Divider sx={{ my: 2 }} />
-                        <pre>{JSON.stringify(testSearchResults.results, null, 2)}</pre>
-                      </Paper>
-                    </Box>
-                  )}
-                </Box>
-              )}
-            </Paper>
-          </Box>
-        )}
-
         {/* About Tab */}
-        {mainTab === 3 && (
+        {mainTab === 2 && (
           <Box my={4}>
             <Paper elevation={3} sx={{ p: 3 }}>
               <Typography variant="h5" gutterBottom>
@@ -1840,11 +1280,6 @@ function App() {
               <Typography variant="body1">
                 Backend API: {API_URL}
               </Typography>
-              {environmentInfo && environmentInfo.environment && (
-                <Typography variant="body1">
-                  Environment: {environmentInfo.environment}
-                </Typography>
-              )}
             </Paper>
           </Box>
         )}
