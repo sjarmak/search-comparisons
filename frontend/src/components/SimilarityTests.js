@@ -480,22 +480,6 @@ const SimilarityTests = () => {
         </Paper>
       )}
 
-      {/* Debug information */}
-      {process.env.NODE_ENV === 'development' && (
-        <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
-          <Typography variant="subtitle2">Debug Info:</Typography>
-          <Typography variant="body2">
-            Operator Results: {operatorResults ? operatorResults.length : 'none'} items
-          </Typography>
-          <Typography variant="body2">
-            Embeddings Results: {embeddingsResults ? embeddingsResults.length : 'none'} items
-          </Typography>
-          <Typography variant="body2">
-            Matching Bibcodes: {matchingBibcodes.length} items
-          </Typography>
-        </Alert>
-      )}
-
       {/* Results Comparison */}
       <Box display="flex" alignItems="center" mb={2}>
         <Typography variant="h6">
