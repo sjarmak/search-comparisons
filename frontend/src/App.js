@@ -23,6 +23,7 @@ import { searchService, experimentService } from './services/api';
 import BoostExperiment from './components/BoostExperiment';
 import QuepidEvaluation from './components/QuepidEvaluation';
 import SimilarityTests from './components/SimilarityTests';
+import QueryIntent from './components/QueryIntent';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import StableInput from './components/StableInput';
@@ -371,6 +372,7 @@ function App() {
             <Tab label="Boost Experiment" value={0} />
             <Tab label="Quepid Evaluation" value={1} />
             <Tab label="Similarity Tests" value={2} />
+            <Tab label="Query Intent" value={3} />
           </Tabs>
         </Box>
         
@@ -402,6 +404,10 @@ function App() {
             {console.log('Attempting to render SimilarityTests component')}
             <SimilarityTests />
           </>
+        )}
+        
+        {experimentTab === 3 && (
+          <QueryIntent />
         )}
       </>
     );
