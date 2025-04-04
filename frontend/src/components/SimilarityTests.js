@@ -16,8 +16,14 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import similarityData from '../data/similarityData.json';
 
 // Import specific JSON files for operator and embeddings
-import operatorData from '../data/2022ApJ...931...44P_operator.json';
-import embeddingsData from '../data/2022ApJ...931...44P_embeddings.json';
+// import operatorData from '../data/2022ApJ...931...44P_operator.json';
+// import embeddingsData from '../data/2022ApJ...931...44P_embeddings.json';
+
+// Import consensus evaluation data
+import consensusEvaluation from '../data/consensus_evaluation.json';
+
+// Import final results data
+import finalResults from '../data/final_results.json';
 
 import { searchService } from '../services/api';
 
@@ -50,53 +56,71 @@ const SimilarityTests = () => {
     try {
       console.log(`Loading data for bibcode: ${bibcode}`);
       
-      // In a real implementation, this would be dynamic imports
-      // For now, we're using the static imports above and filtering
-      let operatorJson = null;
-      let embeddingsJson = null;
-      
+      // For now, we'll just use the finalResults data
       if (bibcode === '2022ApJ...931...44P') {
-        operatorJson = operatorData;
-        embeddingsJson = embeddingsData;
+        // Set the original paper data
+        setOriginalPaper(finalResults.input_paper || finalResults.set_a);
         
-        console.log('Loaded operator data:', operatorJson);
-        console.log('Loaded embeddings data:', embeddingsJson);
+        // Set the operator results (left column) from set_a
+        if (finalResults.set_a && finalResults.set_a.search_results) {
+          console.log(`Setting operator results with ${finalResults.set_a.search_results.length} items`);
+          
+          // Add consensus scores to set_a results from consensus.first_set
+          const operatorWithConsensus = finalResults.set_a.search_results.slice(0, 10).map((paper, idx) => {
+            if (finalResults.consensus && finalResults.consensus.first_set && 
+                finalResults.consensus.first_set.individual_scores && 
+                finalResults.consensus.first_set.individual_scores[idx + 1]) {
+              return {
+                ...paper,
+                consensus_score: finalResults.consensus.first_set.individual_scores[idx + 1].score
+              };
+            }
+            return paper;
+          });
+          
+          setOperatorResults(operatorWithConsensus);
+        } else {
+          console.warn('No search_results found in set_a');
+          setOperatorResults([]);
+        }
+        
+        // Set the embeddings results (right column) from set_b
+        if (finalResults.set_b && finalResults.set_b.search_results) {
+          console.log(`Setting embeddings results with ${finalResults.set_b.search_results.length} items`);
+          
+          // Add consensus scores to set_b results from consensus.second_set
+          const embeddingsWithConsensus = finalResults.set_b.search_results.slice(0, 10).map((paper, idx) => {
+            if (finalResults.consensus && finalResults.consensus.second_set && 
+                finalResults.consensus.second_set.individual_scores && 
+                finalResults.consensus.second_set.individual_scores[idx + 1]) {
+              return {
+                ...paper,
+                consensus_score: finalResults.consensus.second_set.individual_scores[idx + 1].score
+              };
+            }
+            return paper;
+          });
+          
+          setEmbeddingsResults(embeddingsWithConsensus);
+        } else {
+          console.warn('No search_results found in set_b');
+          setEmbeddingsResults([]);
+        }
+        
+        // Compare bibcodes between the two result sets to find matches
+        const operatorBibcodes = finalResults.set_a?.search_results?.map(paper => paper.bibcode) || [];
+        const embeddingsBibcodes = finalResults.set_b?.search_results?.map(paper => paper.bibcode) || [];
+        
+        const matches = operatorBibcodes.filter(bibcode => embeddingsBibcodes.includes(bibcode));
+        setMatchingBibcodes(matches);
+        console.log('Matching bibcodes between set_a and set_b:', matches);
       } else {
-        // Fallback to our default data
-        operatorJson = similarityData;
-        embeddingsJson = similarityData;
+        // Fallback to our default data for other bibcodes
+        setOriginalPaper(similarityData);
+        setOperatorResults(similarityData.search_results || []);
+        setEmbeddingsResults(similarityData.search_results || []);
+        setMatchingBibcodes([]);
       }
-      
-      // Set the original paper data from the embeddings file
-      setOriginalPaper(embeddingsJson);
-      
-      // Set the operator results (left column)
-      if (operatorJson && operatorJson.search_results) {
-        console.log(`Setting operator results with ${operatorJson.search_results.length} items`);
-        // Limit to top 10
-        setOperatorResults(operatorJson.search_results.slice(0, 10));
-      } else {
-        console.warn('No search_results found in operator JSON');
-        setOperatorResults([]);
-      }
-      
-      // Set the embeddings results (right column)
-      if (embeddingsJson && embeddingsJson.search_results) {
-        console.log(`Setting embeddings results with ${embeddingsJson.search_results.length} items`);
-        // Limit to top 10
-        setEmbeddingsResults(embeddingsJson.search_results.slice(0, 10));
-      } else {
-        console.warn('No search_results found in embeddings JSON');
-        setEmbeddingsResults([]);
-      }
-      
-      // Compare bibcodes between the two result sets to find matches
-      const operatorBibcodes = operatorJson?.search_results?.map(paper => paper.bibcode) || [];
-      const embeddingsBibcodes = embeddingsJson?.search_results?.map(paper => paper.bibcode) || [];
-      
-      const matches = operatorBibcodes.filter(bibcode => embeddingsBibcodes.includes(bibcode));
-      setMatchingBibcodes(matches);
-      console.log('Matching bibcodes between operator and embeddings:', matches);
       
     } catch (err) {
       console.error(`Error loading data for bibcode ${bibcode}:`, err);
@@ -255,6 +279,7 @@ const SimilarityTests = () => {
                   {renderScoreChip(paper.claude_score, 'Claude')}
                   {renderScoreChip(paper.deepseek_score, 'DeepSeek')}
                   {renderScoreChip(paper.gemini_score, 'Gemini')}
+                  {renderScoreChip(paper.consensus_score, 'Consensus')}
                 </Box>
               </>
             )}
@@ -275,7 +300,7 @@ const SimilarityTests = () => {
     );
   };
 
-  // Calculate NDCG@10 for a result set based on LLM relevance scores
+  // Calculate NDCG@10 for a result set based on consensus relevance scores
   const calculateNDCG = (results, k = 10) => {
     if (!results || results.length === 0) return 0;
     
@@ -285,18 +310,24 @@ const SimilarityTests = () => {
     // Calculate DCG
     let dcg = 0;
     topK.forEach((paper, idx) => {
-      // Average the available LLM scores (claude_score, deepseek_score, gemini_score)
-      const scores = [
-        paper.claude_score,
-        paper.deepseek_score,
-        paper.gemini_score
-      ].filter(score => score !== undefined && score !== null);
+      // Use consensus score if available, otherwise fall back to average of LLM scores
+      let relevanceScore;
       
-      // If no scores available, use 0
-      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+      if (paper.consensus_score !== undefined && paper.consensus_score !== null) {
+        relevanceScore = paper.consensus_score;
+      } else {
+        // Fall back to average of available LLM scores
+        const scores = [
+          paper.claude_score,
+          paper.deepseek_score,
+          paper.gemini_score
+        ].filter(score => score !== undefined && score !== null);
+        
+        relevanceScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+      }
       
       // Calculate relevance gain (2^rel - 1)
-      const relevanceGain = Math.pow(2, avgScore) - 1;
+      const relevanceGain = Math.pow(2, relevanceScore) - 1;
       
       // Position discount (log2(pos+1))
       const positionDiscount = Math.log2(idx + 2); // +2 because idx is 0-based and log2(1) = 0
@@ -305,30 +336,41 @@ const SimilarityTests = () => {
       dcg += relevanceGain / positionDiscount;
     });
     
-    // Create sorted array of all papers by average score for IDCG calculation
+    // Create sorted array of all papers by consensus score for IDCG calculation
     const allPapersByScore = [...results].sort((a, b) => {
-      const aScores = [a.claude_score, a.deepseek_score, a.gemini_score]
-        .filter(score => score !== undefined && score !== null);
-      const bScores = [b.claude_score, b.deepseek_score, b.gemini_score]
-        .filter(score => score !== undefined && score !== null);
+      // Get consensus score or fall back to average LLM score
+      const getScore = (paper) => {
+        if (paper.consensus_score !== undefined && paper.consensus_score !== null) {
+          return paper.consensus_score;
+        }
+        
+        const scores = [paper.claude_score, paper.deepseek_score, paper.gemini_score]
+          .filter(score => score !== undefined && score !== null);
+        
+        return scores.length > 0 ? scores.reduce((acc, score) => acc + score, 0) / scores.length : 0;
+      };
       
-      const aAvg = aScores.length > 0 ? aScores.reduce((acc, score) => acc + score, 0) / aScores.length : 0;
-      const bAvg = bScores.length > 0 ? bScores.reduce((acc, score) => acc + score, 0) / bScores.length : 0;
-      
-      return bAvg - aAvg; // Sort descending
+      return getScore(b) - getScore(a); // Sort descending
     });
     
     // Calculate IDCG (ideal DCG)
     let idcg = 0;
     allPapersByScore.slice(0, k).forEach((paper, idx) => {
-      const scores = [
-        paper.claude_score,
-        paper.deepseek_score,
-        paper.gemini_score
-      ].filter(score => score !== undefined && score !== null);
+      let relevanceScore;
       
-      const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-      const relevanceGain = Math.pow(2, avgScore) - 1;
+      if (paper.consensus_score !== undefined && paper.consensus_score !== null) {
+        relevanceScore = paper.consensus_score;
+      } else {
+        const scores = [
+          paper.claude_score,
+          paper.deepseek_score,
+          paper.gemini_score
+        ].filter(score => score !== undefined && score !== null);
+        
+        relevanceScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+      }
+      
+      const relevanceGain = Math.pow(2, relevanceScore) - 1;
       const positionDiscount = Math.log2(idx + 2);
       
       idcg += relevanceGain / positionDiscount;
@@ -497,12 +539,12 @@ const SimilarityTests = () => {
       </Box>
       
       <Grid container spacing={2}>
-        {/* Operator Results (left column) */}
+        {/* Operator Results (left column) - Set A */}
         <Grid item xs={12} md={6}>
           <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
               <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                ADS Similar Operator Results
+                ADS Similar Operator Results (Set A)
               </Typography>
               
               {!loading && operatorResults && (
@@ -516,7 +558,7 @@ const SimilarityTests = () => {
             </Box>
             
             <Typography variant="body2" color="text.secondary" paragraph>
-              Results from {referenceBibcode}_operator.json
+              Results from set_a in final_results.json
             </Typography>
             <Divider sx={{ mb: 2 }} />
             
@@ -551,12 +593,12 @@ const SimilarityTests = () => {
           </Paper>
         </Grid>
         
-        {/* Embeddings Results (right column) */}
+        {/* Embeddings Results (right column) - Set B */}
         <Grid item xs={12} md={6}>
           <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
               <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
-                Embeddings Results (title and abstract)
+                Embeddings Results (Set B)
               </Typography>
               
               {!loading && embeddingsResults && (
@@ -570,7 +612,7 @@ const SimilarityTests = () => {
             </Box>
             
             <Typography variant="body2" color="text.secondary" paragraph>
-              Results from {referenceBibcode}_embeddings.json
+              Results from set_b in final_results.json
             </Typography>
             <Divider sx={{ mb: 2 }} />
             

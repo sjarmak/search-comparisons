@@ -37,51 +37,30 @@ const QueryIntent = () => {
     setError(null);
     
     try {
-      // This is a placeholder for your future agentic workflow
-      // You would replace this with an actual API call to your backend
-      // that would analyze the query and return a transformed version
+      // Call the backend API to transform the query
+      const apiUrl = '/api/query-intent/transform';
+      const response = await fetch(`${apiUrl}?query=${encodeURIComponent(query)}`);
       
-      // Mock implementation of query intent analysis
-      // In the future, replace with your actual API call
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      
-      // Example transformation logic (to be replaced with your actual logic)
-      let transformed = query;
-      let intent = "information";
-      let explanation = "";
-      
-      // Simple rule-based intent detection (replace with ML/LLM-based approach)
-      if (query.toLowerCase().includes("latest") || query.toLowerCase().includes("recent")) {
-        transformed = `${query} year:2022-2023`;
-        intent = "recency";
-        explanation = "Added year filter to focus on recent papers";
-      } else if (query.toLowerCase().includes("review") || query.toLowerCase().includes("survey")) {
-        transformed = `${query} doctype:review`;
-        intent = "overview";
-        explanation = "Added doctype filter to focus on review papers";
-      } else if (query.toLowerCase().includes("who") || query.toLowerCase().includes("authors")) {
-        transformed = `${query} sort:citation_count desc`;
-        intent = "authoritative";
-        explanation = "Sorted by citation count to find influential authors";
-      } else if (query.toLowerCase().includes("compare") || query.toLowerCase().includes("versus") || query.toLowerCase().includes("vs")) {
-        transformed = `(${query}) reviews:50`;
-        intent = "comparison";
-        explanation = "Added references filter to find papers that compare topics";
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
       }
       
+      const data = await response.json();
+      console.log('Query intent API response:', data);
+      
+      // Extract the transformed query and intent info
       const intentInfo = {
-        original: query,
-        transformed: transformed,
-        intent: intent,
-        explanation: explanation
+        original: data.original_query,
+        transformed: data.transformed_query,
+        intent: data.intent,
+        explanation: data.explanation
       };
       
-      setTransformedQuery(transformed);
+      setTransformedQuery(data.transformed_query);
       setIntentInfo(intentInfo);
       
-      // Now you would actually send this transformed query to ADS
-      // For now, we'll just simulate it
-      await searchADS(transformed);
+      // Now search ADS with the transformed query
+      await searchADS(data.transformed_query);
       
     } catch (err) {
       console.error('Error analyzing query:', err);
