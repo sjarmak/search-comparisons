@@ -13,6 +13,7 @@ certifi==2023.7.22
 python-dotenv==1.0.0
 nltk==3.8.1
 rbo==0.1.2
+beautifulsoup4==4.12.2
 
 # Development and testing
 pytest==7.4.3
