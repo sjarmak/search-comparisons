@@ -200,6 +200,10 @@ class LLMService:
             - * for wildcards
             - ~ for fuzzy search
             - [x TO y] for ranges
+            - trending(): Find trending papers
+            - reviews(): Find review papers
+            - similar(): Find similar papers
+            - related(): Find related papers
             
             CRITICAL RULES FOR QUERY TRANSFORMATION:
             1. For queries with both author and topic:
@@ -208,6 +212,7 @@ class LLMService:
                - Use abs:"topic" for the topic part
                - NEVER put the topic in the author field
                - NEVER put the author in the topic field
+               - ALWAYS use AND to combine author and topic parts
                - Example: "papers by Stephen Hawking about black holes" becomes:
                  (author:"Hawking, S" OR author:"Hawking, Stephen") AND abs:"black holes"
             
@@ -223,7 +228,26 @@ class LLMService:
                - NEVER interpret or expand acronyms (e.g., keep "ADS" as "ADS")
                - NEVER add words that weren't in the original query
             
-            4. For intent modifiers:
+            4. For year specifications:
+               - When a specific year is mentioned (e.g., "2020"), use year:2020 for exact match
+               - ONLY use year ranges [x TO y] when explicitly requested (e.g., "papers from 2020 to 2023")
+               - NEVER use year ranges for single year specifications
+               - Example: "Jarmak 2020" becomes:
+                 (author:"Jarmak, S" OR author:"Jarmak, Stephanie") AND year:2020
+            
+            5. For special operators:
+               - When "trending" is mentioned, use trending() operator
+                 Example: "trending papers on exoplanets" becomes trending(abs:"exoplanets")
+               - When "review" or "reviews" is mentioned, use reviews() operator
+                 Example: "review papers on exoplanets" becomes reviews(abs:"exoplanets")
+               - When "similar" is mentioned, use similar() operator
+                 Example: "papers similar to this one" becomes similar(bibcode:"2023ApJ...")
+               - When "related" is mentioned, use related() operator
+                 Example: "papers related to exoplanets" becomes related(abs:"exoplanets")
+               - ALWAYS put the topic/query inside the operator's parentheses
+               - NEVER combine multiple operators in the same query
+            
+            6. For intent modifiers:
                - Words like "popular", "highly cited", "most cited", "recent" are INTENT MODIFIERS
                - DO NOT include these words in the actual query
                - They should only affect the intent classification and sorting
@@ -232,18 +256,21 @@ class LLMService:
                - DO NOT use property:influential - this is NOT a valid property
                - DO NOT use property:refereed - this is NOT needed
                - DO NOT use ANY property: conditions unless explicitly requested
+               - DO NOT put intent modifiers in the abstract field
+               - DO NOT put intent modifiers in the title field
+               - DO NOT put intent modifiers in ANY field
             
-            5. IMPORTANT: DO NOT add ANY extra conditions to the query unless explicitly requested:
+            7. IMPORTANT: DO NOT add ANY extra conditions to the query unless explicitly requested:
                - NO property:refereed
                - NO property:cited
                - NO property:popular
                - NO property:influential
-               - NO year ranges
+               - NO year ranges unless explicitly requested
                - NO citation_count filters
                - NO doctype filters
                - NO ANY other conditions not explicitly mentioned in the query
-               - The ONLY fields you should use are author: and abs:
-               - The ONLY operators you should use are AND, OR, and quotes
+               - The ONLY fields you should use are author:, abs:, and year:
+               - The ONLY operators you should use are AND, OR, quotes, and special operators when appropriate
             
             Examples of good transformations:
             Original: "papers about black holes"
@@ -256,15 +283,35 @@ class LLMService:
             Explanation: Looking for papers authored by Stephanie Jarmak
             Transformed: author:"Jarmak, S" OR author:"Jarmak, Stephanie"
             
-            Original: "recent papers by Stephen Hawking"
-            Intent: author_recent
-            Explanation: Looking for recent papers authored by Stephen Hawking
-            Transformed: (author:"Hawking, S" OR author:"Hawking, Stephen") AND year:[2020 TO *]
+            Original: "Jarmak 2020"
+            Intent: author_year
+            Explanation: Looking for papers by Stephanie Jarmak from 2020
+            Transformed: (author:"Jarmak, S" OR author:"Jarmak, Stephanie") AND year:2020
             
-            Original: "highly cited papers on dark matter"
-            Intent: topic_influential
-            Explanation: Looking for influential papers about dark matter
-            Transformed: abs:"dark matter"
+            Original: "papers by Stephen Hawking from 2020 to 2023"
+            Intent: author_year_range
+            Explanation: Looking for papers by Stephen Hawking between 2020 and 2023
+            Transformed: (author:"Hawking, S" OR author:"Hawking, Stephen") AND year:[2020 TO 2023]
+            
+            Original: "trending papers on exoplanets"
+            Intent: topic_trending
+            Explanation: Looking for trending papers about exoplanets
+            Transformed: trending(abs:"exoplanets")
+            
+            Original: "review papers on dark matter"
+            Intent: topic_review
+            Explanation: Looking for review papers about dark matter
+            Transformed: reviews(abs:"dark matter")
+            
+            Original: "papers similar to this one"
+            Intent: similar
+            Explanation: Looking for papers similar to the specified paper
+            Transformed: similar(bibcode:"2023ApJ...")
+            
+            Original: "papers related to exoplanets"
+            Intent: related
+            Explanation: Looking for papers related to exoplanets
+            Transformed: related(abs:"exoplanets")
             
             Original: "popular papers by Stephen Hawking on black holes"
             Intent: author_topic_influential
@@ -276,10 +323,15 @@ class LLMService:
             Explanation: Looking for papers by Alberto Accomazzi about ADS
             Transformed: (author:"Accomazzi, A" OR author:"Accomazzi, Alberto") AND abs:"ADS"
             
+            Original: "popular papers by Stephanie Jarmak about asteroids"
+            Intent: author_topic_influential
+            Explanation: Looking for influential papers by Stephanie Jarmak about asteroids
+            Transformed: (author:"Jarmak, S" OR author:"Jarmak, Stephanie") AND abs:"asteroids"
+            
             Now transform this query: {query}
             
             Return your response in this exact format:
-            Intent: [one of: topic, author, author_recent, topic_influential, author_topic_influential, or other simple classification]
+            Intent: [one of: topic, author, author_year, author_year_range, topic_trending, topic_review, similar, related, topic_influential, author_topic_influential, or other simple classification]
             Explanation: [brief explanation of the transformation]
             Transformed Query: [the transformed query]
             """
@@ -300,6 +352,7 @@ class LLMService:
            - Use abs:"topic" for the topic part
            - NEVER put the topic in the author field
            - NEVER put the author in the topic field
+           - ALWAYS use AND to combine author and topic parts
            - Example: "papers by Stephen Hawking about black holes" becomes:
              (author:"Hawking, S" OR author:"Hawking, Stephen") AND abs:"black holes"
         
@@ -315,7 +368,26 @@ class LLMService:
            - NEVER interpret or expand acronyms (e.g., keep "ADS" as "ADS")
            - NEVER add words that weren't in the original query
         
-        4. For intent modifiers:
+        4. For year specifications:
+           - When a specific year is mentioned (e.g., "2020"), use year:2020 for exact match
+           - ONLY use year ranges [x TO y] when explicitly requested (e.g., "papers from 2020 to 2023")
+           - NEVER use year ranges for single year specifications
+           - Example: "Jarmak 2020" becomes:
+             (author:"Jarmak, S" OR author:"Jarmak, Stephanie") AND year:2020
+        
+        5. For special operators:
+           - When "trending" is mentioned, use trending() operator
+             Example: "trending papers on exoplanets" becomes trending(abs:"exoplanets")
+           - When "review" or "reviews" is mentioned, use reviews() operator
+             Example: "review papers on exoplanets" becomes reviews(abs:"exoplanets")
+           - When "similar" is mentioned, use similar() operator
+             Example: "papers similar to this one" becomes similar(bibcode:"2023ApJ...")
+           - When "related" is mentioned, use related() operator
+             Example: "papers related to exoplanets" becomes related(abs:"exoplanets")
+           - ALWAYS put the topic/query inside the operator's parentheses
+           - NEVER combine multiple operators in the same query
+        
+        6. For intent modifiers:
            - Words like "popular", "highly cited", "most cited", "recent" are INTENT MODIFIERS
            - DO NOT include these words in the actual query
            - They should only affect the intent classification and sorting
@@ -324,18 +396,21 @@ class LLMService:
            - DO NOT use property:influential - this is NOT a valid property
            - DO NOT use property:refereed - this is NOT needed
            - DO NOT use ANY property: conditions unless explicitly requested
+           - DO NOT put intent modifiers in the abstract field
+           - DO NOT put intent modifiers in the title field
+           - DO NOT put intent modifiers in ANY field
         
-        5. IMPORTANT: DO NOT add ANY extra conditions to the query unless explicitly requested:
+        7. IMPORTANT: DO NOT add ANY extra conditions to the query unless explicitly requested:
            - NO property:refereed
            - NO property:cited
            - NO property:popular
            - NO property:influential
-           - NO year ranges
+           - NO year ranges unless explicitly requested
            - NO citation_count filters
            - NO doctype filters
            - NO ANY other conditions not explicitly mentioned in the query
-           - The ONLY fields you should use are author: and abs:
-           - The ONLY operators you should use are AND, OR, and quotes
+           - The ONLY fields you should use are author:, abs:, and year:
+           - The ONLY operators you should use are AND, OR, quotes, and special operators when appropriate
         
         Examples of good transformations:
         Original: "papers about black holes"
@@ -348,15 +423,35 @@ class LLMService:
         Explanation: Looking for papers authored by Stephanie Jarmak
         Transformed: author:"Jarmak, S" OR author:"Jarmak, Stephanie"
         
-        Original: "recent papers by Stephen Hawking"
-        Intent: author_recent
-        Explanation: Looking for recent papers authored by Stephen Hawking
-        Transformed: (author:"Hawking, S" OR author:"Hawking, Stephen") AND year:[2020 TO *]
+        Original: "Jarmak 2020"
+        Intent: author_year
+        Explanation: Looking for papers by Stephanie Jarmak from 2020
+        Transformed: (author:"Jarmak, S" OR author:"Jarmak, Stephanie") AND year:2020
         
-        Original: "highly cited papers on dark matter"
-        Intent: topic_influential
-        Explanation: Looking for influential papers about dark matter
-        Transformed: abs:"dark matter"
+        Original: "papers by Stephen Hawking from 2020 to 2023"
+        Intent: author_year_range
+        Explanation: Looking for papers by Stephen Hawking between 2020 and 2023
+        Transformed: (author:"Hawking, S" OR author:"Hawking, Stephen") AND year:[2020 TO 2023]
+        
+        Original: "trending papers on exoplanets"
+        Intent: topic_trending
+        Explanation: Looking for trending papers about exoplanets
+        Transformed: trending(abs:"exoplanets")
+        
+        Original: "review papers on dark matter"
+        Intent: topic_review
+        Explanation: Looking for review papers about dark matter
+        Transformed: reviews(abs:"dark matter")
+        
+        Original: "papers similar to this one"
+        Intent: similar
+        Explanation: Looking for papers similar to the specified paper
+        Transformed: similar(bibcode:"2023ApJ...")
+        
+        Original: "papers related to exoplanets"
+        Intent: related
+        Explanation: Looking for papers related to exoplanets
+        Transformed: related(abs:"exoplanets")
         
         Original: "popular papers by Stephen Hawking on black holes"
         Intent: author_topic_influential
@@ -368,10 +463,15 @@ class LLMService:
         Explanation: Looking for papers by Alberto Accomazzi about ADS
         Transformed: (author:"Accomazzi, A" OR author:"Accomazzi, Alberto") AND abs:"ADS"
         
+        Original: "popular papers by Stephanie Jarmak about asteroids"
+        Intent: author_topic_influential
+        Explanation: Looking for influential papers by Stephanie Jarmak about asteroids
+        Transformed: (author:"Jarmak, S" OR author:"Jarmak, Stephanie") AND abs:"asteroids"
+        
         Now transform this query: {query}
         
         Return your response in this exact format:
-        Intent: [one of: topic, author, author_recent, topic_influential, author_topic_influential, or other simple classification]
+        Intent: [one of: topic, author, author_year, author_year_range, topic_trending, topic_review, similar, related, topic_influential, author_topic_influential, or other simple classification]
         Explanation: [brief explanation of the transformation]
         Transformed Query: [the transformed query]
         """
