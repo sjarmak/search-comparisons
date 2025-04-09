@@ -30,7 +30,8 @@ from ...services.quepid_service import (
     get_case_judgments,
     get_book_judgments,
     extract_doc_id,
-    calculate_ndcg
+    calculate_ndcg,
+    QUEPID_API_KEY
 )
 from ...core.config import settings
 from ..models import (
@@ -617,10 +618,19 @@ async def evaluate_search_with_quepid(
     try:
         logger.info(f"Quepid evaluation request: {request.dict()}")
         
+        if not QUEPID_API_KEY:
+            raise HTTPException(
+                status_code=500,
+                detail="Quepid API key not configured. Please set QUEPID_API_KEY environment variable."
+            )
+        
         # Get case data from Quepid
         case_data = await get_case_judgments(request.case_id)
         if not case_data:
-            raise HTTPException(status_code=404, detail=f"Case {request.case_id} not found")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Case {request.case_id} not found or no data returned from Quepid"
+            )
         
         # Get judgments for the query
         judgments = {}
@@ -630,9 +640,10 @@ async def evaluate_search_with_quepid(
                 break
         
         if not judgments:
+            available_queries = [q['query'] for q in case_data.get('queries', [])]
             raise HTTPException(
                 status_code=404,
-                detail=f"No judgments found for query '{request.query}' in case {request.case_id}"
+                detail=f"No judgments found for query '{request.query}' in case {request.case_id}. Available queries: {', '.join(available_queries)}"
             )
         
         # Get document titles from Quepid
@@ -648,73 +659,6 @@ async def evaluate_search_with_quepid(
         except Exception as e:
             logger.warning(f"Failed to get document titles: {str(e)}")
         
-        # Get search results
-        search_results = await query_ads_solr(
-            query=request.query,
-            fields=["id", "title", "abstract", "author", "citation_count", 
-                    "pubdate", "doctype", "identifier"],
-            num_results=request.max_results
-        )
-        
-        # Process results and calculate metrics
-        processed_results = []
-        judged_retrieved = 0
-        relevant_retrieved = 0
-        
-        for result in search_results:
-            # Extract document ID from URL
-            doc_id = extract_doc_id(result)
-            if not doc_id:
-                continue
-            
-            # Get judgment for this document
-            judgment = judgments.get(doc_id, 0)
-            if isinstance(judgment, dict):
-                rating = judgment.get('rating', 0)
-            else:
-                rating = float(judgment)
-            
-            # Check if document is judged and relevant
-            has_judgment = doc_id in judgments
-            is_relevant = rating > 0
-            
-            if has_judgment:
-                judged_retrieved += 1
-            if is_relevant:
-                relevant_retrieved += 1
-            
-            # Get document title from Quepid if available
-            title = doc_titles.get(doc_id, result.title)
-            
-            processed_results.append({
-                "title": title,
-                "authors": getattr(result, 'author', []),
-                "year": getattr(result, 'year', ''),
-                "citation_count": getattr(result, 'citation_count', 0),
-                "doc_type": getattr(result, 'doctype', ''),
-                "url": getattr(result, 'url', ''),
-                "doc_id": doc_id,
-                "rating": rating,
-                "has_judgment": has_judgment,
-                "judgment": rating
-            })
-        
-        # Calculate metrics
-        metrics = {}
-        for k in [5, 10, 20]:
-            if len(processed_results) >= k:
-                # Calculate nDCG
-                ratings = [r["rating"] for r in processed_results[:k]]
-                metrics[f"ndcg@{k}"] = calculate_ndcg(ratings, k)
-                
-                # Calculate precision@k
-                relevant_count = sum(1 for r in processed_results[:k] if r["rating"] > 0)
-                metrics[f"p@{k}"] = relevant_count / k
-        
-        # Calculate recall
-        total_relevant = sum(1 for r in processed_results if r["rating"] > 0)
-        metrics["recall"] = total_relevant / len(judgments) if judgments else 0
-        
         # Format judged titles
         judged_titles = []
         for doc_id, judgment in judgments.items():
@@ -725,45 +669,25 @@ async def evaluate_search_with_quepid(
                 rating = float(judgment)
                 title = doc_titles.get(doc_id, '')
             
-            if title:
-                judged_titles.append({
-                    "title": title,
-                    "rating": rating,
-                    "bibcode": doc_id,
-                    "clean_title": title.lower().replace(r'[^a-z0-9]', '')
-                })
+            judged_titles.append({
+                "doc_id": doc_id,
+                "title": title,
+                "rating": rating
+            })
+        
+        # Calculate total relevant documents
+        total_relevant = sum(1 for j in judgments.values() if 
+            (isinstance(j, dict) and j.get('rating', 0) > 0) or 
+            (isinstance(j, (int, float)) and j > 0))
         
         # Format response
         source_result = QuepidEvaluationSourceResult(
-            source="ads",
-            metrics=[
-                MetricResult(
-                    name=name,
-                    value=value,
-                    description=f"{name} metric"
-                )
-                for name, value in metrics.items()
-            ],
-            judged_retrieved=judged_retrieved,
-            relevant_retrieved=relevant_retrieved,
-            results_count=len(processed_results),
-            results=[
-                SearchResult(
-                    title=r["title"],
-                    authors=r["authors"],
-                    year=r["year"],
-                    citation_count=r["citation_count"],
-                    doctype=r["doc_type"],
-                    url=r["url"],
-                    doc_id=r["doc_id"],
-                    rating=r["rating"],
-                    has_judgment=r["has_judgment"],
-                    judgment=r["judgment"],
-                    source="ads",
-                    rank=idx + 1
-                )
-                for idx, r in enumerate(processed_results)
-            ],
+            source="quepid",
+            metrics=[],
+            judged_retrieved=0,
+            relevant_retrieved=0,
+            results_count=0,
+            results=[],
             config=BoostConfig(
                 name="Base Results",
                 citation_boost=0.0,
@@ -779,14 +703,14 @@ async def evaluate_search_with_quepid(
             case_name=case_data.get('case_name', f'Case {request.case_id}'),
             source_results=[source_result],
             total_judged=len(judgments),
-            total_relevant=sum(1 for j in judgments.values() if 
-                (isinstance(j, dict) and j.get('rating', 0) > 0) or 
-                (isinstance(j, (int, float)) and j > 0)),
+            total_relevant=total_relevant,
             available_queries=[q['query'] for q in case_data.get('queries', [])]
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in Quepid evaluation: {str(e)}")
+        logger.error(f"Error in Quepid evaluation: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Error evaluating search results: {str(e)}"

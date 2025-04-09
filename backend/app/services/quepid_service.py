@@ -170,16 +170,35 @@ async def get_case_judgments(case_id: int) -> Dict[str, Any]:
             url = urljoin(QUEPID_API_URL, f"export/ratings/{case_id}")
             logger.info(f"Getting judgments for case {case_id} from Quepid: {url}")
             
-            response_data = await safe_api_request(
-                client,
-                "GET",
+            response = await client.get(
                 url,
                 headers=headers,
                 timeout=TIMEOUT_SECONDS
             )
             
+            # Log the response status and headers
+            logger.info(f"Quepid API response status: {response.status_code}")
+            logger.info(f"Quepid API response headers: {response.headers}")
+            
+            if response.status_code != 200:
+                logger.error(f"Quepid API returned status {response.status_code}: {response.text}")
+                return {}
+            
+            response_data = response.json()
+            logger.info(f"Quepid API response data: {response_data}")
+            
+            if not response_data:
+                logger.error("Empty response from Quepid API")
+                return {}
+            
             return response_data
     
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error retrieving judgments for case {case_id} from Quepid: {str(e)}")
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse Quepid API response: {str(e)}")
+        return {}
     except Exception as e:
         logger.error(f"Error retrieving judgments for case {case_id} from Quepid: {str(e)}")
         return {}

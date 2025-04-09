@@ -3,14 +3,35 @@ import {
   Box, Typography, TextField, Button, 
   Grid, Paper, CircularProgress, Chip,
   Card, CardContent, Divider, Alert, Tooltip,
-  List, ListItem, ListItemText, IconButton
+  List, ListItem, ListItemText, IconButton, Link, Stack
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import InfoIcon from '@mui/icons-material/Info';
 import SchemaIcon from '@mui/icons-material/Schema';
 import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
+import { styled } from '@mui/material/styles';
 
 import { searchService } from '../services/api';
+
+const StyledPaper = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+  backgroundColor: theme.palette.background.paper,
+}));
+
+const ResultPaper = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(2),
+  marginBottom: theme.spacing(2),
+  backgroundColor: theme.palette.background.paper,
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+  },
+}));
+
+const AuthorChip = styled(Chip)(({ theme }) => ({
+  marginRight: theme.spacing(0.5),
+  marginBottom: theme.spacing(0.5),
+}));
 
 /**
  * QueryIntent component for transforming queries based on user intent
@@ -37,30 +58,37 @@ const QueryIntent = () => {
     setError(null);
     
     try {
-      // Call the backend API to transform the query
-      const apiUrl = '/api/query-intent/transform';
-      const response = await fetch(`${apiUrl}?query=${encodeURIComponent(query)}`);
+      // Call the backend API to transform the query and get results
+      const response = await searchService.transformQuery(query);
       
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+      console.log('Raw response from backend:', response);
+      
+      if (response.error) {
+        throw new Error(response.message);
       }
-      
-      const data = await response.json();
-      console.log('Query intent API response:', data);
       
       // Extract the transformed query and intent info
       const intentInfo = {
-        original: data.original_query,
-        transformed: data.transformed_query,
-        intent: data.intent,
-        explanation: data.explanation
+        original: response.original_query,
+        transformed: response.transformed_query,
+        intent: response.intent,
+        explanation: response.explanation
       };
       
-      setTransformedQuery(data.transformed_query);
+      console.log('Processed intent info:', intentInfo);
+      
+      setTransformedQuery(response.transformed_query);
       setIntentInfo(intentInfo);
       
-      // Now search ADS with the transformed query
-      await searchADS(data.transformed_query);
+      // Set the search results - handle both possible response structures
+      const searchResults = {
+        query: response.transformed_query,
+        results: response.search_results?.results || response.results?.docs || []
+      };
+      
+      console.log('Processed search results:', searchResults);
+      
+      setResults(searchResults);
       
     } catch (err) {
       console.error('Error analyzing query:', err);
@@ -73,36 +101,14 @@ const QueryIntent = () => {
   // Function to search ADS with the transformed query
   const searchADS = async (adsQuery) => {
     try {
-      // In a real implementation, you would call your ADS API
-      // For now, this is a placeholder
+      // Call the backend API to get search results
+      const response = await searchService.getSearchResults('ads', adsQuery, [], 20);
       
-      // Mock response with sample data
-      const mockResults = {
-        query: adsQuery,
-        results: [
-          {
-            title: "Sample Paper 1 for query: " + adsQuery,
-            authors: ["Author A", "Author B", "Author C"],
-            year: 2023,
-            abstract: "This is a sample abstract for the first result that would match your transformed query.",
-            bibcode: "2023ApJ...123..456S",
-            citation_count: 42
-          },
-          {
-            title: "Sample Paper 2 for query: " + adsQuery,
-            authors: ["Author D", "Author E"],
-            year: 2022,
-            abstract: "This is a sample abstract for the second result that would match your transformed query.",
-            bibcode: "2022ApJ...456..789T",
-            citation_count: 18
-          }
-        ]
-      };
+      if (response.error) {
+        throw new Error(response.message);
+      }
       
-      // In production, you would use real API call like:
-      // const response = await searchService.getSearchResults('ads', adsQuery, [], 10);
-      
-      setResults(mockResults);
+      setResults(response);
       
     } catch (err) {
       console.error('Error searching ADS:', err);
@@ -112,27 +118,116 @@ const QueryIntent = () => {
   
   // Render a single search result
   const renderSearchResult = (result, index) => {
+    const formatCitationCount = (count) => {
+      if (count >= 1000) {
+        return `${(count / 1000).toFixed(1)}k`;
+      }
+      return count.toString();
+    };
+
+    // Create links object
+    const links = {
+      ads: `https://ui.adsabs.harvard.edu/abs/${result.bibcode}/abstract`,
+      pdf: result.property?.includes('PUB_PDF') ? `https://ui.adsabs.harvard.edu/link_gateway/${result.bibcode}/PUB_PDF` : null,
+      arxiv: result.property?.includes('EPRINT_HTML') ? `https://arxiv.org/abs/${result.bibcode}` : null
+    };
+
+    // Format authors
+    const authors = Array.isArray(result.author) ? result.author : [];
+
     return (
-      <Card key={index} variant="outlined" sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="h6" component="div">
-            {result.title}
+      <React.Fragment key={result.bibcode || index}>
+        <ResultPaper elevation={1}>
+          <Typography variant="h6" component="div" gutterBottom>
+            <Link 
+              href={links.ads} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              color="primary"
+              underline="hover"
+            >
+              {result.title}
+            </Link>
           </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            {Array.isArray(result.authors) 
-              ? result.authors.slice(0, 3).join(', ') + (result.authors.length > 3 ? ', et al.' : '')
-              : result.authors}
-            {result.year ? ` (${result.year})` : ''}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            {result.bibcode} | Citations: {result.citation_count}
-          </Typography>
-          <Divider sx={{ my: 1 }} />
-          <Typography variant="body2">
-            {result.abstract}
-          </Typography>
-        </CardContent>
-      </Card>
+          
+          <Stack direction="row" spacing={1} alignItems="center" mb={1}>
+            <Typography variant="body2" color="textSecondary">
+              {authors.join(', ')}
+            </Typography>
+            {result.year && (
+              <Typography variant="body2" color="textSecondary">
+                • {result.year}
+              </Typography>
+            )}
+            {result.citation_count > 0 && (
+              <Typography variant="body2" color="textSecondary">
+                • {formatCitationCount(result.citation_count)} citations
+              </Typography>
+            )}
+          </Stack>
+
+          {result.pub && (
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              {result.pub}
+              {result.volume && `, Vol. ${result.volume}`}
+              {result.page && `, p. ${result.page}`}
+            </Typography>
+          )}
+
+          {result.abstract && (
+            <Typography variant="body2" paragraph>
+              {result.abstract}
+            </Typography>
+          )}
+
+          <Stack direction="row" spacing={1} alignItems="center">
+            {links.pdf && (
+              <Link 
+                href={links.pdf} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                variant="body2"
+              >
+                PDF
+              </Link>
+            )}
+            {links.arxiv && (
+              <Link 
+                href={links.arxiv} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                variant="body2"
+              >
+                arXiv
+              </Link>
+            )}
+            {result.doi && (
+              <Link 
+                href={`https://doi.org/${result.doi}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                variant="body2"
+              >
+                DOI
+              </Link>
+            )}
+          </Stack>
+
+          {result.keyword && result.keyword.length > 0 && (
+            <Box mt={1}>
+              {result.keyword.map((keyword, idx) => (
+                <Chip 
+                  key={idx} 
+                  label={keyword} 
+                  size="small" 
+                  sx={{ mr: 0.5, mb: 0.5 }}
+                />
+              ))}
+            </Box>
+          )}
+        </ResultPaper>
+        {index < results.results.length - 1 && <Divider />}
+      </React.Fragment>
     );
   };
   
@@ -141,51 +236,23 @@ const QueryIntent = () => {
     if (!intentInfo) return null;
     
     return (
-      <Paper elevation={3} sx={{ p: 3, mb: 4, bgcolor: 'white' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-          <Typography variant="h6" gutterBottom color="primary.main">
-            Query Intent Analysis
-          </Typography>
-          <Chip 
-            icon={<TipsAndUpdatesIcon />} 
-            label={intentInfo.intent.toUpperCase()} 
-            color="primary" 
-          />
-        </Box>
-        
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" gutterBottom>
-              Original Query:
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 1, bgcolor: 'grey.50' }}>
-              <Typography variant="body1">
-                {intentInfo.original}
-              </Typography>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Typography variant="subtitle2" gutterBottom>
-              Transformed Query:
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 1, bgcolor: 'blue.50' }}>
-              <Typography variant="body1" color="primary">
-                {intentInfo.transformed}
-              </Typography>
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Typography variant="subtitle2" gutterBottom>
-              Explanation:
-            </Typography>
-            <Paper variant="outlined" sx={{ p: 1, bgcolor: 'grey.50' }}>
-              <Typography variant="body2">
-                {intentInfo.explanation || "No specific transformations applied."}
-              </Typography>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Paper>
+      <StyledPaper elevation={1}>
+        <Typography variant="h6" gutterBottom>
+          Query Intent Analysis
+        </Typography>
+        <Typography variant="subtitle1" color="textSecondary">
+          {intentInfo.intent.toUpperCase()}
+        </Typography>
+        <Typography variant="body1" paragraph>
+          <strong>Original Query:</strong> {intentInfo.original}
+        </Typography>
+        <Typography variant="body1" paragraph>
+          <strong>Transformed Query:</strong> {intentInfo.transformed}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          {intentInfo.explanation || "No specific transformations applied."}
+        </Typography>
+      </StyledPaper>
     );
   };
   
@@ -246,13 +313,13 @@ const QueryIntent = () => {
       {results && (
         <Box>
           <Typography variant="h6" gutterBottom>
-            Search Results
+            Search Results ({results.results.length})
           </Typography>
-          <Box>
+          <List>
             {results.results.map((result, index) => (
-              renderSearchResult(result, index)
-            ))}
-          </Box>
+              renderSearchResult(result, index))
+            )}
+          </List>
         </Box>
       )}
       

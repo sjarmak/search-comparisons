@@ -10,6 +10,7 @@ import asyncio
 from typing import List, Dict, Any, Optional, Tuple, Union, Literal
 
 import httpx
+import aiohttp
 
 from ..api.models import SearchResult
 from ..utils.http import safe_api_request
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # API Constants
 ADS_API_URL = "https://api.adsabs.harvard.edu/v1/search/query"
-ADS_SOLR_PROXY_URL = os.environ.get("ADS_SOLR_PROXY_URL", "https://playground.adsabs.harvard.edu/dev/solr/collection1/select")
+ADS_SOLR_PROXY_URL = os.environ.get("ADS_SOLR_PROXY_URL", "https://scix-solr-proxy.onrender.com/solr/select")
 ADS_QUERY_METHOD = os.environ.get("ADS_QUERY_METHOD", "solr_first").lower()  # Options: solr_only, api_only, solr_first (default)
 NUM_RESULTS = 20
 TIMEOUT_SECONDS = 15
@@ -46,7 +47,8 @@ SOLR_FIELD_MAPPING = {
     "year": "year",
     "citation_count": "citation_count",
     "doctype": "doctype",
-    "property": "property"
+    "property": "property",
+    "url": "url"
 }
 
 
@@ -86,7 +88,7 @@ def get_ads_solr_password() -> str:
     else:
         # Log masked key for debugging
         masked_key = f"{solr_password[:4]}...{solr_password[-4:]}" if len(solr_password) > 8 else "[KEY]"
-        logger.debug(f"Using ADS API key: {masked_key}")
+        logger.debug(f"Using ADS Solr password: {masked_key}")
         
     return solr_password
 
@@ -163,64 +165,69 @@ async def get_bibcode_from_doi(doi: str) -> Optional[str]:
 async def query_ads_solr(
     query: str, 
     fields: List[str], 
-    num_results: int = NUM_RESULTS
+    num_results: int = NUM_RESULTS,
+    sort: str = "score desc",
+    use_cache: bool = False
 ) -> List[SearchResult]:
     """
-    Query the dev instance of ADS Solr. 
-    
-    Uses the dev credentials to access Solr instance directly 
-    with a GET request and BasicAuth 
+    Query the ADS Solr proxy directly.
     
     Args:
         query: Search query string
         fields: List of fields to include in results
         num_results: Maximum number of results to return
+        sort: Sort parameter for the query (e.g., "score desc", "citation_count desc", "date desc")
+        use_cache: Whether to use caching
     
     Returns:
         List[SearchResult]: List of search results from ADS Solr
     """
-    logger.info(f"Querying ADS Solr directly via proxy with: {query}")
+    logger.info(f"Querying ADS Solr proxy with: {query}")
     
     try:
-        # Check cache first
-        cache_key = get_cache_key("ads_solr", query, fields, num_results)
-        cached_results = load_from_cache(cache_key)
+        # Check cache first if enabled
+        if use_cache:
+            cache_key = get_cache_key("ads_solr", query, fields, num_results)
+            cached_results = load_from_cache(cache_key)
+            
+            if cached_results is not None:
+                logger.info(f"Retrieved {len(cached_results)} results from cache for Solr query")
+                return cached_results
         
-        if cached_results is not None:
-            logger.info(f"Retrieved {len(cached_results)} results from cache for Solr query")
-            return cached_results
+        # Map requested fields to Solr fields
+        solr_fields = ["bibcode", "id"]  # Always include these
+        for field in fields:
+            if field in SOLR_FIELD_MAPPING:
+                solr_field = SOLR_FIELD_MAPPING[field]
+                if solr_field not in solr_fields:
+                    solr_fields.append(solr_field)
         
+        # Add special fields needed for processing
+        if "doi" in fields and "identifier" not in solr_fields:
+            solr_fields.append("identifier")
+        
+        # Set query parameters
+        params = {
+            "q": query,
+            "fl": ",".join(solr_fields),
+            "rows": num_results,
+            "sort": sort,
+            "wt": "json"  # Ensure JSON response format
+        }
+        
+        # Get password
+        solr_password = get_ads_solr_password()
+        if not solr_password:
+            logger.error("ADS Solr password not configured")
+            return []
+        
+        # Make request
+        logger.info(f"Querying ADS Solr proxy with: {query}")
         async with httpx.AsyncClient() as client:
-            # Map requested fields to Solr fields
-            solr_fields = ["bibcode", "id"]  # Always include these
-            for field in fields:
-                if field in SOLR_FIELD_MAPPING:
-                    solr_field = SOLR_FIELD_MAPPING[field]
-                    if solr_field not in solr_fields:
-                        solr_fields.append(solr_field)
-            
-            # Add special fields needed for processing
-            if "doi" in fields and "identifier" not in solr_fields:
-                solr_fields.append("identifier")
-            
-            # Set query parameters
-            params = {
-                "q": query,
-                "fl": ",".join(solr_fields),
-                "rows": num_results,
-                "sort": "score desc",
-                "wt": "json"  # Ensure JSON response format
-            }
-            
-            # Get password
-            ads_solr_password = get_ads_solr_password()
-
-            # Make request
-            logger.info(f"Querying ADS Solr proxy with: {query}")
             response = await client.get(
                 ADS_SOLR_PROXY_URL,
                 params=params,
-                auth=httpx.BasicAuth('ads', ads_solr_password),
+                auth=httpx.BasicAuth('ads', solr_password),
                 timeout=TIMEOUT_SECONDS
             )
             
@@ -231,65 +238,60 @@ async def query_ads_solr(
             
             # Parse JSON response
             response_data = response.json()
-            
-            # Check if we got a response
             docs = response_data.get("response", {}).get("docs", [])
-            if not docs:
-                logger.warning(f"No results found from ADS Solr for query: {query}")
-                return []
             
             # Process results
             results = []
-            for rank, doc in enumerate(docs, 1):
-                # Extract DOI from identifier field if present
-                doi = None
-                if "identifier" in doc:
-                    identifiers = doc["identifier"] if isinstance(doc["identifier"], list) else [doc["identifier"]]
-                    for identifier in identifiers:
-                        if isinstance(identifier, str) and identifier.lower().startswith("doi:"):
-                            doi = identifier[4:].strip()
-                            break
-                
-                # Handle title field which can be a list or string
-                title = ""
-                if "title" in doc:
-                    if isinstance(doc["title"], list):
-                        title = doc["title"][0] if doc["title"] else ""
-                    else:
-                        title = doc["title"]
-                
-                # Create result object
-                result = SearchResult(
-                    title=title,
-                    authors=doc.get("author", []),
-                    abstract=doc.get("abstract", ""),
-                    doi=doi,
-                    year=doc.get("year"),
-                    url=f"https://ui.adsabs.harvard.edu/abs/{doc.get('bibcode')}/abstract" if doc.get('bibcode') else None,
-                    source="ads",
-                    rank=rank,
-                    citation_count=doc.get("citation_count", 0),
-                    doctype=doc.get("doctype", ""),
-                    property=doc.get("property", [])
-                )
-                results.append(result)
+            for doc in docs:
+                try:
+                    # Extract DOI from identifier field if present
+                    doi = None
+                    if "identifier" in doc:
+                        identifiers = doc["identifier"]
+                        if isinstance(identifiers, list):
+                            for id in identifiers:
+                                if id.startswith("doi:"):
+                                    doi = id[4:]
+                                    break
+                        elif isinstance(identifiers, str) and identifiers.startswith("doi:"):
+                            doi = identifiers[4:]
+                    
+                    # Create search result
+                    result = SearchResult(
+                        title=doc.get("title", [""])[0] if isinstance(doc.get("title"), list) else doc.get("title", ""),
+                        authors=doc.get("author", []),
+                        abstract=doc.get("abstract", [""])[0] if isinstance(doc.get("abstract"), list) else doc.get("abstract", ""),
+                        doi=doi,
+                        year=doc.get("year"),
+                        url=f"https://ui.adsabs.harvard.edu/abs/{doc.get('bibcode')}/abstract",
+                        source="ads",
+                        rank=len(results) + 1,
+                        citation_count=doc.get("citation_count", 0),
+                        doctype=doc.get("doctype", ""),
+                        property=doc.get("property", [])
+                    )
+                    results.append(result)
+                except Exception as e:
+                    logger.error(f"Error processing document: {str(e)}")
+                    continue
             
-            # Save to cache
-            if results:
+            # Cache results if enabled
+            if use_cache and results:
                 save_to_cache(cache_key, results)
             
-            logger.info(f"Retrieved {len(results)} results from ADS Solr")
             return results
             
     except Exception as e:
-        logger.error(f"Error retrieving results from ADS Solr: {str(e)}")
+        logger.error(f"Error querying ADS Solr proxy: {str(e)}")
         return []
 
 
 async def query_ads_api(
     query: str, 
     fields: List[str], 
-    num_results: int = NUM_RESULTS
+    num_results: int = NUM_RESULTS,
+    sort: str = "score desc",
+    use_cache: bool = False
 ) -> List[SearchResult]:
     """
     Query the official ADS API.
@@ -300,6 +302,8 @@ async def query_ads_api(
         query: Search query string
         fields: List of fields to include in results
         num_results: Maximum number of results to return
+        sort: Sort parameter for the query (e.g., "score desc", "citation_count desc", "date desc")
+        use_cache: Whether to use caching
     
     Returns:
         List[SearchResult]: List of search results from ADS API
@@ -311,13 +315,14 @@ async def query_ads_api(
         return []
     
     try:
-        # Check cache first
-        cache_key = get_cache_key("ads_api", query, fields, num_results)
-        cached_results = load_from_cache(cache_key)
-        
-        if cached_results is not None:
-            logger.info(f"Retrieved {len(cached_results)} results from cache for API query")
-            return cached_results
+        # Check cache first if enabled
+        if use_cache:
+            cache_key = get_cache_key("ads_api", query, fields, num_results)
+            cached_results = load_from_cache(cache_key)
+            
+            if cached_results is not None:
+                logger.info(f"Retrieved {len(cached_results)} results from cache for API query")
+                return cached_results
         
         async with httpx.AsyncClient() as client:
             # Set headers with API key
@@ -339,7 +344,7 @@ async def query_ads_api(
                 "q": query,
                 "fl": ",".join(ads_fields),
                 "rows": num_results,
-                "sort": "score desc"
+                "sort": sort
             }
             
             # Make request
@@ -378,8 +383,8 @@ async def query_ads_api(
                 )
                 results.append(result)
             
-            # Save to cache
-            if results:
+            # Save to cache if enabled
+            if use_cache and results:
                 save_to_cache(cache_key, results)
             
             logger.info(f"Retrieved {len(results)} results from ADS API")
@@ -391,39 +396,78 @@ async def query_ads_api(
 
 
 async def get_ads_results(
-    query: str, 
-    fields: List[str], 
-    num_results: int = NUM_RESULTS
-) -> List[SearchResult]:
+    query: str,
+    fields: List[str] = None,
+    num_results: int = 20,
+    use_cache: bool = False,
+    intent: str = None,
+    sort: str = None
+) -> List[Any]:
     """
-    Get search results from ADS, using either Solr or API based on configuration.
-    
-    This function provides a unified interface to get ADS results, selecting
-    the appropriate method (Solr or API) based on environment configuration.
+    Get search results from ADS API.
     
     Args:
         query: Search query string
-        fields: List of fields to include in results
+        fields: List of fields to retrieve
         num_results: Maximum number of results to return
-    
+        use_cache: Whether to use caching
+        intent: Query intent (e.g., "influential", "recent")
+        sort: Sort parameter (e.g., "citation_count desc", "date desc")
+        
     Returns:
-        List[SearchResult]: List of search results from ADS
+        List[Any]: List of search results
     """
-    # Determine which method to use based on configuration
-    if ADS_QUERY_METHOD == "solr_only":
-        return await query_ads_solr(query, fields, num_results)
-    elif ADS_QUERY_METHOD == "api_only":
-        return await query_ads_api(query, fields, num_results)
-    else:  # solr_first (default)
-        try:
-            # Try Solr first
-            results = await query_ads_solr(query, fields, num_results)
-            if results:
+    try:
+        # Set default fields if not provided
+        if not fields:
+            fields = [
+                "id", "bibcode", "title", "author", "year", "citation_count",
+                "abstract", "doctype", "property", "pub", "volume", "page",
+                "doi", "keyword"
+            ]
+        
+        # Determine sort parameter based on intent or provided sort
+        sort_param = sort or "score desc"  # Default sort by relevance score
+        if not sort and intent:
+            if "influential" in intent or "highly cited" in intent or "popular" in intent:
+                sort_param = "citation_count desc"
+                logger.info(f"Sorting by citation count for intent: {intent}")
+            elif "recent" in intent:
+                sort_param = "date desc"
+                logger.info(f"Sorting by date for intent: {intent}")
+        
+        # Get API key
+        ads_api_key = get_ads_api_key()
+        if not ads_api_key:
+            logger.error("ADS API key not configured")
+            return []
+        
+        # Prepare query parameters
+        params = {
+            "q": query,
+            "fl": ",".join(fields),
+            "rows": num_results,
+            "sort": sort_param  # This is the correct way to pass sort parameter
+        }
+        
+        logger.info(f"ADS API request parameters: {params}")
+        
+        # Make request to ADS API
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                ADS_API_URL,
+                params=params,
+                headers={"Authorization": f"Bearer {ads_api_key}"}
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
+                
+                # Extract results from response
+                results = data.get("response", {}).get("docs", [])
+                logger.info(f"Retrieved {len(results)} results from ADS API, sorted by {sort_param}")
+                
                 return results
-            
-            # If Solr fails or returns empty results, fall back to API
-            logger.info("Falling back to ADS API after Solr returned no results")
-            return await query_ads_api(query, fields, num_results)
-        except Exception as e:
-            logger.error(f"Error with Solr query, falling back to API: {str(e)}")
-            return await query_ads_api(query, fields, num_results) 
+                
+    except Exception as e:
+        logger.error(f"Error getting ADS results: {str(e)}")
+        return [] 

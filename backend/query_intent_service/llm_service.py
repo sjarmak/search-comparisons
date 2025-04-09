@@ -16,6 +16,27 @@ from .config import LLM_CONFIG, LLMModel, DEFAULT_MODEL, DEFAULT_TEMPERATURE, DE
 # Configure logger for this module
 logger = logging.getLogger(__name__)
 
+# Default prompt template for query understanding
+DEFAULT_PROMPT_TEMPLATE = """You are an expert query understanding assistant.
+Your task is to analyze search queries and identify the user's intent.
+Based on their intent, transform the original query to make it more effective.
+
+Respond ONLY with a JSON object containing:
+1. "original_query": The user's original query
+2. "intent": The identified intent (e.g., recent, highly_cited, author_search, review, etc.)
+3. "intent_confidence": Your confidence in the intent (0.0-1.0)
+4. "transformed_query": The query with appropriate search syntax
+5. "explanation": A brief explanation of how you transformed the query
+
+Example intents:
+- recent: For finding recent content (add time-based filters)
+- highly_cited: For finding influential content (add citation/impact filters)
+- author_search: For finding content by specific authors
+- review: For finding review/summary content
+- comparison: For finding content comparing topics
+- definition: For finding definitions or explanations
+
+Keep the transformed query focused on the user's original intent while making it more effective."""
 
 class LLMService:
     """
@@ -31,7 +52,8 @@ class LLMService:
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         provider: str = "ollama",
-        api_endpoint: Optional[str] = None
+        api_endpoint: Optional[str] = None,
+        prompt_template: Optional[str] = None
     ) -> None:
         """
         Initialize the LLM service with configuration parameters.
@@ -42,11 +64,19 @@ class LLMService:
             max_tokens: Maximum number of tokens to generate
             provider: LLM provider (ollama, huggingface, openai)
             api_endpoint: API endpoint URL for the LLM provider
+            prompt_template: Optional custom prompt template for query understanding
         """
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.provider = provider
+        
+        # Get model-specific prompt template if available
+        model_config = LLM_CONFIG.get("models", {}).get(model_name, {})
+        model_prompt_template = model_config.get("default_prompt_template")
+        
+        # Use provided template, model-specific template, or default template
+        self.prompt_template = prompt_template or model_prompt_template or DEFAULT_PROMPT_TEMPLATE
         
         # Initialize API endpoint based on provider if not specified
         if api_endpoint:
@@ -71,7 +101,8 @@ class LLMService:
             temperature=LLM_CONFIG.get("temperature", DEFAULT_TEMPERATURE),
             max_tokens=LLM_CONFIG.get("max_tokens", DEFAULT_MAX_TOKENS),
             provider=LLM_CONFIG.get("provider", "ollama"),
-            api_endpoint=LLM_CONFIG.get("api_endpoint")
+            api_endpoint=LLM_CONFIG.get("api_endpoint"),
+            prompt_template=LLM_CONFIG.get("prompt_template")
         )
     
     def format_prompt(self, query: str, system_message: Optional[str] = None) -> Dict[str, Any]:
@@ -88,12 +119,8 @@ class LLMService:
         current_date = datetime.datetime.now().strftime("%Y-%m-%d")
         
         if not system_message:
-            system_message = f"""You are an expert astronomy query assistant for the NASA/ADS (Astrophysics Data System).
-Your task is to analyze user search queries and identify their intent.
-Based on their intent, transform the original query to make it more effective by adding appropriate ADS search syntax.
-Today's date is {current_date}.
-Respond only with the JSON object containing the original query, identified intent, and transformed query."""
-        
+            system_message = self.prompt_template
+            
         if self.provider == "ollama":
             # Format for Ollama API
             prompt_data = {
@@ -156,6 +183,11 @@ Respond only with the JSON object containing the original query, identified inte
                 return response_data.get("response", "")
             elif self.provider == "openai":
                 return response_data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            elif self.provider == "huggingface":
+                # Handle Hugging Face API response format
+                if isinstance(response_data, list):
+                    return response_data[0].get("generated_text", "")
+                return response_data.get("generated_text", "")
             else:
                 return response_data.get("output", "")
                 
@@ -205,30 +237,8 @@ Respond only with the JSON object containing the original query, identified inte
         """
         logger.info(f"Interpreting query: {query}")
         
-        # Define the system prompt for intent recognition
-        system_prompt = """You are an expert astronomy query assistant for the NASA/ADS (Astrophysics Data System).
-Your task is to analyze astronomy search queries and identify the user's intent.
-Based on their intent, transform the original query to make it more effective by adding appropriate ADS search syntax.
-
-Respond ONLY with a JSON object containing:
-1. "original_query": The user's original query
-2. "intent": The identified intent (e.g., recent, highly_cited, author_search, review, etc.)
-3. "intent_confidence": Your confidence in the intent (0.0-1.0)
-4. "transformed_query": The query with appropriate ADS search syntax
-5. "explanation": A brief explanation of how you transformed the query
-
-Example intents:
-- recent: For finding recent papers (add year filter, sort by date)
-- highly_cited: For finding influential papers (add citation_count filter)
-- author_search: For finding papers by specific authors (format author names properly)
-- review: For finding review papers on a topic (add doctype:review)
-- comparison: For finding papers comparing topics (add property:refereed)
-- definition: For finding definitions or explanations (focus on reviews and catalog papers)
-
-Keep the transformed query focused on the user's original intent while making it more effective with proper ADS syntax."""
-        
         # Format the prompt and query the LLM
-        prompt_data = self.format_prompt(query, system_prompt)
+        prompt_data = self.format_prompt(query)
         llm_response = self.query_llm(prompt_data)
         
         if not llm_response:

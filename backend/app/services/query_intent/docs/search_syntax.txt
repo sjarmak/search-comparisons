@@ -1,0 +1,155 @@
+ADS Search Syntax Documentation
+
+1. Search Basics
+---------------
+ADS supports both fielded and unfielded queries. Unfielded queries search metadata including author, publication year, title, abstract, identifiers, and bibstem.
+
+2. Fielded Searches
+------------------
+- author:"Lastname, F" - Search for papers by author
+- author:"^Lastname, F" - Limit to first-author papers
+- abs:"term" - Search in abstract, title, and keywords
+- title:"term" - Search in title only
+- abstract:"term" - Search in abstract only
+- keyword:"term" - Search in keywords
+- year:YYYY - Search for specific year
+- year:YYYY-YYYY - Search for year range
+- body:"term" - Search in article body
+- full:"term" - Search in title, abstract, body, acknowledgements, and keywords
+- bibstem:ApJ - Search in specific publication
+- object:((SMC OR LMC) AND M31) - Search using SIMBAD and NED object search
+
+3. Boolean Operators and Grouping
+--------------------------------
+- AND - Both terms must match (default)
+- OR - Either term can match
+- NOT - Exclude term
+- -term - Exclude term (same as NOT)
+- (term1 OR term2) AND term3 - Group terms with parentheses
+
+Operator precedence:
+1. NOT
+2. AND
+3. OR
+4. Default AND (space between terms)
+
+4. Wildcards and Proximity
+-------------------------
+- term* - Multi-character wildcard
+- term? - Single-character wildcard
+- term~N - Fuzzy search with N edit distance
+- "term1 term2"~N - Proximity search within N words
+
+5. Document Types
+----------------
+- article - Journal article
+- eprint - Preprint (e.g., arXiv)
+- inproceedings - Conference paper
+- inbook - Chapter in book
+- abstract - Meeting abstract
+- book - Book (monograph)
+- bookreview - Book review
+- catalog - Data catalog
+- circular - Circular
+- erratum - Erratum
+- mastersthesis - Master's thesis
+- newsletter - Newsletter
+- obituary - Obituary
+- phdthesis - PhD thesis
+- pressrelease - Press release
+- proceedings - Conference proceedings
+- proposal - Proposal
+- software - Software
+- talk - Research talk
+- techreport - Technical report
+- misc - Miscellaneous
+
+6. Properties
+------------
+- ads_openaccess - OA version available from ADS
+- article - Regular article
+- associated - Has associated articles
+- author_openaccess - Author-submitted OA version
+- data - Has data links
+- eprint_openaccess - OA version from preprint server
+- esource - Has electronic source
+- inspire - Has INSPIRE record
+- library_catalog - Has library catalog record
+- nonarticle - Not a regular article
+- notrefereed - Not peer reviewed
+- ocr_abstract - Abstract generated from OCR
+- openaccess - Has at least one OA version
+- presentation - Has media presentations
+- pub_openaccess - OA version from publisher
+- refereed - Peer reviewed
+- toc - Has table of contents
+
+7. Citations and References
+--------------------------
+- citation(bibcode) - Papers citing a specific paper
+- reference(bibcode) - Papers referenced by a specific paper
+- citation_count:[N TO *] - Papers with at least N citations
+- reference_count:[N TO *] - Papers with at least N references
+
+8. Second-Order Queries
+----------------------
+- trending(term) - Find trending topics
+- similar(bibcode) - Find similar papers
+- related(bibcode) - Find related papers
+- coauthor(author:"Lastname, F") - Find co-authors
+
+9. Positional Field Searches
+---------------------------
+- author:"Lastname, F"^N - Author in position N
+- first_author:"Lastname, F" - First author
+- last_author:"Lastname, F" - Last author
+
+10. Comprehensive Solr Fields
+----------------------------
+- aff:"institution" - Affiliation
+- bibcode:YYYYJJJJJVVVVMPPPPA - Bibcode
+- bibgroup:"group" - Bibliographic group
+- citation_count:number - Number of citations
+- data:"archive" - Data links
+- doi:"doi" - Digital Object Identifier
+- identifier:"id" - Other identifiers
+- inst:"abbreviation" - Institution
+- issue:number - Issue number
+- lang:"language" - Language
+- orcid:id - ORCID ID
+- page:number - Page number
+- property:type - Property type
+- read_count:count - Read count
+- vizier:"phrase" - VizieR keywords
+- volume:volume - Volume number
+
+11. Examples
+-----------
+1. Basic searches:
+   - author:"Smith, J" - Papers by J. Smith
+   - abs:"dark energy" - Papers about dark energy
+   - title:"gravitational waves" - Papers with title containing "gravitational waves"
+
+2. Combined searches:
+   - author:"Smith, J" AND year:2020-2022 - Smith's papers from 2020-2022
+   - abs:"dark energy" AND property:openaccess - Open access papers about dark energy
+   - doctype:(phdthesis OR mastersthesis) AND abs:galaxies - Theses about galaxies
+
+3. Citation searches:
+   - citation(bibcode:2023ApJ...123..456S) - Papers citing a specific paper
+   - citation_count:[100 TO *] - Highly cited papers
+   - reference(bibcode:2023ApJ...123..456S) - Papers referenced by a specific paper
+
+4. Second-order queries:
+   - trending(astronomy) - Trending topics in astronomy
+   - similar(bibcode:2023ApJ...123..456S) - Papers similar to a specific paper
+   - coauthor(author:"Smith, J") - Co-authors of J. Smith
+
+5. Positional searches:
+   - first_author:"Smith, J" - Papers where J. Smith is first author
+   - author:"Smith, J"^2 - Papers where J. Smith is second author
+
+6. Property searches:
+   - property:refereed AND abs:cosmology - Refereed papers about cosmology
+   - property:data AND abs:observations - Papers with data about observations
+   - property:openaccess AND year:[2020 TO *] - Recent open access papers 

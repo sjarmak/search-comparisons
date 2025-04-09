@@ -128,6 +128,18 @@ const searchService = {
     } catch (error) {
       return handleApiError(error);
     }
+  },
+  
+  /**
+   * Transform a search query using the LLM service to understand user intent
+   */
+  transformQuery: async (query) => {
+    try {
+      const response = await apiClient.post('/api/intent-transform-query', { query });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
   }
 };
 

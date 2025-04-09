@@ -53,8 +53,8 @@ const DOC_TYPES = [
 
 const QuepidEvaluation = () => {
   // State for search parameters
-  const [query, setQuery] = useState('');
-  const [caseId, setCaseId] = useState('');
+  const [query, setQuery] = useState('weak lensing');
+  const [caseId, setCaseId] = useState('8835');
   const [maxResults, setMaxResults] = useState(20);
   
   // State for boost configuration
@@ -202,7 +202,7 @@ const QuepidEvaluation = () => {
                   ))}
                 </Grid>
 
-                {/* Judged Titles Section */}
+                {/* Judged Documents Section */}
                 {results.judged_titles && results.judged_titles.length > 0 && (
                   <Box sx={{ mt: 3 }}>
                     <Typography variant="h6" gutterBottom>
@@ -212,6 +212,7 @@ const QuepidEvaluation = () => {
                       <Table>
                         <TableHead>
                           <TableRow>
+                            <TableCell>Document ID</TableCell>
                             <TableCell>Title</TableCell>
                             <TableCell>Rating</TableCell>
                             <TableCell>Found in Results</TableCell>
@@ -220,23 +221,19 @@ const QuepidEvaluation = () => {
                         <TableBody>
                           {results.judged_titles.map((judged, idx) => {
                             const foundInResults = sourceResult.results.some(
-                              r => r.clean_title === judged.clean_title
+                              r => r.doc_id === judged.doc_id
                             );
                             return (
                               <TableRow key={idx}>
                                 <TableCell>
                                   <Typography variant="body2">
-                                    {judged.title}
+                                    {judged.doc_id}
                                   </Typography>
-                                  {judged.bibcode && (
-                                    <Typography variant="caption" color="primary">
-                                      <a href={`https://ui.adsabs.harvard.edu/abs/${judged.bibcode}/abstract`} 
-                                         target="_blank" 
-                                         rel="noopener noreferrer">
-                                        View in ADS
-                                      </a>
-                                    </Typography>
-                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2">
+                                    {judged.title || 'No title available'}
+                                  </Typography>
                                 </TableCell>
                                 <TableCell>
                                   <Chip 
@@ -255,59 +252,6 @@ const QuepidEvaluation = () => {
                               </TableRow>
                             );
                           })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
-
-                {/* Search Results Table */}
-                {sourceResult.results && sourceResult.results.length > 0 && (
-                  <Box sx={{ mt: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Top {sourceResult.results.length} Search Results
-                    </Typography>
-                    <TableContainer>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Rank</TableCell>
-                            <TableCell>Title</TableCell>
-                            <TableCell>Authors</TableCell>
-                            <TableCell>Year</TableCell>
-                            <TableCell>Citations</TableCell>
-                            <TableCell>Type</TableCell>
-                            <TableCell>Judgment</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {sourceResult.results.map((result, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>{idx + 1}</TableCell>
-                              <TableCell>
-                                <Link 
-                                  href={result.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                >
-                                  {result.title}
-                                </Link>
-                              </TableCell>
-                              <TableCell>{result.authors?.join(', ')}</TableCell>
-                              <TableCell>{result.year}</TableCell>
-                              <TableCell>{result.citation_count}</TableCell>
-                              <TableCell>{result.doc_type}</TableCell>
-                              <TableCell>
-                                <Chip 
-                                  label={result.has_judgment ? 
-                                    `Relevant (${result.judgment})` : 
-                                    'Not Judged'}
-                                  color={result.has_judgment ? 'success' : 'default'}
-                                  size="small"
-                                />
-                              </TableCell>
-                            </TableRow>
-                          ))}
                         </TableBody>
                       </Table>
                     </TableContainer>

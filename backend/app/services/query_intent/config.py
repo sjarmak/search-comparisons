@@ -67,11 +67,11 @@ class LLMModel(str, Enum):
 
 # LLM configuration
 LLM_CONFIG = {
-    "model": DEFAULT_MODEL,
+    "model": "qwen2:7b",
     "temperature": DEFAULT_TEMPERATURE,
     "max_tokens": DEFAULT_MAX_TOKENS,
     "provider": "ollama",
-    "api_endpoint": None,
+    "api_endpoint": "http://localhost:11434/api/generate",
     "prompt_template": None,  # Use default template if None
     "models": {
         "qwen2:7b": {

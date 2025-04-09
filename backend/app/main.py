@@ -16,7 +16,10 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.routes import search_routes, debug_routes, experiment_routes, query_intent
+from .api.routes.search_routes import router as search_router
+from .api.routes.debug_routes import router as debug_router
+from .api.routes.experiment_routes import router as experiment_router, back_compat_router
+from .api.routes.query_intent import router as query_intent_router
 from .api.models import ErrorResponse
 
 # Set up platform-specific fixes and environment variables first
@@ -26,8 +29,15 @@ if os.name == 'posix' and 'darwin' in os.uname().sysname.lower():
     import certifi
     os.environ['SSL_CERT_FILE'] = certifi.where()
 
-# Load environment variables
-load_dotenv()  # First try .env file
+# Load environment variables from backend/.env
+backend_dir = Path(__file__).parent.parent
+env_path = backend_dir / '.env'
+load_dotenv(dotenv_path=env_path)
+
+# Log environment variables for debugging
+logger = logging.getLogger(__name__)
+logger.info(f"Loading environment variables from: {env_path}")
+logger.info(f"ADS_SOLR_PASSWORD set: {'Yes' if os.getenv('ADS_SOLR_PASSWORD') else 'No'}")
 
 # Ensure critical environment variables are set
 ADS_API_KEY = os.getenv("ADS_API_KEY", "")
@@ -162,11 +172,11 @@ async def health_check() -> Dict[str, Any]:
 
 
 # Register routes
-app.include_router(search_routes.router)
-app.include_router(debug_routes.router)
-app.include_router(experiment_routes.router)
-app.include_router(experiment_routes.back_compat_router)  # Include the backward compatibility router
-app.include_router(query_intent.router)  # Include the query intent router
+app.include_router(search_router)
+app.include_router(debug_router)
+app.include_router(experiment_router)
+app.include_router(back_compat_router)  # Include the backward compatibility router
+app.include_router(query_intent_router)  # Include the query intent router
 
 
 @app.on_event("startup")
