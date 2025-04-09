@@ -42,51 +42,56 @@ jobs:
     # For Render, you might use their Deploy Hook
 
 services:
-  # Backend API service
   - type: web
-    name: search-comparisons-api
+    name: search-comparisons-backend
     env: python
-    region: ohio
-    plan: starter
-    buildCommand: cd backend && pip install -r requirements.txt
-    startCommand: >-
-      cd backend && 
-      echo "WEB_OF_SCIENCE_API_KEY is ${WEB_OF_SCIENCE_API_KEY:0:4}... (length ${#WEB_OF_SCIENCE_API_KEY})" &&
-      WEB_OF_SCIENCE_API_KEY=$WEB_OF_SCIENCE_API_KEY uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: APP_ENVIRONMENT
-        value: production
-      - key: LOG_LEVEL
-        value: INFO
-      - key: DEBUG
-        value: false
+      - key: LLM_PROVIDER
+        value: ollama
+      - key: LLM_MODEL_NAME
+        value: qwen2:7b
+      - key: LLM_TEMPERATURE
+        value: 0.1
+      - key: LLM_MAX_TOKENS
+        value: 1024
+      - key: LLM_API_ENDPOINT
+        value: http://ollama:11434/api/generate
       - key: ADS_API_TOKEN
         sync: false
-      - key: SEMANTIC_SCHOLAR_API_KEY
-        sync: false
-      - key: WEB_OF_SCIENCE_API_KEY
-        sync: false
+      - key: SOLR_URL
+        value: https://api.adsabs.harvard.edu/v1/search/query
       - key: CORS_ORIGINS
-        value: https://search-comparisons.onrender.com,https://search.sjarmak.ai
-    healthCheckPath: /api/health
-    autoDeploy: true
+        value: https://search-comparisons-frontend.onrender.com
+      - key: ENVIRONMENT
+        value: production
+    depends_on:
+      - ollama
 
-  # Frontend web application
   - type: web
-    name: search-comparisons-web
-    env: static
-    region: ohio
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: ./frontend/build
-    nodeVersion: 18.17.1
+    name: ollama
+    image: ollama/ollama:latest
+    env: docker
+    startCommand: serve
+    envVars:
+      - key: OLLAMA_HOST
+        value: 0.0.0.0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  - type: web
+    name: search-comparisons-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
       - key: REACT_APP_API_URL
-        value: https://search-comparisons-api.onrender.com
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: max-age=0, no-cache, no-store, must-revalidate
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+        value: https://search-comparisons-backend.onrender.com
+      - key: NODE_ENV
+        value: production

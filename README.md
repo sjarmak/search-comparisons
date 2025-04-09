@@ -240,3 +240,127 @@ When running locally, the API documentation is available at:
 ## License
 
 [MIT License](LICENSE)
+
+# Search Comparisons Tool
+
+A tool for comparing search results across different academic search engines.
+
+## Deployment on Render
+
+### Prerequisites
+
+1. A Render account
+2. ADS API token
+3. Git repository with the code
+
+### Backend Deployment
+
+1. Create a new Web Service on Render
+2. Connect your Git repository
+3. Configure the following settings:
+   - Name: search-comparisons-backend
+   - Environment: Python
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - Environment Variables:
+     - `LLM_PROVIDER`: ollama
+     - `LLM_MODEL_NAME`: llama2
+     - `LLM_TEMPERATURE`: 0.7
+     - `LLM_MAX_TOKENS`: 1000
+     - `ADS_API_TOKEN`: (your ADS API token)
+     - `SOLR_URL`: https://api.adsabs.harvard.edu/v1/search/query
+     - `CORS_ORIGINS`: https://search-comparisons-frontend.onrender.com
+     - `ENVIRONMENT`: production
+
+### Frontend Deployment
+
+1. Create a new Web Service on Render
+2. Connect your Git repository
+3. Configure the following settings:
+   - Name: search-comparisons-frontend
+   - Environment: Node
+   - Build Command: `npm install && npm run build`
+   - Start Command: `npm start`
+   - Environment Variables:
+     - `REACT_APP_API_URL`: https://search-comparisons-backend.onrender.com
+     - `NODE_ENV`: production
+
+### Using Docker
+
+Alternatively, you can deploy using Docker:
+
+1. Create a new Web Service on Render
+2. Select "Docker" as the environment
+3. Point to your Dockerfile
+4. Configure the same environment variables as above
+
+### Health Checks
+
+The backend service includes a health check endpoint at `/api/health`. Render will automatically monitor this endpoint.
+
+### Environment Variables
+
+Make sure to set up the following environment variables in your Render dashboard:
+
+- `ADS_API_TOKEN`: Your ADS API token
+- `LLM_PROVIDER`: The LLM provider to use (default: ollama)
+- `LLM_MODEL_NAME`: The model name to use (default: llama2)
+- `LLM_TEMPERATURE`: The temperature for LLM generation (default: 0.7)
+- `LLM_MAX_TOKENS`: Maximum tokens to generate (default: 1000)
+- `SOLR_URL`: The Solr API endpoint
+- `CORS_ORIGINS`: Allowed CORS origins
+- `ENVIRONMENT`: Set to "production" for production deployment
+
+### Monitoring and Logs
+
+Render provides built-in monitoring and logging. You can view:
+- Application logs
+- Build logs
+- Health check status
+- Resource usage
+
+### Scaling
+
+The service can be scaled horizontally by:
+1. Going to the service settings
+2. Adjusting the instance count
+3. Setting up auto-scaling rules if needed
+
+### Custom Domains
+
+You can set up custom domains for both services:
+1. Go to the service settings
+2. Click on "Custom Domains"
+3. Follow the instructions to add your domain
+
+## Development
+
+### Local Setup
+
+1. Clone the repository
+2. Create a virtual environment: `python -m venv venv`
+3. Activate the virtual environment: `source venv/bin/activate`
+4. Install dependencies: `pip install -r requirements.txt`
+5. Set up environment variables in a `.env` file
+6. Run the development server: `uvicorn app.main:app --reload`
+
+### Testing
+
+Run tests with:
+```bash
+pytest
+```
+
+### Code Quality
+
+The project uses:
+- Ruff for linting
+- Black for code formatting
+- MyPy for type checking
+
+Run these tools with:
+```bash
+ruff check .
+black .
+mypy .
+```
