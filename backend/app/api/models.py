@@ -190,22 +190,18 @@ class QuepidJudgmentEntry(BaseModel):
 
 class QuepidEvaluationRequest(BaseModel):
     """
-    Model representing a request to evaluate search results against Quepid judgments.
+    Request model for Quepid evaluation.
     
     Attributes:
-        query: The search query string
-        sources: List of search engines to query
-        case_id: The Quepid case ID containing judgments
-        fields: List of fields to include in the search (optional)
-        max_results: Maximum number of results to return (optional)
-        boost_configs: List of boost configurations to evaluate (optional)
+        query: The search query to evaluate
+        case_id: The Quepid case ID to use for evaluation
+        query_id: Optional ID of a specific query to filter by
+        sources: List of search sources to evaluate
     """
     query: str
-    sources: List[str]
-    case_id: int = Field(gt=0)
-    fields: Optional[List[str]] = None
-    max_results: Optional[int] = Field(default=20, ge=1, le=1000)
-    boost_configs: Optional[List[BoostConfig]] = None
+    case_id: int = Field(default=8862, description="The Quepid case ID to use for evaluation")
+    query_id: Optional[int] = Field(default=None, description="Optional ID of a specific query to filter by")
+    sources: List[str] = Field(default=["ads"], description="List of search sources to evaluate")
 
 
 class QuepidEvaluationSourceResult(BaseModel):

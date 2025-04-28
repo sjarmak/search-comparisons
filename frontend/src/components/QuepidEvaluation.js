@@ -54,7 +54,8 @@ const DOC_TYPES = [
 const QuepidEvaluation = () => {
   // State for search parameters
   const [query, setQuery] = useState('weak lensing');
-  const [caseId, setCaseId] = useState('8835');
+  const [caseId, setCaseId] = useState('8862');
+  const [queryId, setQueryId] = useState('231665');
   const [maxResults, setMaxResults] = useState(20);
   
   // State for boost configuration
@@ -112,6 +113,7 @@ const QuepidEvaluation = () => {
     const evaluationRequest = {
       query: query.trim(),
       case_id: parseInt(caseId),
+      query_id: parseInt(queryId),
       max_results: maxResults,
       sources: ['ads'],  // Always use ADS
       boost_configs: [
@@ -136,17 +138,37 @@ const QuepidEvaluation = () => {
       if (response.error) {
         setError(response.message || 'Error evaluating search results');
       } else {
+        // Process the judged documents directly
+        if (response.judged_documents && Array.isArray(response.judged_documents)) {
+          // Map the judged documents to the format expected by the UI
+          const judgedDocuments = response.judged_documents.map(doc => ({
+            title: doc.title || 'No title available',
+            authors: doc.authors || [],
+            year: doc.year || '',
+            citation_count: doc.citation_count || 0,
+            doc_type: doc.doc_type || 'N/A',
+            bibcode: doc.bibcode || '',
+            rating: doc.judgment || 0
+          }));
+          
+          // Update the response with the processed documents
+          response.judged_titles = judgedDocuments;
+          response.total_judged = judgedDocuments.length;
+          
+          // Calculate found documents
+          if (response.source_results?.[0]?.results) {
+            const foundDocuments = judgedDocuments.filter(doc => 
+              response.source_results[0].results.some(r => r.title === doc.title)
+            );
+            response.source_results[0].judged_retrieved = foundDocuments.length;
+            response.source_results[0].relevant_retrieved = foundDocuments.filter(d => d.rating >= 2).length;
+            response.source_results[0].results_count = response.source_results[0].results.length;
+          }
+        }
+        
         setResults(response);
         if (!response.source_results || response.source_results.length === 0) {
-          // More detailed error message based on available information
-          let errorMessage = 'No search results were returned. ';
-          if (response.total_judged > 0) {
-            errorMessage += `Found ${response.total_judged} judged documents in the case. `;
-          }
-          if (response.available_queries && response.available_queries.length > 0) {
-            errorMessage += 'Available queries in this case: ' + response.available_queries.join(', ');
-          }
-          setError(errorMessage);
+          setError('No search results were returned');
         } else {
           setSuccessMessage('Evaluation completed successfully');
         }
@@ -208,33 +230,50 @@ const QuepidEvaluation = () => {
                     <Typography variant="h6" gutterBottom>
                       Judged Documents ({results.judged_titles.length})
                     </Typography>
-                    <TableContainer>
+                    <TableContainer component={Paper}>
                       <Table>
                         <TableHead>
                           <TableRow>
-                            <TableCell>Document ID</TableCell>
+                            <TableCell>Rank</TableCell>
                             <TableCell>Title</TableCell>
+                            <TableCell>Authors</TableCell>
+                            <TableCell>Year</TableCell>
+                            <TableCell>Citations</TableCell>
+                            <TableCell>Type</TableCell>
                             <TableCell>Rating</TableCell>
                             <TableCell>Found in Results</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
                           {results.judged_titles.map((judged, idx) => {
-                            const foundInResults = sourceResult.results.some(
-                              r => r.doc_id === judged.doc_id
-                            );
+                            const foundInResults = sourceResult?.results?.some(
+                              r => r.title === judged.title
+                            ) || false;
                             return (
                               <TableRow key={idx}>
-                                <TableCell>
-                                  <Typography variant="body2">
-                                    {judged.doc_id}
-                                  </Typography>
-                                </TableCell>
+                                <TableCell>{idx + 1}</TableCell>
                                 <TableCell>
                                   <Typography variant="body2">
                                     {judged.title || 'No title available'}
                                   </Typography>
+                                  {judged.bibcode && (
+                                    <Typography variant="caption" color="primary">
+                                      <a href={`https://ui.adsabs.harvard.edu/abs/${judged.bibcode}/abstract`} 
+                                         target="_blank" 
+                                         rel="noopener noreferrer">
+                                        View
+                                      </a>
+                                    </Typography>
+                                  )}
                                 </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2">
+                                    {judged.authors?.join(', ')}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>{judged.year}</TableCell>
+                                <TableCell>{judged.citation_count || 0}</TableCell>
+                                <TableCell>{judged.doc_type || 'N/A'}</TableCell>
                                 <TableCell>
                                   <Chip 
                                     label={`${judged.rating}`}
@@ -262,15 +301,84 @@ const QuepidEvaluation = () => {
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="body2" color="text.secondary">
                     Documents judged: {results.total_judged} | 
-                    Documents retrieved: {sourceResult.results_count} | 
-                    Judged documents found: {sourceResult.judged_retrieved} | 
-                    Relevant documents found: {sourceResult.relevant_retrieved}
+                    Documents retrieved: {sourceResult?.results_count || 0} | 
+                    Judged documents found: {sourceResult?.judged_retrieved || 0} | 
+                    Relevant documents found: {sourceResult?.relevant_retrieved || 0}
                   </Typography>
                 </Box>
               </Paper>
             </Grid>
           ))}
         </Grid>
+
+        {/* Original Results Display */}
+        {results && results.comparison_results?.[0]?.original_results && (
+          <Box mt={4}>
+            <Typography variant="h5" gutterBottom>
+              Original Search Results
+            </Typography>
+            
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Rank</TableCell>
+                    <TableCell>Title</TableCell>
+                    <TableCell>Authors</TableCell>
+                    <TableCell>Year</TableCell>
+                    <TableCell>Citations</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Judgment</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {results.comparison_results[0].original_results.map((result, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {result.title}
+                        </Typography>
+                        {result.bibcode && (
+                          <Typography variant="caption" color="primary">
+                            <a href={`https://ui.adsabs.harvard.edu/abs/${result.bibcode}/abstract`} 
+                               target="_blank" 
+                               rel="noopener noreferrer">
+                              View
+                            </a>
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {result.authors?.join(', ')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{result.year}</TableCell>
+                      <TableCell>{result.citation_count || 0}</TableCell>
+                      <TableCell>{result.doc_type || 'N/A'}</TableCell>
+                      <TableCell>
+                        {result.has_judgment ? (
+                          <Chip 
+                            label={`Rating: ${result.judgment}`}
+                            color={result.judgment >= 2 ? 'success' : 'default'}
+                            size="small"
+                          />
+                        ) : (
+                          <Chip 
+                            label="Not Judged"
+                            color="default"
+                            size="small"
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
       </Box>
     );
   };
@@ -315,7 +423,19 @@ const QuepidEvaluation = () => {
                   type="number"
                 />
               </Grid>
-              
+
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Query ID"
+                  fullWidth
+                  margin="normal"
+                  value={queryId}
+                  onChange={(e) => setQueryId(e.target.value)}
+                  placeholder="Enter the query ID"
+                  type="number"
+                />
+              </Grid>
+
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Max Results"
@@ -418,75 +538,6 @@ const QuepidEvaluation = () => {
         </Card>
         
         {renderResults()}
-        
-        {/* Original Results Display */}
-        {results && results.comparison_results?.[0]?.original_results && (
-          <Box mt={4}>
-            <Typography variant="h5" gutterBottom>
-              Original Search Results
-            </Typography>
-            
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Rank</TableCell>
-                    <TableCell>Title</TableCell>
-                    <TableCell>Authors</TableCell>
-                    <TableCell>Year</TableCell>
-                    <TableCell>Citations</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Judgment</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {results.comparison_results[0].original_results.map((result, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {result.title}
-                        </Typography>
-                        {result.bibcode && (
-                          <Typography variant="caption" color="primary">
-                            <a href={`https://ui.adsabs.harvard.edu/abs/${result.bibcode}/abstract`} 
-                               target="_blank" 
-                               rel="noopener noreferrer">
-                              View
-                            </a>
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {result.authors?.join(', ')}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{result.year}</TableCell>
-                      <TableCell>{result.citation_count || 0}</TableCell>
-                      <TableCell>{result.doc_type || 'N/A'}</TableCell>
-                      <TableCell>
-                        {result.has_judgment ? (
-                          <Chip 
-                            label={`Rating: ${result.judgment}`}
-                            color={result.judgment >= 2 ? 'success' : 'default'}
-                            size="small"
-                          />
-                        ) : (
-                          <Chip 
-                            label="Not Judged"
-                            color="default"
-                            size="small"
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        )}
       </Box>
     </Container>
   );

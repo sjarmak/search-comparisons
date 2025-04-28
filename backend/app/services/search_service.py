@@ -348,34 +348,62 @@ def compare_results(
             
             # Categorize results by whether they have DOIs
             for idx, result in enumerate(results1):
-                if result.doi:
-                    identifiers1.add(result.doi.lower())
-                    results1_with_doi[result.doi.lower()] = idx
+                # Handle both SearchResult objects and dictionaries
+                if isinstance(result, dict):
+                    doi = result.get('doi')
+                    title = result.get('title', '')
                 else:
-                    identifiers1.add(f"title:{result.title.lower()}")
-                    results1_no_doi[result.title.lower()] = idx
+                    doi = getattr(result, 'doi', None)
+                    title = getattr(result, 'title', '')
+                
+                # Ensure doi and title are strings
+                if isinstance(doi, list):
+                    doi = doi[0] if doi else None
+                if isinstance(title, list):
+                    title = title[0] if title else ''
+                
+                if doi:
+                    identifiers1.add(str(doi).lower())
+                    results1_with_doi[str(doi).lower()] = idx
+                else:
+                    identifiers1.add(f"title:{str(title).lower()}")
+                    results1_no_doi[str(title).lower()] = idx
                 
                 # Always track title for potential title matching
-                if result.title:
+                if title:
                     # Store title with index regardless of DOI status
                     if "titles" not in results1_with_doi:
                         results1_with_doi["titles"] = {}
-                    results1_with_doi["titles"][result.title.lower()] = idx
+                    results1_with_doi["titles"][str(title).lower()] = idx
             
             for idx, result in enumerate(results2):
-                if result.doi:
-                    identifiers2.add(result.doi.lower())
-                    results2_with_doi[result.doi.lower()] = idx
+                # Handle both SearchResult objects and dictionaries
+                if isinstance(result, dict):
+                    doi = result.get('doi')
+                    title = result.get('title', '')
                 else:
-                    identifiers2.add(f"title:{result.title.lower()}")
-                    results2_no_doi[result.title.lower()] = idx
+                    doi = getattr(result, 'doi', None)
+                    title = getattr(result, 'title', '')
+                
+                # Ensure doi and title are strings
+                if isinstance(doi, list):
+                    doi = doi[0] if doi else None
+                if isinstance(title, list):
+                    title = title[0] if title else ''
+                
+                if doi:
+                    identifiers2.add(str(doi).lower())
+                    results2_with_doi[str(doi).lower()] = idx
+                else:
+                    identifiers2.add(f"title:{str(title).lower()}")
+                    results2_no_doi[str(title).lower()] = idx
                 
                 # Always track title for potential title matching
-                if result.title:
+                if title:
                     # Store title with index regardless of DOI status
                     if "titles" not in results2_with_doi:
                         results2_with_doi["titles"] = {}
-                    results2_with_doi["titles"][result.title.lower()] = idx
+                    results2_with_doi["titles"][str(title).lower()] = idx
             
             # First, find overlap by DOI (most precise)
             overlap_doi = set(results1_with_doi.keys()) & set(results2_with_doi.keys())
@@ -395,13 +423,59 @@ def compare_results(
             doi_title_overlap = set()
             for title in all_title_matches:
                 # Get corresponding papers for this title
-                papers1 = [r for idx, r in enumerate(results1) if idx in results1_with_doi.get("titles", {}).values() and r.title.lower() == title]
-                papers2 = [r for idx, r in enumerate(results2) if idx in results2_with_doi.get("titles", {}).values() and r.title.lower() == title]
+                papers1 = []
+                for idx, r in enumerate(results1):
+                    if idx in results1_with_doi.get("titles", {}).values():
+                        # Handle both SearchResult objects and dictionaries
+                        if isinstance(r, dict):
+                            r_title = r.get('title', '')
+                        else:
+                            r_title = getattr(r, 'title', '')
+                        
+                        # Ensure title is a string
+                        if isinstance(r_title, list):
+                            r_title = r_title[0] if r_title else ''
+                        
+                        if str(r_title).lower() == title:
+                            papers1.append(r)
+                
+                papers2 = []
+                for idx, r in enumerate(results2):
+                    if idx in results2_with_doi.get("titles", {}).values():
+                        # Handle both SearchResult objects and dictionaries
+                        if isinstance(r, dict):
+                            r_title = r.get('title', '')
+                        else:
+                            r_title = getattr(r, 'title', '')
+                        
+                        # Ensure title is a string
+                        if isinstance(r_title, list):
+                            r_title = r_title[0] if r_title else ''
+                        
+                        if str(r_title).lower() == title:
+                            papers2.append(r)
                 
                 # Check if any of these papers also match by DOI
                 for p1 in papers1:
                     for p2 in papers2:
-                        if p1.doi and p2.doi and p1.doi.lower() == p2.doi.lower():
+                        # Handle both SearchResult objects and dictionaries
+                        if isinstance(p1, dict):
+                            p1_doi = p1.get('doi')
+                        else:
+                            p1_doi = getattr(p1, 'doi', None)
+                        
+                        if isinstance(p2, dict):
+                            p2_doi = p2.get('doi')
+                        else:
+                            p2_doi = getattr(p2, 'doi', None)
+                        
+                        # Ensure doi is a string
+                        if isinstance(p1_doi, list):
+                            p1_doi = p1_doi[0] if p1_doi else None
+                        if isinstance(p2_doi, list):
+                            p2_doi = p2_doi[0] if p2_doi else None
+                        
+                        if p1_doi and p2_doi and str(p1_doi).lower() == str(p2_doi).lower():
                             doi_title_overlap.add(title)
                             break
             
@@ -430,22 +504,33 @@ def compare_results(
                     continue
                 idx1 = results1_with_doi.get(doi)
                 idx2 = results2_with_doi.get(doi)
-                if idx1 is not None and idx2 is not None and results1[idx1].rank == results2[idx2].rank:
-                    same_rank_matches.append({
-                        "doi": doi,
-                        "rank": results1[idx1].rank,
-                        "title": results1[idx1].title
-                    })
+                if idx1 is not None and idx2 is not None:
+                    r1 = results1[idx1]
+                    r2 = results2[idx2]
+                    rank1 = r1.get('rank') if isinstance(r1, dict) else getattr(r1, 'rank', 0)
+                    rank2 = r2.get('rank') if isinstance(r2, dict) else getattr(r2, 'rank', 0)
+                    if rank1 == rank2:
+                        title1 = r1.get('title', '') if isinstance(r1, dict) else getattr(r1, 'title', '')
+                        same_rank_matches.append({
+                            "doi": doi,
+                            "rank": rank1,
+                            "title": title1
+                        })
             
             # Then check title matches for papers without DOIs
             for title in overlap_title_no_doi:
                 idx1 = results1_no_doi.get(title)
                 idx2 = results2_no_doi.get(title)
-                if idx1 is not None and idx2 is not None and results1[idx1].rank == results2[idx2].rank:
-                    same_rank_matches.append({
-                        "title": title,
-                        "rank": results1[idx1].rank
-                    })
+                if idx1 is not None and idx2 is not None:
+                    r1 = results1[idx1]
+                    r2 = results2[idx2]
+                    rank1 = r1.get('rank') if isinstance(r1, dict) else getattr(r1, 'rank', 0)
+                    rank2 = r2.get('rank') if isinstance(r2, dict) else getattr(r2, 'rank', 0)
+                    if rank1 == rank2:
+                        same_rank_matches.append({
+                            "title": title,
+                            "rank": rank1
+                        })
             
             # Add to results
             comparison_results["overlap"][pair_key]["same_rank_matches"] = same_rank_matches
@@ -477,26 +562,54 @@ def compare_results(
                     
                     # Prepare normalized identifiers
                     for r in results1:
-                        if r.doi:
+                        # Handle both SearchResult objects and dictionaries
+                        if isinstance(r, dict):
+                            doi = r.get('doi')
+                            title = r.get('title', '')
+                        else:
+                            doi = getattr(r, 'doi', None)
+                            title = getattr(r, 'title', '')
+                        
+                        # Ensure doi and title are strings
+                        if isinstance(doi, list):
+                            doi = doi[0] if doi else None
+                        if isinstance(title, list):
+                            title = title[0] if title else ''
+                        
+                        if doi:
                             # Clean and normalize DOI
-                            clean_doi = r.doi.lower().strip()
+                            clean_doi = str(doi).lower().strip()
                             norm_identifiers1.add(f"doi:{clean_doi}")
                             logger.debug(f"Source1 DOI: {clean_doi}")
-                        if r.title:
+                        if title:
                             # Clean and normalize title
-                            clean_title = r.title.lower().strip()
+                            clean_title = str(title).lower().strip()
                             norm_identifiers1.add(f"title:{clean_title}")
                             logger.debug(f"Source1 Title: {clean_title}")
                     
                     for r in results2:
-                        if r.doi:
+                        # Handle both SearchResult objects and dictionaries
+                        if isinstance(r, dict):
+                            doi = r.get('doi')
+                            title = r.get('title', '')
+                        else:
+                            doi = getattr(r, 'doi', None)
+                            title = getattr(r, 'title', '')
+                        
+                        # Ensure doi and title are strings
+                        if isinstance(doi, list):
+                            doi = doi[0] if doi else None
+                        if isinstance(title, list):
+                            title = title[0] if title else ''
+                        
+                        if doi:
                             # Clean and normalize DOI
-                            clean_doi = r.doi.lower().strip()
+                            clean_doi = str(doi).lower().strip()
                             norm_identifiers2.add(f"doi:{clean_doi}")
                             logger.debug(f"Source2 DOI: {clean_doi}")
-                        if r.title:
+                        if title:
                             # Clean and normalize title
-                            clean_title = r.title.lower().strip()
+                            clean_title = str(title).lower().strip()
                             norm_identifiers2.add(f"title:{clean_title}")
                             logger.debug(f"Source2 Title: {clean_title}")
                     
@@ -519,7 +632,11 @@ def compare_results(
                         # Extract values from results
                         values1 = []
                         for r in results1:
-                            value = getattr(r, field, "") or ""
+                            # Handle both SearchResult objects and dictionaries
+                            if isinstance(r, dict):
+                                value = r.get(field, "") or ""
+                            else:
+                                value = getattr(r, field, "") or ""
                             # Convert list to tuple if necessary (lists are unhashable)
                             if isinstance(value, list):
                                 for item in value:
@@ -530,7 +647,11 @@ def compare_results(
                         
                         values2 = []
                         for r in results2:
-                            value = getattr(r, field, "") or ""
+                            # Handle both SearchResult objects and dictionaries
+                            if isinstance(r, dict):
+                                value = r.get(field, "") or ""
+                            else:
+                                value = getattr(r, field, "") or ""
                             # Convert list to tuple if necessary (lists are unhashable)
                             if isinstance(value, list):
                                 for item in value:
@@ -559,12 +680,26 @@ def compare_results(
                     
                     # Process results and build ranked lists with both DOI and title identifiers
                     for idx, r in enumerate(results1):
+                        # Handle both SearchResult objects and dictionaries
+                        if isinstance(r, dict):
+                            doi = r.get('doi')
+                            title = r.get('title', '')
+                        else:
+                            doi = getattr(r, 'doi', None)
+                            title = getattr(r, 'title', '')
+                        
+                        # Ensure doi and title are strings
+                        if isinstance(doi, list):
+                            doi = doi[0] if doi else None
+                        if isinstance(title, list):
+                            title = title[0] if title else ''
+                        
                         identifier = None
-                        if r.doi:
-                            clean_doi = r.doi.lower().strip()
+                        if doi:
+                            clean_doi = str(doi).lower().strip()
                             identifier = f"doi:{clean_doi}"
-                        elif r.title:
-                            clean_title = r.title.lower().strip()
+                        elif title:
+                            clean_title = str(title).lower().strip()
                             identifier = f"title:{clean_title}"
                         
                         if identifier:
@@ -572,17 +707,31 @@ def compare_results(
                             id_to_index1[identifier] = idx
                             
                             # Also add title as alternative identifier if DOI exists
-                            if r.doi and r.title:
-                                alt_id = f"title:{r.title.lower().strip()}"
+                            if doi and title:
+                                alt_id = f"title:{str(title).lower().strip()}"
                                 id_to_index1[alt_id] = idx
                     
                     for idx, r in enumerate(results2):
+                        # Handle both SearchResult objects and dictionaries
+                        if isinstance(r, dict):
+                            doi = r.get('doi')
+                            title = r.get('title', '')
+                        else:
+                            doi = getattr(r, 'doi', None)
+                            title = getattr(r, 'title', '')
+                        
+                        # Ensure doi and title are strings
+                        if isinstance(doi, list):
+                            doi = doi[0] if doi else None
+                        if isinstance(title, list):
+                            title = title[0] if title else ''
+                        
                         identifier = None
-                        if r.doi:
-                            clean_doi = r.doi.lower().strip()
+                        if doi:
+                            clean_doi = str(doi).lower().strip()
                             identifier = f"doi:{clean_doi}"
-                        elif r.title:
-                            clean_title = r.title.lower().strip()
+                        elif title:
+                            clean_title = str(title).lower().strip()
                             identifier = f"title:{clean_title}"
                         
                         if identifier:
@@ -590,8 +739,8 @@ def compare_results(
                             id_to_index2[identifier] = idx
                             
                             # Also add title as alternative identifier if DOI exists
-                            if r.doi and r.title:
-                                alt_id = f"title:{r.title.lower().strip()}"
+                            if doi and title:
+                                alt_id = f"title:{str(title).lower().strip()}"
                                 id_to_index2[alt_id] = idx
                     
                     # Log the items for debugging
@@ -614,10 +763,24 @@ def compare_results(
                     for field in fields:
                         if field in ["title", "abstract"]:
                             # Extract and preprocess text
-                            texts1 = [preprocess_text(getattr(r, field, "") or "") for r in results1]
+                            texts1 = []
+                            for r in results1:
+                                # Handle both SearchResult objects and dictionaries
+                                if isinstance(r, dict):
+                                    text = r.get(field, "") or ""
+                                else:
+                                    text = getattr(r, field, "") or ""
+                                texts1.append(preprocess_text(text))
                             texts1 = [t for t in texts1 if t]
                             
-                            texts2 = [preprocess_text(getattr(r, field, "") or "") for r in results2]
+                            texts2 = []
+                            for r in results2:
+                                # Handle both SearchResult objects and dictionaries
+                                if isinstance(r, dict):
+                                    text = r.get(field, "") or ""
+                                else:
+                                    text = getattr(r, field, "") or ""
+                                texts2.append(preprocess_text(text))
                             texts2 = [t for t in texts2 if t]
                             
                             # Skip if either list is empty
@@ -640,11 +803,6 @@ def compare_results(
                             
                             # Store result
                             comparison_results["similarity"]["cosine"][f"{pair_key}_{field}"] = cosine_sim
-                
-                elif metric == "euclidean":
-                    # A placeholder for euclidean distance calculation
-                    # This is just a simple implementation - you might want to implement a more sophisticated version
-                    comparison_results["similarity"]["euclidean"][pair_key] = 0.5  # Default placeholder
     
     return comparison_results
 

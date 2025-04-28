@@ -31,7 +31,8 @@ from ...services.quepid_service import (
     get_book_judgments,
     extract_doc_id,
     calculate_ndcg,
-    QUEPID_API_KEY
+    QUEPID_API_KEY,
+    QuepidService
 )
 from ...core.config import settings
 from ..models import (
@@ -62,6 +63,9 @@ back_compat_router = APIRouter(
     tags=["experiments"],
     responses={404: {"description": "Not found"}},
 )
+
+# Initialize QuepidService
+quepid_service = QuepidService()
 
 
 class BoostFactors(BaseModel):
@@ -624,6 +628,12 @@ async def evaluate_search_with_quepid(
                 detail="Quepid API key not configured. Please set QUEPID_API_KEY environment variable."
             )
         
+        # Get judged documents from Quepid
+        judged_documents = await quepid_service.get_judged_documents(
+            case_id=request.case_id, 
+            query_id=request.query_id
+        )
+        
         # Get case data from Quepid
         case_data = await get_case_judgments(request.case_id)
         if not case_data:
@@ -646,40 +656,6 @@ async def evaluate_search_with_quepid(
                 detail=f"No judgments found for query '{request.query}' in case {request.case_id}. Available queries: {', '.join(available_queries)}"
             )
         
-        # Get document titles from Quepid
-        doc_titles = {}
-        try:
-            book_id = case_data.get('book_id')
-            if book_id:
-                titles_data = await get_book_judgments(book_id)
-                for doc in titles_data.get('judgements', []):
-                    doc_id = doc.get('doc_id')
-                    if doc_id:
-                        doc_titles[doc_id] = doc.get('title', '')
-        except Exception as e:
-            logger.warning(f"Failed to get document titles: {str(e)}")
-        
-        # Format judged titles
-        judged_titles = []
-        for doc_id, judgment in judgments.items():
-            if isinstance(judgment, dict):
-                rating = judgment.get('rating', 0)
-                title = judgment.get('title', '')
-            else:
-                rating = float(judgment)
-                title = doc_titles.get(doc_id, '')
-            
-            judged_titles.append({
-                "doc_id": doc_id,
-                "title": title,
-                "rating": rating
-            })
-        
-        # Calculate total relevant documents
-        total_relevant = sum(1 for j in judgments.values() if 
-            (isinstance(j, dict) and j.get('rating', 0) > 0) or 
-            (isinstance(j, (int, float)) and j > 0))
-        
         # Format response
         source_result = QuepidEvaluationSourceResult(
             source="quepid",
@@ -694,7 +670,7 @@ async def evaluate_search_with_quepid(
                 recency_boost=0.0,
                 doctype_boosts={}
             ),
-            judged_titles=judged_titles
+            judged_titles=[]
         )
 
         return QuepidEvaluationResponse(
@@ -703,8 +679,11 @@ async def evaluate_search_with_quepid(
             case_name=case_data.get('case_name', f'Case {request.case_id}'),
             source_results=[source_result],
             total_judged=len(judgments),
-            total_relevant=total_relevant,
-            available_queries=[q['query'] for q in case_data.get('queries', [])]
+            total_relevant=sum(1 for j in judgments.values() if 
+                (isinstance(j, dict) and j.get('rating', 0) > 0) or 
+                (isinstance(j, (int, float)) and j > 0)),
+            available_queries=[q['query'] for q in case_data.get('queries', [])],
+            judged_documents=judged_documents  # Add judged documents to response
         )
         
     except HTTPException:

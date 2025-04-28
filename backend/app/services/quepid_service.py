@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional, Tuple, Union
 from urllib.parse import urljoin
 
 import httpx
+from fastapi import HTTPException
 
 from ..api.models import SearchResult
 from ..utils.http import safe_api_request
@@ -22,8 +23,8 @@ from ..utils.http import safe_api_request
 logger = logging.getLogger(__name__)
 
 # API Constants
-QUEPID_API_URL = os.environ.get("QUEPID_API_URL", "https://app.quepid.com/api/")
-QUEPID_API_KEY = os.environ.get("QUEPID_API_KEY", "")
+QUEPID_API_URL = os.environ.get("QUEPID_API_URL", "https://quepid.herokuapp.com/api/")
+QUEPID_API_KEY = os.environ.get("QUEPID_API_KEY", "c707e3d691c5f681f31a05b4c68bb09fc402597f325213a2e6411beebf199405")  # Hardcoded API key
 TIMEOUT_SECONDS = 30
 
 
@@ -74,13 +75,143 @@ class QuepidCase:
 
 
 class QuepidService:
-    """Service class for interacting with the Quepid API."""
+    """
+    Service for interacting with the Quepid API.
+    
+    This service handles all communication with the Quepid API, including
+    retrieving cases, judgments, and evaluating search results.
+    """
     
     def __init__(self):
-        """Initialize the Quepid service."""
-        self.api_url = QUEPID_API_URL
+        """
+        Initialize the QuepidService with API configuration.
+        """
+        self.api_url = QUEPID_API_URL  # Use the URL from environment variable
         self.api_key = QUEPID_API_KEY
-        self.timeout = TIMEOUT_SECONDS
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+    
+    async def _make_request(self, endpoint: str, method: str = "GET", data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Make a request to the Quepid API.
+        
+        Args:
+            endpoint: The API endpoint to call
+            method: HTTP method to use (GET, POST, etc.)
+            data: Optional data to send with the request
+        
+        Returns:
+            Dict[str, Any]: The JSON response from the API
+        
+        Raises:
+            HTTPException: If the API request fails
+        """
+        url = urljoin(self.api_url, endpoint.lstrip('/'))  # Use urljoin to handle paths properly
+        try:
+            logger.info(f"Making request to Quepid API: {url}")
+            async with httpx.AsyncClient() as client:
+                response = await client.request(
+                    method=method,
+                    url=url,
+                    headers=self.headers,
+                    json=data
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPError as e:
+            logger.error(f"Quepid API error: {str(e)}")
+            raise HTTPException(
+                status_code=e.response.status_code if hasattr(e, 'response') else 500,
+                detail=f"Quepid API error: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Error making request to Quepid: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error making request to Quepid: {str(e)}"
+            )
+    
+    async def get_judged_documents(self, case_id: int, query_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get judged documents from a Quepid case.
+        
+        Args:
+            case_id: The ID of the Quepid case
+            query_id: Optional ID of a specific query to filter by
+        
+        Returns:
+            List[Dict[str, Any]]: List of judged documents with their metadata
+        
+        Raises:
+            HTTPException: If the API request fails
+        """
+        try:
+            # First get the case data to find the book ID
+            case_url = f"cases/{case_id}"
+            case_data = await self._make_request(case_url)
+            
+            if not case_data:
+                logger.warning(f"No case data found for case {case_id}")
+                return []
+            
+            book_id = case_data.get('book_id')
+            if not book_id:
+                logger.warning(f"No book ID found for case {case_id}")
+                return []
+            
+            # Get the book judgments
+            book_url = f"books/{book_id}/judgements"
+            book_data = await self._make_request(book_url)
+            
+            if not book_data:
+                logger.warning(f"No book data found for book {book_id}")
+                return []
+            
+            # Get the latest snapshot for the case
+            snapshot_url = f"cases/{case_id}/snapshots/latest"
+            snapshot_data = await self._make_request(snapshot_url)
+            
+            if not snapshot_data:
+                logger.warning(f"No snapshot data found for case {case_id}")
+                return []
+            
+            # Extract documents and their ratings
+            documents = []
+            for query in snapshot_data.get('queries', []):
+                # If query_id is provided, only process that query
+                if query_id is not None and query.get('query_id') != query_id:
+                    continue
+                    
+                query_text = query.get('query', '')
+                ratings = query.get('ratings', {})
+                
+                for doc_id, rating in ratings.items():
+                    # Get document details from the book judgments
+                    doc = next((d for d in book_data.get('judgements', []) if d.get('doc_id') == doc_id), None)
+                    if doc:
+                        documents.append({
+                            'id': doc_id,
+                            'title': doc.get('title', ''),
+                            'authors': doc.get('authors', []),
+                            'year': doc.get('year'),
+                            'citation_count': doc.get('citation_count', 0),
+                            'doc_type': doc.get('doc_type', ''),
+                            'bibcode': doc.get('bibcode', ''),
+                            'judgment': rating if isinstance(rating, (int, float)) else rating.get('rating', 0),
+                            'query': query_text
+                        })
+            
+            logger.info(f"Found {len(documents)} judged documents for case {case_id}")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error getting judged documents: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error getting judged documents: {str(e)}"
+            )
     
     async def load_case_with_judgments(self, case_id: int) -> Optional[QuepidCase]:
         """Load a case and its judgments from Quepid."""
@@ -391,18 +522,29 @@ async def evaluate_search_results(
         has_judgment = doc_id in judgment_dict
         
         # If no match by ID, try matching by title
-        if not has_judgment and result.title:
-            clean_title = result.title.lower().strip()
-            logger.info(f"Attempting title match with: '{clean_title}'")
-            for j in judged_titles:
-                judged_title = j['title'].lower().strip()
-                logger.info(f"Comparing with judged title: '{judged_title}'")
-                if judged_title == clean_title:
-                    rating = j['rating']
-                    has_judgment = True
-                    logger.info(f"MATCH FOUND BY TITLE! Rating: {rating}")
-                    logger.info(f"Matched with judged document: '{j['title']}'")
-                    break
+        if not has_judgment:
+            # Handle both SearchResult objects and dictionaries
+            if isinstance(result, dict):
+                title = result.get('title', '')
+            else:
+                title = getattr(result, 'title', '')
+            
+            # Ensure title is a string
+            if isinstance(title, list):
+                title = title[0] if title else ''
+            
+            if title:
+                clean_title = str(title).lower().strip()
+                logger.info(f"Attempting title match with: '{clean_title}'")
+                for j in judged_titles:
+                    judged_title = str(j['title']).lower().strip()
+                    logger.info(f"Comparing with judged title: '{judged_title}'")
+                    if judged_title == clean_title:
+                        rating = j['rating']
+                        has_judgment = True
+                        logger.info(f"MATCH FOUND BY TITLE! Rating: {rating}")
+                        logger.info(f"Matched with judged document: '{j['title']}'")
+                        break
         
         if has_judgment:
             logger.info(f"MATCH FOUND! Rating: {rating}")
@@ -413,8 +555,18 @@ async def evaluate_search_results(
             logger.info("Available judgment titles: " + ", ".join(title_dict.values()))
         logger.info("---")
         
+        # Extract title safely
+        if isinstance(result, dict):
+            title = result.get('title', '')
+        else:
+            title = getattr(result, 'title', '')
+        
+        # Ensure title is a string
+        if isinstance(title, list):
+            title = title[0] if title else ''
+        
         processed_results.append({
-            "title": result.title,
+            "title": title,
             "authors": authors,
             "year": getattr(result, 'year', ''),
             "citation_count": getattr(result, 'citation_count', 0),

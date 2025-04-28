@@ -593,7 +593,7 @@ function App() {
                                 
                                 {/* Side by Side Grid Layout */}
                                 <Grid container spacing={2}>
-                                  {Object.keys(results.results).map(source => {
+                                  {Object.keys(results.results).map((source, idx) => {
                                     const sourceResults = results.results[source];
                                     const filteredResults = filterText
                                       ? sourceResults.filter(result => 
@@ -688,7 +688,7 @@ function App() {
                                                         {result.doi && (
                                                           <Chip 
                                                             size="small" 
-                                                            label={`DOI: ${result.doi.substring(0, 15)}...`} 
+                                                            label={`DOI: ${typeof result.doi === 'string' ? result.doi.substring(0, 15) + '...' : result.doi}`} 
                                                             sx={{ fontSize: '0.7rem' }}
                                                           />
                                                         )}
@@ -749,7 +749,7 @@ function App() {
                                                       primary={
                                                         <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
                                                           <Chip 
-                                                            label={result.rank} 
+                                                            label={typeof result.rank === 'number' && result.rank > 0 ? result.rank : idx + 1} 
                                                             size="small" 
                                                             sx={{ 
                                                               mr: 1, 
