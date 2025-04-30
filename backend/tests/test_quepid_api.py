@@ -21,9 +21,9 @@ QUEPID_API_URL = os.environ.get("QUEPID_API_URL", "https://quepid.herokuapp.com/
 QUEPID_API_KEY = 'c707e3d691c5f681f31a05b4c68bb09fc402597f325213a2e6411beebf199405' # os.environ.get("QUEPID_API_KEY", "")
 TIMEOUT_SECONDS = 30
 
-# Specific case and snapshot IDs
-CASE_ID = 8862
-WEAK_LENSING_QUERY_ID = 231665  # Query ID for "weak lensing"
+# User input: set these for your test
+CASE_ID = 8914  # Change as needed
+QUERY_TEXT = "triton"  # Change as needed
 
 def validate_api_key() -> bool:
     """
@@ -85,68 +85,101 @@ async def test_endpoint(endpoint: str, method: str = "GET", data: Optional[Dict[
         logger.error(f"Error testing endpoint {endpoint}: {str(e)}")
         return None
 
-async def get_judged_documents() -> List[Dict[str, Any]]:
+async def get_case_queries(case_id: int) -> List[Dict[str, Any]]:
+    """Fetch all queries for a given case using the ratings export endpoint."""
+    url = urljoin(QUEPID_API_URL, f"export/ratings/{case_id}")
+    headers = {
+        "Authorization": f"Bearer {QUEPID_API_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+        resp = await client.get(url, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+    return data.get("queries", [])
+
+def find_query_entry(queries: List[Dict[str, Any]], query_text: str) -> Optional[Dict[str, Any]]:
+    """Find the query entry for a given query string."""
+    for q in queries:
+        if q.get("query", "").strip().lower() == query_text.strip().lower():
+            return q
+    return None
+
+async def get_judged_documents_by_text(case_id: int, query_text: str) -> List[Dict[str, Any]]:
     """
-    Get documents with their judgments from the latest snapshot.
-    
-    Returns:
-        List[Dict[str, Any]]: List of documents with their judgments
+    Get judged documents (title and judgment) for a given case and query text.
     """
-    # Get the latest snapshot data
-    snapshot_response = await test_endpoint(f"cases/{CASE_ID}/snapshots/latest")
-    if not snapshot_response:
-        logger.error("Failed to get snapshot data")
+    snapshot_url = urljoin(QUEPID_API_URL, f"cases/{case_id}/snapshots/latest")
+    headers = {
+        "Authorization": f"Bearer {QUEPID_API_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+        resp = await client.get(snapshot_url, headers=headers)
+        resp.raise_for_status()
+        snapshot = resp.json()
+
+    # Find the query in the snapshot by query text
+    ratings = None
+    for q in snapshot.get("queries", []):
+        if q.get("query_text", "").strip().lower() == query_text.strip().lower():
+            ratings = q.get("ratings", {})
+            break
+    if ratings is None:
+        logger.warning("No ratings found for this query in the snapshot.")
+        logger.info("Available queries in snapshot:")
+        for q in snapshot.get("queries", []):
+            logger.info(f"  - {q.get('query')}")
         return []
-    
-    # Get the weak lensing query
-    weak_lensing_query = next(
-        (q for q in snapshot_response.get('queries', []) if q.get('query_id') == WEAK_LENSING_QUERY_ID),
-        None
-    )
-    
-    if not weak_lensing_query:
-        logger.error("Could not find weak lensing query in response")
-        return []
-    
-    # Get the ratings
-    ratings = weak_lensing_query.get('ratings', {})
-    
-    # Get the docs
-    docs = snapshot_response.get('docs', {})
-    
-    # Extract documents with their judgments
-    documents = []
-    for doc_id, rating in ratings.items():
-        # Find the document in the docs
-        doc = next(
-            (d for d in docs.get(str(WEAK_LENSING_QUERY_ID), []) if str(d.get('id')) == doc_id),
-            None
-        )
-        
-        if doc:
-            title = doc.get('fields', {}).get('title', '')
-            documents.append({
-                'title': title,
-                'judgment': rating
-            })
-    
-    return documents
+
+    # Create doc_map from the docs dictionary
+    doc_map = {}
+    for doc_id, doc_list in snapshot.get("docs", {}).items():
+        # Each doc_list contains all documents for this query
+        for doc in doc_list:
+            # Use the document's own ID as the key
+            doc_map[doc["id"]] = doc
+
+    # Debug: Print what we found in doc_map
+    logger.info("Documents found in doc_map:")
+    for doc_id in doc_map:
+        logger.info(f"  - {doc_id}")
+
+    results = []
+    for doc_id, score in ratings.items():
+        doc = doc_map.get(doc_id, {})
+        title = None
+        if "fields" in doc:
+            title = doc["fields"].get("title")
+        if title is None:
+            logger.warning(f"Missing title for doc_id={doc_id}")
+        results.append({
+            "title": title or "Unknown Title",
+            "score": score
+        })
+    return results
 
 async def main():
-    """Run tests on various Quepid API endpoints."""
     if not validate_api_key():
         sys.exit(1)
-    
-    # Get documents with their judgments
-    documents = await get_judged_documents()
-    
-    if documents:
+
+    # Step 1: Get all queries for the case (for debug/info)
+    queries = await get_case_queries(CASE_ID)
+    logger.info("Available queries in this case (from ratings export):")
+    for q in queries:
+        logger.info(f"  - {q.get('query')} (query_id={q.get('query_id')})")
+
+    # Step 2: Get judged documents for this query (by text)
+    judged_docs = await get_judged_documents_by_text(CASE_ID, QUERY_TEXT)
+    if judged_docs:
         logger.info("\nTitle | Judgment")
         logger.info("-" * 80)
-        for doc in documents:
-            logger.info(f"{doc['title']} | {doc['judgment']}")
+        for doc in judged_docs:
+            logger.info(f"{doc['title']} | {doc['score']}")
     else:
-        logger.info("No judged documents found in the response")
+        logger.info("No judged documents found for the given query.")
 
 if __name__ == "__main__":
     asyncio.run(main()) 

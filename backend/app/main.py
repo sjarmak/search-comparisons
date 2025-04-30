@@ -20,6 +20,7 @@ from .api.routes.search_routes import router as search_router
 from .api.routes.debug_routes import router as debug_router
 from .api.routes.experiment_routes import router as experiment_router, back_compat_router
 from .api.routes.query_intent import router as query_intent_router
+from .routes.quepid import router as quepid_router
 from .api.models import ErrorResponse
 
 # Set up platform-specific fixes and environment variables first
@@ -177,6 +178,7 @@ app.include_router(debug_router)
 app.include_router(experiment_router)
 app.include_router(back_compat_router)  # Include the backward compatibility router
 app.include_router(query_intent_router)  # Include the query intent router
+app.include_router(quepid_router, prefix="/api/quepid")  # Include the Quepid router
 
 
 @app.on_event("startup")

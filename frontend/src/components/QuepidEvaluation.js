@@ -4,7 +4,7 @@
  * This component provides UI for evaluating search results against
  * Quepid judgments, calculating metrics like nDCG@10.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { experimentService } from '../services/api';
 import {
   Container,
@@ -53,9 +53,8 @@ const DOC_TYPES = [
 
 const QuepidEvaluation = () => {
   // State for search parameters
-  const [query, setQuery] = useState('weak lensing');
-  const [caseId, setCaseId] = useState('8862');
-  const [queryId, setQueryId] = useState('231665');
+  const [query, setQuery] = useState('triton');
+  const [caseId, setCaseId] = useState('8914');
   const [maxResults, setMaxResults] = useState(20);
   
   // State for boost configuration
@@ -71,6 +70,27 @@ const QuepidEvaluation = () => {
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [results, setResults] = useState(null);
+  const [judgedDocuments, setJudgedDocuments] = useState([]);
+  
+  // Fetch judged documents when component mounts or caseId/query changes
+  useEffect(() => {
+    const fetchJudgedDocuments = async () => {
+      try {
+        const response = await experimentService.getJudgedDocuments(caseId, query);
+        if (response.error) {
+          setError(response.message || 'Error fetching judged documents');
+        } else {
+          setJudgedDocuments(response);
+        }
+      } catch (error) {
+        setError(error.message || 'Error fetching judged documents');
+      }
+    };
+
+    if (caseId && query) {
+      fetchJudgedDocuments();
+    }
+  }, [caseId, query]);
   
   // Function to update boost configuration
   const updateBoostConfig = (field, value) => {
@@ -113,7 +133,6 @@ const QuepidEvaluation = () => {
     const evaluationRequest = {
       query: query.trim(),
       case_id: parseInt(caseId),
-      query_id: parseInt(queryId),
       max_results: maxResults,
       sources: ['ads'],  // Always use ADS
       boost_configs: [
@@ -138,34 +157,6 @@ const QuepidEvaluation = () => {
       if (response.error) {
         setError(response.message || 'Error evaluating search results');
       } else {
-        // Process the judged documents directly
-        if (response.judged_documents && Array.isArray(response.judged_documents)) {
-          // Map the judged documents to the format expected by the UI
-          const judgedDocuments = response.judged_documents.map(doc => ({
-            title: doc.title || 'No title available',
-            authors: doc.authors || [],
-            year: doc.year || '',
-            citation_count: doc.citation_count || 0,
-            doc_type: doc.doc_type || 'N/A',
-            bibcode: doc.bibcode || '',
-            rating: doc.judgment || 0
-          }));
-          
-          // Update the response with the processed documents
-          response.judged_titles = judgedDocuments;
-          response.total_judged = judgedDocuments.length;
-          
-          // Calculate found documents
-          if (response.source_results?.[0]?.results) {
-            const foundDocuments = judgedDocuments.filter(doc => 
-              response.source_results[0].results.some(r => r.title === doc.title)
-            );
-            response.source_results[0].judged_retrieved = foundDocuments.length;
-            response.source_results[0].relevant_retrieved = foundDocuments.filter(d => d.rating >= 2).length;
-            response.source_results[0].results_count = response.source_results[0].results.length;
-          }
-        }
-        
         setResults(response);
         if (!response.source_results || response.source_results.length === 0) {
           setError('No search results were returned');
@@ -184,11 +175,110 @@ const QuepidEvaluation = () => {
     }
   };
   
+  // Function to render the judged documents
+  const renderJudgedDocuments = () => {
+    if (!judgedDocuments.length) return null;
+    
+    return (
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" gutterBottom>
+          Judged Documents
+        </Typography>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Title</TableCell>
+                <TableCell>Authors</TableCell>
+                <TableCell>Year</TableCell>
+                <TableCell>Citations</TableCell>
+                <TableCell>Type</TableCell>
+                <TableCell>Database</TableCell>
+                <TableCell>Score</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {judgedDocuments.map((doc, idx) => (
+                <React.Fragment key={idx}>
+                  <TableRow>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {doc.title || 'No title available'}
+                      </Typography>
+                      {doc.bibcode && (
+                        <Typography variant="caption" color="primary">
+                          <a href={`https://ui.adsabs.harvard.edu/abs/${doc.bibcode}/abstract`} 
+                             target="_blank" 
+                             rel="noopener noreferrer">
+                            View
+                          </a>
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {doc.authors?.join('; ')}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{doc.year}</TableCell>
+                    <TableCell>{doc.citation_count || 0}</TableCell>
+                    <TableCell>{doc.doc_type || 'N/A'}</TableCell>
+                    <TableCell>{doc.database || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={`${doc.score}`}
+                        color={doc.score === 3 ? undefined : doc.score > 0 ? 'success' : 'default'}
+                        size="small"
+                        sx={{
+                          backgroundColor: doc.score === 3 ? '#00e676' : undefined,
+                          color: doc.score === 3 ? '#000' : undefined
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                  {doc.abstract && (
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ py: 0 }}>
+                        <Accordion>
+                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography variant="subtitle2">Abstract</Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <Typography variant="body2" paragraph>
+                              {doc.abstract}
+                            </Typography>
+                            {doc.keywords && doc.keywords.length > 0 && (
+                              <>
+                                <Typography variant="subtitle2">Keywords:</Typography>
+                                <Box sx={{ mt: 1 }}>
+                                  {doc.keywords.map((keyword, kidx) => (
+                                    <Chip
+                                      key={kidx}
+                                      label={keyword}
+                                      size="small"
+                                      sx={{ mr: 0.5, mb: 0.5 }}
+                                    />
+                                  ))}
+                                </Box>
+                              </>
+                            )}
+                          </AccordionDetails>
+                        </Accordion>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
+    );
+  };
+  
   // Function to render the evaluation results
   const renderResults = () => {
     if (!results) return null;
-    
-    console.log('Rendering results:', results); // Debug log
     
     return (
       <Box sx={{ mt: 4 }}>
@@ -224,79 +314,6 @@ const QuepidEvaluation = () => {
                   ))}
                 </Grid>
 
-                {/* Judged Documents Section */}
-                {results.judged_titles && results.judged_titles.length > 0 && (
-                  <Box sx={{ mt: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Judged Documents ({results.judged_titles.length})
-                    </Typography>
-                    <TableContainer component={Paper}>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Rank</TableCell>
-                            <TableCell>Title</TableCell>
-                            <TableCell>Authors</TableCell>
-                            <TableCell>Year</TableCell>
-                            <TableCell>Citations</TableCell>
-                            <TableCell>Type</TableCell>
-                            <TableCell>Rating</TableCell>
-                            <TableCell>Found in Results</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {results.judged_titles.map((judged, idx) => {
-                            const foundInResults = sourceResult?.results?.some(
-                              r => r.title === judged.title
-                            ) || false;
-                            return (
-                              <TableRow key={idx}>
-                                <TableCell>{idx + 1}</TableCell>
-                                <TableCell>
-                                  <Typography variant="body2">
-                                    {judged.title || 'No title available'}
-                                  </Typography>
-                                  {judged.bibcode && (
-                                    <Typography variant="caption" color="primary">
-                                      <a href={`https://ui.adsabs.harvard.edu/abs/${judged.bibcode}/abstract`} 
-                                         target="_blank" 
-                                         rel="noopener noreferrer">
-                                        View
-                                      </a>
-                                    </Typography>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <Typography variant="body2">
-                                    {judged.authors?.join(', ')}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell>{judged.year}</TableCell>
-                                <TableCell>{judged.citation_count || 0}</TableCell>
-                                <TableCell>{judged.doc_type || 'N/A'}</TableCell>
-                                <TableCell>
-                                  <Chip 
-                                    label={`${judged.rating}`}
-                                    color={judged.rating > 0 ? 'success' : 'default'}
-                                    size="small"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Chip 
-                                    label={foundInResults ? 'Found' : 'Not Found'}
-                                    color={foundInResults ? 'success' : 'error'}
-                                    size="small"
-                                  />
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
-
                 {/* Summary Stats */}
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="body2" color="text.secondary">
@@ -310,75 +327,6 @@ const QuepidEvaluation = () => {
             </Grid>
           ))}
         </Grid>
-
-        {/* Original Results Display */}
-        {results && results.comparison_results?.[0]?.original_results && (
-          <Box mt={4}>
-            <Typography variant="h5" gutterBottom>
-              Original Search Results
-            </Typography>
-            
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Rank</TableCell>
-                    <TableCell>Title</TableCell>
-                    <TableCell>Authors</TableCell>
-                    <TableCell>Year</TableCell>
-                    <TableCell>Citations</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Judgment</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {results.comparison_results[0].original_results.map((result, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{index + 1}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {result.title}
-                        </Typography>
-                        {result.bibcode && (
-                          <Typography variant="caption" color="primary">
-                            <a href={`https://ui.adsabs.harvard.edu/abs/${result.bibcode}/abstract`} 
-                               target="_blank" 
-                               rel="noopener noreferrer">
-                              View
-                            </a>
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {result.authors?.join(', ')}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{result.year}</TableCell>
-                      <TableCell>{result.citation_count || 0}</TableCell>
-                      <TableCell>{result.doc_type || 'N/A'}</TableCell>
-                      <TableCell>
-                        {result.has_judgment ? (
-                          <Chip 
-                            label={`Rating: ${result.judgment}`}
-                            color={result.judgment >= 2 ? 'success' : 'default'}
-                            size="small"
-                          />
-                        ) : (
-                          <Chip 
-                            label="Not Judged"
-                            color="default"
-                            size="small"
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        )}
       </Box>
     );
   };
@@ -420,18 +368,6 @@ const QuepidEvaluation = () => {
                   value={caseId}
                   onChange={(e) => setCaseId(e.target.value)}
                   placeholder="Enter your Quepid case ID"
-                  type="number"
-                />
-              </Grid>
-
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Query ID"
-                  fullWidth
-                  margin="normal"
-                  value={queryId}
-                  onChange={(e) => setQueryId(e.target.value)}
-                  placeholder="Enter the query ID"
                   type="number"
                 />
               </Grid>
@@ -537,6 +473,7 @@ const QuepidEvaluation = () => {
           </CardContent>
         </Card>
         
+        {renderJudgedDocuments()}
         {renderResults()}
       </Box>
     </Container>

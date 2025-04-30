@@ -238,6 +238,74 @@ class QuepidService:
         """Extract document ID from a search result or URL."""
         return extract_doc_id(result)
 
+    async def get_judged_documents_by_text(self, case_id: int, query_text: str) -> List[Dict[str, Any]]:
+        """
+        Get judged documents (title and judgment) for a given case and query text.
+        
+        Args:
+            case_id: The Quepid case ID
+            query_text: The query text to match
+            
+        Returns:
+            List[Dict[str, Any]]: List of judged documents with their metadata and scores
+        """
+        # Get the latest snapshot for the case
+        snapshot_url = urljoin(self.api_url, f"cases/{case_id}/snapshots/latest")
+        logger.info(f"Fetching snapshot from: {snapshot_url}")
+        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+            resp = await client.get(snapshot_url, headers=self.headers)
+            resp.raise_for_status()
+            snapshot = resp.json()
+            
+        logger.info(f"Snapshot keys: {list(snapshot.keys())}")
+        logger.info(f"Looking for query text: {query_text}")
+        
+        # Find the query in the snapshot by query text
+        ratings = None
+        for q in snapshot.get("queries", []):
+            # Try both query_text and query fields
+            query_in_snapshot = q.get("query_text", q.get("query", "")).strip().lower()
+            logger.info(f"Checking query: {query_in_snapshot} (type: {type(query_in_snapshot)})")
+            if query_in_snapshot == query_text.strip().lower():
+                ratings = q.get("ratings", {})
+                logger.info(f"Found ratings for query: {ratings}")
+                break
+        if ratings is None:
+            logger.warning("No ratings found for this query in the snapshot.")
+            logger.info("Available queries in snapshot:")
+            for q in snapshot.get("queries", []):
+                query_in_snapshot = q.get("query_text", q.get("query", ""))
+                logger.info(f"  - {query_in_snapshot} (type: {type(query_in_snapshot)})")
+            return []
+
+        # Create doc_map from the docs dictionary
+        doc_map = {}
+        logger.info(f"Building doc_map from docs dictionary with keys: {list(snapshot.get('docs', {}).keys())}")
+        for doc_id, doc_list in snapshot.get("docs", {}).items():
+            # Each doc_list contains all documents for this query
+            for doc in doc_list:
+                # Use the document's own ID as the key
+                doc_map[doc["id"]] = doc
+                logger.info(f"Added doc to map: id={doc['id']}, fields={doc.get('fields', {}).keys()}")
+
+        results = []
+        for doc_id, score in ratings.items():
+            doc = doc_map.get(doc_id, {})
+            title = None
+            if "fields" in doc:
+                title = doc["fields"].get("title")
+                logger.info(f"Found title in fields for doc_id={doc_id}: {title}")
+            if title is None:
+                logger.warning(f"Missing title for doc_id={doc_id}, doc={doc}")
+            results.append({
+                "id": doc_id,
+                "title": title or "Unknown Title",
+                "score": score,
+                "metadata": doc.get("fields", {})
+            })
+        logger.info(f"Returning {len(results)} results")
+        return results
+
 
 async def get_quepid_cases() -> List[Dict[str, Any]]:
     """
@@ -820,3 +888,67 @@ async def get_book_judgments(book_id: int) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error retrieving judgments for book {book_id} from Quepid: {str(e)}")
         return {} 
+
+
+async def get_judgments_for_query(case_id: int, query: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve judged document titles and scores for any query in a Quepid case.
+
+    Args:
+        case_id (int): The Quepid case ID.
+        query (str): The query string to match.
+
+    Returns:
+        List[Dict[str, Any]]: List of judged documents with title and score.
+    """
+    # Get all queries for the case to find the query_id
+    case_url = urljoin(QUEPID_API_URL, f"cases/{case_id}")
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(case_url, headers={
+            "Authorization": f"Bearer {QUEPID_API_KEY}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        })
+        resp.raise_for_status()
+        case_data = resp.json()
+
+    # Find the query_id for the given query string
+    query_id = None
+    for q in case_data.get("queries", []):
+        if q.get("query", "").strip().lower() == query.strip().lower():
+            query_id = q.get("id")
+            break
+    if query_id is None:
+        raise ValueError(f"Query '{query}' not found in case {case_id}")
+
+    # Get the latest snapshot for the case
+    snapshot_url = urljoin(QUEPID_API_URL, f"cases/{case_id}/snapshots/latest")
+    async with httpx.AsyncClient() as client:
+        snapshot_resp = await client.get(snapshot_url, headers={
+            "Authorization": f"Bearer {QUEPID_API_KEY}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        })
+        snapshot_resp.raise_for_status()
+        snapshot = snapshot_resp.json()
+
+    # Find the query in the snapshot
+    ratings = None
+    for q in snapshot.get("queries", []):
+        if q.get("query_id") == query_id:
+            ratings = q.get("ratings", {})
+            break
+    if ratings is None:
+        return []
+
+    # Map doc_id to document details
+    doc_map = {doc["id"]: doc for doc in snapshot.get("documents", [])}
+
+    results = []
+    for doc_id, score in ratings.items():
+        doc = doc_map.get(doc_id, {})
+        results.append({
+            "title": doc.get("title", "Unknown Title"),
+            "score": score
+        })
+    return results 

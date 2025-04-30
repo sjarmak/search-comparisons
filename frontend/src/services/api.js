@@ -227,6 +227,18 @@ const experimentService = {
     } catch (error) {
       return handleApiError(error);
     }
+  },
+  
+  /**
+   * Get judged documents for a specific query
+   */
+  getJudgedDocuments: async (caseId = 8914, queryText = "triton") => {
+    try {
+      const response = await apiClient.get(`/api/quepid/documents?case_id=${caseId}&query_text=${encodeURIComponent(queryText)}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
   }
 };
 
