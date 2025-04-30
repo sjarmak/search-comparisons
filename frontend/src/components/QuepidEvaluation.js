@@ -16,14 +16,8 @@ import {
   CardContent,
   Chip,
   Grid,
-  List,
-  ListItem,
-  ListItemText,
   Alert,
   CircularProgress,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Table,
   TableBody,
   TableCell,
@@ -31,15 +25,8 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Divider,
   Slider,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Link
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 // Available document types for boosting
 const DOC_TYPES = [
@@ -193,81 +180,42 @@ const QuepidEvaluation = () => {
                 <TableCell>Year</TableCell>
                 <TableCell>Citations</TableCell>
                 <TableCell>Type</TableCell>
-                <TableCell>Database</TableCell>
                 <TableCell>Score</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {judgedDocuments.map((doc, idx) => (
-                <React.Fragment key={idx}>
-                  <TableRow>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {doc.title || 'No title available'}
+                <TableRow key={idx}>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {doc.title || 'No title available'}
+                    </Typography>
+                    {doc.bibcode && (
+                      <Typography variant="caption" color="primary">
+                        <a href={`https://ui.adsabs.harvard.edu/abs/${doc.bibcode}/abstract`} 
+                           target="_blank" 
+                           rel="noopener noreferrer">
+                          View
+                        </a>
                       </Typography>
-                      {doc.bibcode && (
-                        <Typography variant="caption" color="primary">
-                          <a href={`https://ui.adsabs.harvard.edu/abs/${doc.bibcode}/abstract`} 
-                             target="_blank" 
-                             rel="noopener noreferrer">
-                            View
-                          </a>
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {doc.authors?.join('; ')}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{doc.year}</TableCell>
-                    <TableCell>{doc.citation_count || 0}</TableCell>
-                    <TableCell>{doc.doc_type || 'N/A'}</TableCell>
-                    <TableCell>{doc.database || 'N/A'}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label={`${doc.score}`}
-                        color={doc.score === 3 ? undefined : doc.score > 0 ? 'success' : 'default'}
-                        size="small"
-                        sx={{
-                          backgroundColor: doc.score === 3 ? '#00e676' : undefined,
-                          color: doc.score === 3 ? '#000' : undefined
-                        }}
-                      />
-                    </TableCell>
-                  </TableRow>
-                  {doc.abstract && (
-                    <TableRow>
-                      <TableCell colSpan={7} sx={{ py: 0 }}>
-                        <Accordion>
-                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Typography variant="subtitle2">Abstract</Typography>
-                          </AccordionSummary>
-                          <AccordionDetails>
-                            <Typography variant="body2" paragraph>
-                              {doc.abstract}
-                            </Typography>
-                            {doc.keywords && doc.keywords.length > 0 && (
-                              <>
-                                <Typography variant="subtitle2">Keywords:</Typography>
-                                <Box sx={{ mt: 1 }}>
-                                  {doc.keywords.map((keyword, kidx) => (
-                                    <Chip
-                                      key={kidx}
-                                      label={keyword}
-                                      size="small"
-                                      sx={{ mr: 0.5, mb: 0.5 }}
-                                    />
-                                  ))}
-                                </Box>
-                              </>
-                            )}
-                          </AccordionDetails>
-                        </Accordion>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </React.Fragment>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {doc.author?.join(', ')}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{doc.year}</TableCell>
+                  <TableCell>{doc.citation_count || 0}</TableCell>
+                  <TableCell>{doc.doc_type || 'N/A'}</TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={`${doc.score}`}
+                      color={doc.score > 0 ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </TableCell>
+                </TableRow>
               ))}
             </TableBody>
           </Table>
