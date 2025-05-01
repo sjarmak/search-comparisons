@@ -291,17 +291,32 @@ class QuepidService:
         results = []
         for doc_id, score in ratings.items():
             doc = doc_map.get(doc_id, {})
-            title = None
-            if "fields" in doc:
-                title = doc["fields"].get("title")
-                logger.info(f"Found title in fields for doc_id={doc_id}: {title}")
-            if title is None:
-                logger.warning(f"Missing title for doc_id={doc_id}, doc={doc}")
+            fields = doc.get("fields", {})
+            
+            # Extract metadata from fields
+            title = fields.get("title", "Unknown Title")
+            authors = fields.get("author", [])
+            pubdate = fields.get("pubdate", "")
+            citation_count = fields.get("citation_count", "0")
+            database = fields.get("database", [])
+            abstract = fields.get("abstract", "")
+            
+            # Get explain details if available
+            explain = doc.get("explain", {})
+            rated_only = doc.get("rated_only", False)
+            
             results.append({
                 "id": doc_id,
-                "title": title or "Unknown Title",
+                "title": title,
+                "authors": authors,
+                "pubdate": pubdate,
+                "citation_count": citation_count,
+                "database": database,
+                "abstract": abstract,
                 "score": score,
-                "metadata": doc.get("fields", {})
+                "explain": explain,
+                "rated_only": rated_only,
+                "metadata": fields
             })
         logger.info(f"Returning {len(results)} results")
         return results

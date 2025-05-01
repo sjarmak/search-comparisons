@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     This class defines all configuration settings for the application,
     loaded from environment variables.
     """
+    # Environment Configuration
+    ENVIRONMENT: EnvironmentType = EnvironmentType.DEVELOPMENT
+    
     # API Configuration
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Academic Search Results Comparator"
@@ -102,12 +105,9 @@ logging.basicConfig(
     format=settings.LOG_FORMAT
 )
 
-# Initialize settings
-settings = Settings()
-
 # Update DEBUG based on environment if not explicitly set
 if os.getenv("DEBUG") is None:
-    settings.DEBUG = settings.ENVIRONMENT.lower() in ["local", "development"]
+    settings.DEBUG = settings.ENVIRONMENT in [EnvironmentType.LOCAL, EnvironmentType.DEVELOPMENT]
 
 # Set log level in Python's logging module
 log_level_map = {

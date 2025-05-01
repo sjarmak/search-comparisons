@@ -177,10 +177,11 @@ const QuepidEvaluation = () => {
               <TableRow>
                 <TableCell>Title</TableCell>
                 <TableCell>Authors</TableCell>
-                <TableCell>Year</TableCell>
+                <TableCell>Publication Date</TableCell>
                 <TableCell>Citations</TableCell>
-                <TableCell>Type</TableCell>
+                <TableCell>Databases</TableCell>
                 <TableCell>Score</TableCell>
+                <TableCell>Abstract</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -190,9 +191,9 @@ const QuepidEvaluation = () => {
                     <Typography variant="body2">
                       {doc.title || 'No title available'}
                     </Typography>
-                    {doc.bibcode && (
+                    {doc.id && (
                       <Typography variant="caption" color="primary">
-                        <a href={`https://ui.adsabs.harvard.edu/abs/${doc.bibcode}/abstract`} 
+                        <a href={`https://ui.adsabs.harvard.edu/abs/${doc.id}/abstract`} 
                            target="_blank" 
                            rel="noopener noreferrer">
                           View
@@ -202,18 +203,44 @@ const QuepidEvaluation = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {doc.author?.join(', ')}
+                      {Array.isArray(doc.authors) ? doc.authors.join(', ') : doc.authors}
                     </Typography>
                   </TableCell>
-                  <TableCell>{doc.year}</TableCell>
-                  <TableCell>{doc.citation_count || 0}</TableCell>
-                  <TableCell>{doc.doc_type || 'N/A'}</TableCell>
+                  <TableCell>{doc.pubdate}</TableCell>
+                  <TableCell>{doc.citation_count}</TableCell>
+                  <TableCell>
+                    {Array.isArray(doc.database) && doc.database.map((db, i) => (
+                      <Chip 
+                        key={i}
+                        label={db}
+                        size="small"
+                        sx={{ mr: 0.5, mb: 0.5 }}
+                      />
+                    ))}
+                  </TableCell>
                   <TableCell>
                     <Chip 
                       label={`${doc.score}`}
                       color={doc.score > 0 ? 'success' : 'default'}
                       size="small"
                     />
+                    {doc.rated_only && (
+                      <Typography variant="caption" display="block" color="text.secondary">
+                        Rated Only
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ 
+                      maxWidth: 300,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical'
+                    }}>
+                      {doc.abstract}
+                    </Typography>
                   </TableCell>
                 </TableRow>
               ))}
