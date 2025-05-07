@@ -194,7 +194,7 @@ class QuepidService:
                         documents.append({
                             'id': doc_id,
                             'title': doc.get('title', ''),
-                            'authors': doc.get('authors', []),
+                            'author': doc.get('author', []),
                             'year': doc.get('year'),
                             'citation_count': doc.get('citation_count', 0),
                             'doc_type': doc.get('doc_type', ''),
@@ -295,7 +295,7 @@ class QuepidService:
             
             # Extract metadata from fields
             title = fields.get("title", "Unknown Title")
-            authors = fields.get("author", [])
+            author = fields.get("author", [])
             pubdate = fields.get("pubdate", "")
             citation_count = fields.get("citation_count", "0")
             database = fields.get("database", [])
@@ -308,7 +308,7 @@ class QuepidService:
             results.append({
                 "id": doc_id,
                 "title": title,
-                "authors": authors,
+                "author": author,
                 "pubdate": pubdate,
                 "citation_count": citation_count,
                 "database": database,
@@ -593,10 +593,10 @@ async def evaluate_search_results(
         
         # Extract authors safely
         authors = []
-        if hasattr(result, 'authors'):
-            authors = result.authors
-        elif hasattr(result, 'author'):
+        if hasattr(result, 'author'):
             authors = result.author
+        elif hasattr(result, 'authors'):
+            authors = result.authors
         elif hasattr(result, 'author_list'):
             authors = result.author_list
         
@@ -650,7 +650,7 @@ async def evaluate_search_results(
         
         processed_results.append({
             "title": title,
-            "authors": authors,
+            "author": authors,
             "year": getattr(result, 'year', ''),
             "citation_count": getattr(result, 'citation_count', 0),
             "doc_type": getattr(result, 'doctype', ''),

@@ -241,11 +241,11 @@ const SimilarityTests = () => {
           </Typography>
           
           {/* Authors and year */}
-          {paper.authors && (
+          {paper.author && (
             <Typography variant="body2" color="text.secondary" gutterBottom noWrap>
-              {Array.isArray(paper.authors) 
-                ? paper.authors.slice(0, 3).join(', ') + (paper.authors.length > 3 ? ', et al.' : '')
-                : paper.authors}
+              {Array.isArray(paper.author) 
+                ? paper.author.slice(0, 3).join(', ') + (paper.author.length > 3 ? ', et al.' : '')
+                : paper.author}
               {paper.year ? ` (${paper.year})` : ''}
             </Typography>
           )}

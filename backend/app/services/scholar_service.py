@@ -248,7 +248,7 @@ async def parse_scholar_html(html_content: str) -> List[SearchResult]:
                 # Create result object
                 result = SearchResult(
                     title=title,
-                    authors=authors,
+                    author=authors if isinstance(authors, list) else [authors],
                     abstract=abstract,
                     year=year,
                     url=url,
@@ -320,7 +320,7 @@ async def get_scholar_results_scholarly(
                 # Create result object
                 result = SearchResult(
                     title=title,
-                    authors=authors if isinstance(authors, list) else [authors],
+                    author=authors if isinstance(authors, list) else [authors],
                     abstract=abstract,
                     year=year,
                     url=url,

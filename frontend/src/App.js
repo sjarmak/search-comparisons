@@ -167,7 +167,7 @@ function App() {
       const selectedMetrics = Object.keys(metrics).filter(key => metrics[key]);
       
       // Always include all fields since we removed the fields selection UI
-      const selectedFields = ['title', 'abstract', 'authors', 'doi', 'year', 'citation_count'];
+      const selectedFields = ['title', 'abstract', 'author', 'doi', 'year', 'citation_count'];
       
       const requestBody = {
         query,
@@ -292,7 +292,7 @@ function App() {
       const selectedMetrics = Object.keys(metrics).filter(key => metrics[key]);
       
       // Always include all fields since we removed the fields selection UI
-      const selectedFields = ['title', 'abstract', 'authors', 'doi', 'year', 'citation_count'];
+      const selectedFields = ['title', 'abstract', 'author', 'doi', 'year', 'citation_count'];
       
       // Clean the transformedQuery to make sure it doesn't get too complex on repeated applications
       let cleanQuery = transformedQuery;
@@ -599,7 +599,7 @@ function App() {
                                       ? sourceResults.filter(result => 
                                           result.title.toLowerCase().includes(filterText.toLowerCase()) ||
                                           (result.abstract && result.abstract.toLowerCase().includes(filterText.toLowerCase())) ||
-                                          (result.authors && result.authors.some(author => 
+                                          (result.author && result.author.some(author => 
                                             author && author.toLowerCase().includes(filterText.toLowerCase())
                                           ))
                                         )
@@ -695,11 +695,11 @@ function App() {
                                                       </Box>
                                                       
                                                       {/* Authors - condensed */}
-                                                      {result.authors && result.authors.length > 0 && (
+                                                      {result.author && result.author.length > 0 && (
                                                         <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
-                                                          <strong>Authors:</strong> {Array.isArray(result.authors) 
-                                                            ? result.authors.slice(0, 3).join(', ') + (result.authors.length > 3 ? ', et al.' : '')
-                                                            : result.authors}
+                                                          <strong>Authors:</strong> {Array.isArray(result.author) 
+                                                            ? result.author.slice(0, 3).join(', ') + (result.author.length > 3 ? ', et al.' : '')
+                                                            : result.author}
                                                         </Typography>
                                                       )}
                                                       
@@ -790,9 +790,9 @@ function App() {
                                                               textOverflow: 'ellipsis'
                                                             }}
                                                           >
-                                                            {Array.isArray(result.authors) 
-                                                              ? result.authors.slice(0, 2).join(', ') + (result.authors.length > 2 ? ', et al.' : '') 
-                                                              : result.authors}
+                                                            {Array.isArray(result.author) 
+                                                              ? result.author.slice(0, 2).join(', ') + (result.author.length > 2 ? ', et al.' : '') 
+                                                              : result.author}
                                                             {result.year ? ` (${result.year})` : ''}
                                                           </Typography>
                                                           

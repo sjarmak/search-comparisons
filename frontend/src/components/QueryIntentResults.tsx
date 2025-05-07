@@ -10,7 +10,7 @@ interface Author {
 interface SearchResult {
   id: string;
   title: string;
-  authors: string[];
+  author: string[];
   abstract: string;
   year: string;
   citation_count: number;
@@ -106,7 +106,7 @@ const QueryIntentResults: React.FC<QueryIntentResultsProps> = ({
           </Typography>
           
           <Box sx={{ my: 1 }}>
-            {result.authors.map((author, index) => (
+            {result.author.map((author, index) => (
               <AuthorChip
                 key={index}
                 label={author}

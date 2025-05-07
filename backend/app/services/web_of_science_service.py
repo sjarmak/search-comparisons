@@ -74,7 +74,7 @@ async def get_web_of_science_results(
         no_results_msg = f"Web of Science API key not found in environment variables."
         placeholder = SearchResult(
             title="[Web of Science API Error]",
-            authors=[],
+            author=[],
             abstract=no_results_msg,
             doi=None,
             year=None,
@@ -129,7 +129,7 @@ async def get_web_of_science_results(
                 no_results_msg = f"Error accessing Web of Science API: Status {response.status_code}"
                 placeholder = SearchResult(
                     title="[Web of Science API Error]",
-                    authors=[],
+                    author=[],
                     abstract=no_results_msg,
                     doi=None,
                     year=None,
@@ -165,7 +165,7 @@ async def get_web_of_science_results(
                 no_results_msg = f"The term '{query}' did not match any documents in the Web of Science Core Collection."
                 placeholder = SearchResult(
                     title="[No results found in Web of Science database]",
-                    authors=[],
+                    author=[],
                     abstract=no_results_msg,
                     doi=None,
                     year=None,
@@ -264,7 +264,7 @@ async def get_web_of_science_results(
                     # Create result object
                     result = SearchResult(
                         title=title,
-                        authors=authors,
+                        author=authors,
                         abstract=abstract,
                         doi=doi,
                         year=year,
@@ -288,7 +288,7 @@ async def get_web_of_science_results(
         no_results_msg = f"Error accessing Web of Science API: {str(e)}"
         placeholder = SearchResult(
             title="[Web of Science API Error]",
-            authors=[],
+            author=[],
             abstract=no_results_msg,
             doi=None,
             year=None,

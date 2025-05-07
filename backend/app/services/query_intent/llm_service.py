@@ -791,7 +791,7 @@ class LLMService:
                     "id": str(result.get('id')),
                     "bibcode": result.get('bibcode'),
                     "title": result.get('title'),
-                    "authors": authors,
+                    "author": authors,
                     "year": int(result.get('year')) if result.get('year') else None,
                     "citation_count": int(result.get('citation_count', 0)),
                     "abstract": result.get('abstract'),

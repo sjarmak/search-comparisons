@@ -94,7 +94,7 @@ class SearchResult(BaseModel):
     
     Attributes:
         title: Title of the paper
-        authors: List of authors
+        author: List of authors
         abstract: Abstract text
         doi: Digital Object Identifier
         year: Publication year
@@ -111,7 +111,7 @@ class SearchResult(BaseModel):
         boost_factors: Dictionary of applied boost factors
     """
     title: str
-    authors: List[str]
+    author: List[str]
     abstract: Optional[str] = None
     doi: Optional[str] = None
     year: Optional[int] = None

@@ -203,7 +203,7 @@ const QuepidEvaluation = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {Array.isArray(doc.authors) ? doc.authors.join(', ') : doc.authors}
+                      {Array.isArray(doc.author) ? doc.author.join(', ') : doc.author}
                     </Typography>
                   </TableCell>
                   <TableCell>{doc.pubdate}</TableCell>

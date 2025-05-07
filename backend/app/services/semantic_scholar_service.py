@@ -197,7 +197,7 @@ async def get_semantic_scholar_results(
     no_results_msg = f"The term '{query}' did not match any documents in Semantic Scholar, or the API rate limit was exceeded."
     placeholder = SearchResult(
         title="[No results found in Semantic Scholar]",
-        authors=[],
+        author=[],
         abstract=no_results_msg,
         doi=None,
         year=None,

@@ -231,7 +231,7 @@ async def query_ads_solr(
                     # Create search result
                     result = SearchResult(
                         title=doc.get("title", [""])[0] if isinstance(doc.get("title"), list) else doc.get("title", ""),
-                        authors=doc.get("author", []),
+                        author=doc.get("author", []),
                         abstract=doc.get("abstract", [""])[0] if isinstance(doc.get("abstract"), list) else doc.get("abstract", ""),
                         doi=doi,
                         year=doc.get("year"),
@@ -343,7 +343,7 @@ async def query_ads_api(
                 # Create result object
                 result = SearchResult(
                     title=doc.get("title", [""])[0] if isinstance(doc.get("title"), list) else doc.get("title", ""),
-                    authors=doc.get("author", []),
+                    author=doc.get("author", []),
                     abstract=doc.get("abstract", ""),
                     doi=doc.get("doi", [""])[0] if isinstance(doc.get("doi"), list) else doc.get("doi", ""),
                     year=doc.get("year"),

@@ -419,7 +419,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
           query: searchQuery,
           sources: ['ads', 'scholar'],
           metrics: ['ndcg@10', 'precision@10', 'recall@10'],
-          fields: ['title', 'abstract', 'authors', 'year', 'citation_count', 'doctype'],
+          fields: ['title', 'abstract', 'author', 'year', 'citation_count', 'doctype'],
           max_results: 20,
           quepid_case_id: quepidCaseId || undefined
         }),
@@ -488,7 +488,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
           originalQuery: searchQuery,
           sources: ['ads'],
           metrics: ['ndcg@10', 'precision@10', 'recall@10'],
-          fields: ['title', 'abstract', 'authors', 'year', 'citation_count', 'doctype'],
+          fields: ['title', 'abstract', 'author', 'year', 'citation_count', 'doctype'],
           max_results: 20,
           useTransformedQuery: true,
           boost_config: {
