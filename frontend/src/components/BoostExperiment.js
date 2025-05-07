@@ -33,6 +33,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [transformedQuery, setTransformedQuery] = useState(null);
   const [searchQuery, setSearchQuery] = useState('triton');
+  const [informationNeed, setInformationNeed] = useState('');
   const [quepidCaseId, setQuepidCaseId] = useState('8914');
   const [searchResults, setSearchResults] = useState(null);
   const [quepidResults, setQuepidResults] = useState(null);
@@ -43,6 +44,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [showBoostControls, setShowBoostControls] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [judgmentNoteDialogOpen, setJudgmentNoteDialogOpen] = useState(false);
+  const [currentJudgmentData, setCurrentJudgmentData] = useState(null);
   const [visibleResults, setVisibleResults] = useState({
     original: 10,
     boosted: 10,
@@ -710,7 +713,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         Search Configuration
       </Typography>
       <Grid container spacing={2} alignItems="center">
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={4}>
           <TextField
             fullWidth
             label="Search Query"
@@ -721,6 +724,18 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
           />
         </Grid>
         <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth
+            label="Information Need"
+            value={informationNeed}
+            onChange={(e) => setInformationNeed(e.target.value)}
+            placeholder="Describe the information need"
+            disabled={searchLoading}
+            multiline
+            rows={2}
+          />
+        </Grid>
+        <Grid item xs={12} md={2}>
           <TextField
             fullWidth
             label="Quepid Case ID (Optional)"
@@ -959,18 +974,66 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
   // Function to handle judgment selection
   const handleJudgmentSelect = (recordId, judgment, sourceId) => {
-    setLocalJudgments(prev => {
-      // If the judgment is empty string, remove the judgment
-      if (judgment === '') {
+    if (judgment === '') {
+      // If clearing the judgment, just remove it
+      setLocalJudgments(prev => {
         const newJudgments = { ...prev };
         delete newJudgments[`${sourceId}_${recordId}`];
         return newJudgments;
-      }
+      });
+      return;
+    }
+
+    // For new judgments, store with default values
+    setLocalJudgments(prev => {
+      const existingJudgment = prev[`${sourceId}_${recordId}`];
+      const judgmentType = existingJudgment === undefined ? 'new' : 
+                          existingJudgment.judgment !== judgment ? 'changed' : 'existing';
+
       return {
         ...prev,
-        [`${sourceId}_${recordId}`]: judgment
+        [`${sourceId}_${recordId}`]: {
+          judgment,
+          note: existingJudgment?.note || '',
+          type: judgmentType,
+          timestamp: new Date().toISOString()
+        }
       };
     });
+  };
+
+  // Function to handle adding/editing a note
+  const handleAddNote = (recordId, sourceId) => {
+    const currentJudgment = localJudgments[`${sourceId}_${recordId}`];
+    setCurrentJudgmentData({
+      recordId,
+      judgment: currentJudgment?.judgment,
+      sourceId,
+      note: currentJudgment?.note || ''
+    });
+    setJudgmentNoteDialogOpen(true);
+  };
+
+  // Function to confirm judgment note
+  const handleConfirmNote = (note) => {
+    if (!currentJudgmentData) return;
+
+    const { recordId, judgment, sourceId } = currentJudgmentData;
+    
+    setLocalJudgments(prev => {
+      const existingJudgment = prev[`${sourceId}_${recordId}`];
+      return {
+        ...prev,
+        [`${sourceId}_${recordId}`]: {
+          ...existingJudgment,
+          note,
+          timestamp: new Date().toISOString()
+        }
+      };
+    });
+
+    setJudgmentNoteDialogOpen(false);
+    setCurrentJudgmentData(null);
   };
 
   // Function to render judgment selector
@@ -979,38 +1042,74 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     const sourceId = record.source_id || 'original';
     const quepidJudgment = getJudgmentForTitle(record.title);
     const userJudgment = localJudgments[`${sourceId}_${recordId}`];
-    const currentJudgment = userJudgment !== undefined ? userJudgment : quepidJudgment;
+    const currentJudgment = userJudgment?.judgment ?? quepidJudgment;
     const hasQuepidJudgment = quepidJudgment !== null;
 
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {hasQuepidJudgment && (
-          <Tooltip title={`Quepid Judgment: ${quepidJudgment}`}>
-            <Chip 
-              label="Quepid" 
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {hasQuepidJudgment && (
+            <Tooltip title={`Quepid Judgment: ${quepidJudgment}`}>
+              <Chip 
+                label="Quepid" 
+                size="small"
+                variant="outlined"
+                color="info"
+                sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+              />
+            </Tooltip>
+          )}
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <Select
+              value={currentJudgment !== null && currentJudgment !== undefined ? currentJudgment : ''}
+              onChange={(e) => handleJudgmentSelect(recordId, e.target.value, sourceId)}
+              displayEmpty
+              sx={{ height: 20, fontSize: '0.7rem' }}
+            >
+              <MenuItem value="" disabled>
+                <em>Add Judgment</em>
+              </MenuItem>
+              <MenuItem value={0}>Poor (0)</MenuItem>
+              <MenuItem value={1}>Fair (1)</MenuItem>
+              <MenuItem value={2}>Good (2)</MenuItem>
+              <MenuItem value={3}>Perfect (3)</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+        {currentJudgment !== null && currentJudgment !== undefined && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Button
               size="small"
-              variant="outlined"
-              color="info"
-              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-            />
-          </Tooltip>
+              variant="text"
+              onClick={() => handleAddNote(recordId, sourceId)}
+              sx={{ 
+                height: 24,
+                minWidth: 'auto',
+                px: 1,
+                fontSize: '0.7rem',
+                textTransform: 'none'
+              }}
+            >
+              {userJudgment?.note ? "Edit Note" : "Add Note"}
+            </Button>
+            {userJudgment?.note && (
+              <Tooltip title={userJudgment.note}>
+                <Chip 
+                  label="View Note" 
+                  size="small"
+                  variant="outlined"
+                  color="secondary"
+                  onClick={() => handleAddNote(recordId, sourceId)}
+                  sx={{ 
+                    height: 20, 
+                    '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                    cursor: 'pointer'
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Box>
         )}
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select
-            value={currentJudgment !== null && currentJudgment !== undefined ? currentJudgment : ''}
-            onChange={(e) => handleJudgmentSelect(recordId, e.target.value, sourceId)}
-            displayEmpty
-            sx={{ height: 20, fontSize: '0.7rem' }}
-          >
-            <MenuItem value="" disabled>
-              <em>Add Judgment</em>
-            </MenuItem>
-            <MenuItem value={0}>Poor (0)</MenuItem>
-            <MenuItem value={1}>Fair (1)</MenuItem>
-            <MenuItem value={2}>Good (2)</MenuItem>
-            <MenuItem value={3}>Perfect (3)</MenuItem>
-          </Select>
-        </FormControl>
       </Box>
     );
   };
@@ -1023,50 +1122,112 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
   // Function to export judgments to TXT
   const handleExportJudgments = () => {
-    // Get all records that have manually added judgments
+    // Get all records that have judgments (both Quepid and manual)
     const recordsWithJudgments = [];
+
+    // Helper function to add a record with judgment
+    const addRecordWithJudgment = (record, judgment, source, judgmentType = 'existing') => {
+      recordsWithJudgments.push({
+        query: searchQuery,
+        information_need: informationNeed,
+        title: record.title,
+        judgment: judgment,
+        note: judgment?.note || '',
+        type: judgmentType,
+        source: source,
+        timestamp: judgment?.timestamp || new Date().toISOString(),
+        // Add boost information if available
+        boosts: source === 'boosted' ? {
+          field_boosts: boostConfig.fieldBoosts,
+          citation_boost: boostConfig.citationBoost,
+          recency_boost: boostConfig.recencyBoost,
+          doctype_boosts: boostConfig.doctypeBoosts,
+          reference_year: boostConfig.referenceYear
+        } : null
+      });
+    };
 
     // Check ADS results
     searchResults?.results?.ads?.forEach(record => {
       const recordId = record.bibcode || normalizeTitle(record.title);
-      const judgment = localJudgments[recordId];
-      if (judgment !== undefined && judgment !== null) {
-        recordsWithJudgments.push({
-          query: searchQuery,
-          title: record.title,
-          judgment: judgment,
-          source: 'ads'
-        });
+      const userJudgment = localJudgments[recordId];
+      const quepidJudgment = getJudgmentForTitle(record.title);
+
+      if (userJudgment) {
+        addRecordWithJudgment(record, userJudgment, 'ads', userJudgment.type);
+      } else if (quepidJudgment !== null) {
+        addRecordWithJudgment(record, { judgment: quepidJudgment }, 'ads', 'quepid');
       }
     });
 
     // Check Google Scholar results
     searchResults?.results?.scholar?.forEach(record => {
       const recordId = normalizeTitle(record.title);
-      const judgment = localJudgments[recordId];
-      if (judgment !== undefined && judgment !== null) {
-        recordsWithJudgments.push({
-          query: searchQuery,
-          title: record.title,
-          judgment: judgment,
-          source: 'Google Scholar'
-        });
+      const userJudgment = localJudgments[recordId];
+      if (userJudgment) {
+        addRecordWithJudgment(record, userJudgment, 'Google Scholar', userJudgment.type);
+      }
+    });
+
+    // Check boosted results
+    boostedResults?.results?.ads?.forEach(record => {
+      const recordId = record.bibcode || normalizeTitle(record.title);
+      const userJudgment = localJudgments[recordId];
+      if (userJudgment) {
+        addRecordWithJudgment(record, userJudgment, 'boosted', userJudgment.type);
       }
     });
 
     if (recordsWithJudgments.length === 0) {
-      setError('No manual judgments to export. Please add some judgments first.');
+      setError('No judgments to export. Please add some judgments first.');
       return;
     }
 
+    // Calculate NDCG@10 scores for each source
+    const ndcgScores = {
+      original: calculateNDCG(searchResults?.results?.ads),
+      boosted: calculateNDCG(boostedResults?.results?.ads),
+      scholar: calculateNDCG(searchResults?.results?.scholar),
+      quepid: calculateNDCG(quepidResults)
+    };
+
     // Format as tab-separated text
     const txtContent = [
-      'Query\tTitle\tJudgment\tSource',
+      // Header section with metadata
+      '=== Search Configuration ===',
+      `Query: ${searchQuery}`,
+      `Information Need: ${informationNeed}`,
+      `Timestamp: ${new Date().toISOString()}`,
+      '',
+      '=== NDCG@10 Scores ===',
+      `Original Results: ${ndcgScores.original?.toFixed(3) || 'N/A'}`,
+      `Boosted Results: ${ndcgScores.boosted?.toFixed(3) || 'N/A'}`,
+      `Google Scholar Results: ${ndcgScores.scholar?.toFixed(3) || 'N/A'}`,
+      `Quepid Results: ${ndcgScores.quepid?.toFixed(3) || 'N/A'}`,
+      '',
+      '=== Boost Configuration ===',
+      'Field Boosts:',
+      ...Object.entries(boostConfig.fieldBoosts).map(([field, value]) => `  ${field}: ${value}`),
+      '',
+      `Citation Boost: ${boostConfig.citationBoost}`,
+      `Recency Boost: ${boostConfig.recencyBoost}`,
+      `Reference Year: ${boostConfig.referenceYear}`,
+      '',
+      'Document Type Boosts:',
+      ...Object.entries(boostConfig.doctypeBoosts).map(([type, value]) => `  ${type}: ${value}`),
+      '',
+      '=== Judgments ===',
+      'Query\tInformation Need\tTitle\tJudgment\tNote\tType\tSource\tTimestamp\tBoost Configuration',
       ...recordsWithJudgments.map(record => [
         record.query,
+        record.information_need,
         record.title,
         record.judgment,
-        record.source
+        record.note,
+        record.type,
+        record.source,
+        record.timestamp,
+        record.boosts ? JSON.stringify(record.boosts) : ''
       ].join('\t'))
     ].join('\n');
 
@@ -1138,6 +1299,33 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     </Dialog>
   );
 
+  // Function to render judgment note dialog
+  const renderJudgmentNoteDialog = () => (
+    <Dialog open={judgmentNoteDialogOpen} onClose={() => setJudgmentNoteDialogOpen(false)}>
+      <DialogTitle>Add/Edit Judgment Note</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" gutterBottom>
+          Add a note explaining your judgment (optional):
+        </Typography>
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          value={currentJudgmentData?.note || ''}
+          onChange={(e) => setCurrentJudgmentData(prev => ({ ...prev, note: e.target.value }))}
+          placeholder="Enter your judgment note here..."
+          sx={{ mt: 2 }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setJudgmentNoteDialogOpen(false)}>Cancel</Button>
+        <Button onClick={() => handleConfirmNote(currentJudgmentData?.note || '')} variant="contained">
+          Save Note
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
   // Modify the renderResultItem function to remove inline expansion
   const renderResultItem = (result, index, containerId) => {
     const recordId = result.bibcode || normalizeTitle(result.title);
@@ -1169,7 +1357,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 {index + 1}
               </Typography>
               <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                   <Typography 
                     variant="body2" 
                     sx={{ 
@@ -1187,41 +1375,47 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   <IconButton 
                     size="small" 
                     onClick={() => handleRecordExpand(result)}
-                    sx={{ ml: 1 }}
+                    sx={{ 
+                      ml: 'auto',
+                      flexShrink: 0,
+                      p: 0.5
+                    }}
                   >
                     <ExpandMoreIcon />
                   </IconButton>
                 </Box>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                  {result.year && (
-                    <Chip 
-                      label={`${result.year}`} 
-                      size="small" 
-                      variant="outlined"
-                      sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                    />
-                  )}
-                  {result.citation_count !== undefined && (
-                    <Chip 
-                      label={`Citations: ${result.citation_count}`} 
-                      size="small"
-                      variant="outlined"
-                      sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                    />
-                  )}
-                  {containerId === 'boosted' && result.boosted_score !== undefined && result.boosted_score !== null && (
-                    <Chip 
-                      label={`Boost: ${result.boosted_score.toFixed(1)}`} 
-                      size="small"
-                      color="primary"
-                      sx={{ 
-                        height: 20, 
-                        '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
-                        fontWeight: 'bold', 
-                        bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
-                      }}
-                    />
-                  )}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {result.year && (
+                      <Chip 
+                        label={`${result.year}`} 
+                        size="small" 
+                        variant="outlined"
+                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                      />
+                    )}
+                    {result.citation_count !== undefined && (
+                      <Chip 
+                        label={`Citations: ${result.citation_count}`} 
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                      />
+                    )}
+                    {containerId === 'boosted' && result.boosted_score !== undefined && result.boosted_score !== null && (
+                      <Chip 
+                        label={`Boost: ${result.boosted_score.toFixed(1)}`} 
+                        size="small"
+                        color="primary"
+                        sx={{ 
+                          height: 20, 
+                          '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                          fontWeight: 'bold', 
+                          bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
+                        }}
+                      />
+                    )}
+                  </Box>
                   {renderJudgmentSelector(result)}
                 </Box>
               </Box>
@@ -1245,14 +1439,40 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     </Button>
   );
 
-  // Add export dialog
+  // Update the export dialog to show more information
   const renderExportDialog = () => (
     <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)}>
       <DialogTitle>Export Judgments</DialogTitle>
       <DialogContent>
         <Typography variant="body2" gutterBottom>
-          This will export only the judgments you have manually entered to a text file. The file will include the search query, paper title, judgment score, and search engine source.
+          This will export a comprehensive report including:
         </Typography>
+        <List dense>
+          <ListItem>
+            <ListItemText 
+              primary="Search Configuration" 
+              secondary="Query, information need, and timestamp"
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemText 
+              primary="NDCG@10 Scores" 
+              secondary="Performance metrics for all result sets"
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemText 
+              primary="Boost Configuration" 
+              secondary="All boost factors used for the experiment"
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemText 
+              primary="Judgments" 
+              secondary="All judgments with notes, types, and associated boost configurations"
+            />
+          </ListItem>
+        </List>
       </DialogContent>
       <DialogActions>
         <Button onClick={() => setExportDialogOpen(false)}>Cancel</Button>
@@ -1451,6 +1671,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       
       {renderExportDialog()}
       {renderDetailsDialog()}
+      {renderJudgmentNoteDialog()}
     </Box>
   );
 };
