@@ -4,7 +4,8 @@ import {
   Slider, FormControlLabel, Switch, Typography, FormControl,
   InputLabel, Select, MenuItem, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, Divider,
-  CircularProgress, Alert, Tooltip, IconButton, Collapse, List, ListItem, ListItemText, TextField
+  CircularProgress, Alert, Tooltip, IconButton, Collapse, List, ListItem, ListItemText, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -14,6 +15,9 @@ import BugReportIcon from '@mui/icons-material/BugReport';
 import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import SearchIcon from '@mui/icons-material/Search';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { experimentService, API_URL as DEFAULT_API_URL } from '../services/api';
 import { List as ListIcon } from '@mui/icons-material';
 import LaunchIcon from '@mui/icons-material/Launch';
@@ -38,6 +42,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [searchResults, setSearchResults] = useState(null);
   const [quepidResults, setQuepidResults] = useState(null);
   const [judgmentMap, setJudgmentMap] = useState({});
+  const [expandedRecords, setExpandedRecords] = useState({});
+  const [localJudgments, setLocalJudgments] = useState({});
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -1060,6 +1067,242 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     );
   }, [getJudgmentForTitle]);
   
+  // Function to handle record expansion
+  const handleRecordExpand = (recordId) => {
+    setExpandedRecords(prev => ({
+      ...prev,
+      [recordId]: !prev[recordId]
+    }));
+  };
+
+  // Function to handle judgment selection
+  const handleJudgmentSelect = (recordId, judgment) => {
+    setLocalJudgments(prev => ({
+      ...prev,
+      [recordId]: judgment
+    }));
+  };
+
+  // Function to export judgments to CSV
+  const handleExportJudgments = () => {
+    const allJudgments = { ...judgmentMap, ...localJudgments };
+    const records = searchResults?.results?.ads || [];
+    
+    const csvContent = [
+      ['Query', 'Title', 'Authors', 'Year', 'Judgment'],
+      ...records.map(record => {
+        const judgment = allJudgments[normalizeTitle(record.title)];
+        return [
+          searchQuery,
+          record.title,
+          formatAuthors(record.author),
+          record.year,
+          judgment !== undefined ? judgment : ''
+        ];
+      })
+    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `judgments_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Function to render judgment selector
+  const renderJudgmentSelector = (record) => {
+    const recordId = record.bibcode || normalizeTitle(record.title);
+    const currentJudgment = localJudgments[recordId] ?? getJudgmentForTitle(record.title);
+
+    if (currentJudgment !== null && currentJudgment !== undefined) {
+      return (
+        <Chip 
+          label={`Score: ${currentJudgment}`} 
+          size="small"
+          variant="outlined"
+          color={currentJudgment > 0 ? "success" : "default"}
+          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+        />
+      );
+    }
+
+    return (
+      <FormControl size="small" sx={{ minWidth: 120 }}>
+        <Select
+          value=""
+          onChange={(e) => handleJudgmentSelect(recordId, e.target.value)}
+          displayEmpty
+          sx={{ height: 20, fontSize: '0.7rem' }}
+        >
+          <MenuItem value="" disabled>
+            <em>Add Judgment</em>
+          </MenuItem>
+          <MenuItem value={0}>Poor (0)</MenuItem>
+          <MenuItem value={1}>Fair (1)</MenuItem>
+          <MenuItem value={2}>Good (2)</MenuItem>
+          <MenuItem value={3}>Perfect (3)</MenuItem>
+        </Select>
+      </FormControl>
+    );
+  };
+
+  // Function to render expanded record details
+  const renderExpandedDetails = (record) => {
+    const recordId = record.bibcode || normalizeTitle(record.title);
+    if (!expandedRecords[recordId]) return null;
+
+    return (
+      <Collapse in={expandedRecords[recordId]}>
+        <Box sx={{ pl: 4, pr: 2, py: 1, bgcolor: 'grey.50' }}>
+          <Typography variant="body2" gutterBottom>
+            <strong>Title:</strong> {record.title}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>Authors:</strong> {formatAuthors(record.author)}
+          </Typography>
+          {record.abstract && (
+            <Typography variant="body2" gutterBottom>
+              <strong>Abstract:</strong> {record.abstract}
+            </Typography>
+          )}
+          <Box sx={{ mt: 1 }}>
+            {renderJudgmentSelector(record)}
+          </Box>
+        </Box>
+      </Collapse>
+    );
+  };
+
+  // Modify the ListItem rendering to include expansion and judgment selection
+  const renderResultItem = (result, index, containerId) => {
+    const recordId = result.bibcode || normalizeTitle(result.title);
+    const isExpanded = expandedRecords[recordId];
+
+    return (
+      <React.Fragment key={recordId}>
+        <ListItem 
+          id={`${containerId}-item-${index}`}
+          divider
+          sx={{ 
+            px: 2, 
+            py: 1,
+            position: 'relative',
+            transition: 'background-color 0.3s ease',
+            whiteSpace: 'normal'
+          }}
+        >
+          <ListItemText
+            primary={
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <Typography 
+                  variant="body2" 
+                  component="span"
+                  sx={{ 
+                    minWidth: '24px',
+                    fontWeight: 'bold',
+                    mr: 1
+                  }}
+                >
+                  {index + 1}
+                </Typography>
+                <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        fontWeight: 'medium',
+                        flexGrow: 1,
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => handleRecordExpand(recordId)}
+                    >
+                      {truncateText(result.title, 60)}
+                    </Typography>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => handleRecordExpand(recordId)}
+                      sx={{ ml: 1 }}
+                    >
+                      {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </IconButton>
+                  </Box>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                    {result.year && (
+                      <Chip 
+                        label={`${result.year}`} 
+                        size="small" 
+                        variant="outlined"
+                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                      />
+                    )}
+                    {result.citation_count !== undefined && (
+                      <Chip 
+                        label={`Citations: ${result.citation_count}`} 
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                      />
+                    )}
+                    {containerId === 'boosted' && result.boosted_score !== undefined && result.boosted_score !== null && (
+                      <Chip 
+                        label={`Boost: ${result.boosted_score.toFixed(1)}`} 
+                        size="small"
+                        color="primary"
+                        sx={{ 
+                          height: 20, 
+                          '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                          fontWeight: 'bold', 
+                          bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
+                        }}
+                      />
+                    )}
+                    {renderJudgmentSelector(result)}
+                  </Box>
+                </Box>
+              </Box>
+            }
+          />
+        </ListItem>
+        {renderExpandedDetails(result)}
+      </React.Fragment>
+    );
+  };
+
+  // Add export button to the top of the results panel
+  const renderExportButton = () => (
+    <Button
+      startIcon={<FileDownloadIcon />}
+      variant="outlined"
+      size="small"
+      onClick={() => setExportDialogOpen(true)}
+      sx={{ ml: 2 }}
+    >
+      Export Judgments
+    </Button>
+  );
+
+  // Add export dialog
+  const renderExportDialog = () => (
+    <Dialog open={exportDialogOpen} onClose={() => setExportDialogOpen(false)}>
+      <DialogTitle>Export Judgments</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" gutterBottom>
+          This will export all judgments (both from Quepid and manually added) to a CSV file.
+          The file will include the search query, paper title, authors, year, and judgment score.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setExportDialogOpen(false)}>Cancel</Button>
+        <Button onClick={handleExportJudgments} variant="contained">
+          Export
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+  
   return (
     <Box sx={{ width: '100%', p: 2 }}>
       {renderSearchForm()}
@@ -1097,6 +1340,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   Ranking Results
                 </Typography>
                 {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
+                {renderExportButton()}
                 <Button
                   startIcon={<BugReportIcon />}
                   variant="outlined"
@@ -1176,84 +1420,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {searchResults?.results?.ads?.map((result, index) => (
-                      <Tooltip
-                        key={result.bibcode || index}
-                        title={
-                          <Box>
-                            <Typography variant="subtitle2">{result.title}</Typography>
-                            <Typography variant="body2">
-                              <strong>Authors:</strong> {formatAuthors(result.author)}
-                            </Typography>
-                            {result.abstract && (
-                              <Typography variant="body2">
-                                <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
-                              </Typography>
-                            )}
-                            {getJudgmentForTitle(result.title) !== null && (
-                              <Typography variant="body2">
-                                <strong>Quepid Judgment:</strong> {getJudgmentForTitle(result.title)}
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                        placement="left"
-                      >
-                        <ListItem 
-                          id={`original-item-${index}`}
-                          divider
-                          sx={{ 
-                            px: 2, 
-                            py: 1,
-                            position: 'relative',
-                            transition: 'background-color 0.3s ease',
-                            whiteSpace: 'normal'
-                          }}
-                        >
-                          <ListItemText
-                            primary={
-                              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                <Typography 
-                                  variant="body2" 
-                                  component="span"
-                                  sx={{ 
-                                    minWidth: '24px',
-                                    fontWeight: 'bold',
-                                    mr: 1
-                                  }}
-                                >
-                                  {index + 1}
-                                </Typography>
-                                <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                    {truncateText(result.title, 60)}
-                                  </Typography>
-                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                    {result.year && (
-                                      <Chip 
-                                        label={`${result.year}`} 
-                                        size="small" 
-                                        variant="outlined"
-                                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                      />
-                                    )}
-                                    {result.citation_count !== undefined && (
-                                      <Chip 
-                                        label={`Citations: ${result.citation_count}`} 
-                                        size="small"
-                                        variant="outlined"
-                                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                      />
-                                    )}
-                                    {renderJudgmentChip(result.title)}
-                                  </Box>
-                                </Box>
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      </Tooltip>
-                    ))}
+                    {searchResults?.results?.ads?.map((result, index) => 
+                      renderResultItem(result, index, 'original')
+                    )}
                   </List>
                 </Box>
                 
@@ -1276,140 +1445,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     flexGrow: 1
                   }}>
                     {boostedResults?.results?.ads ? (
-                      boostedResults.results.ads.map((result, index) => {
-                        const originalResult = searchResults.results.ads.find(
-                          r => r.bibcode === result.bibcode || r.title === result.title
-                        );
-                        const originalIndex = originalResult ? searchResults.results.ads.indexOf(originalResult) : -1;
-                        const rankChange = originalIndex !== -1 ? originalIndex - index : 0;
-                        
-                        let borderStyle = {};
-                        if (Math.abs(rankChange) >= 5) {
-                          borderStyle = {
-                            borderLeft: rankChange !== 0 ? '6px solid' : 'none',
-                            borderLeftColor: rankChange > 0 ? 'success.main' : rankChange < 0 ? 'error.main' : 'transparent',
-                            bgcolor: rankChange !== 0 ? (rankChange > 0 ? 'success.50' : 'error.50') : 'transparent'
-                          };
-                        } else if (rankChange !== 0) {
-                          borderStyle = {
-                            borderLeft: '4px solid',
-                            borderLeftColor: rankChange > 0 ? 'success.main' : 'error.main',
-                          };
-                        }
-                        
-                        return (
-                          <Tooltip
-                            key={result.bibcode || index}
-                            title={
-                              <Box>
-                                <Typography variant="subtitle2">{result.title}</Typography>
-                                <Typography variant="body2">
-                                  <strong>Authors:</strong> {formatAuthors(result.author)}
-                                </Typography>
-                                {result.abstract && (
-                                  <Typography variant="body2">
-                                    <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
-                                  </Typography>
-                                )}
-                                <Divider sx={{ my: 1 }} />
-                                <Typography variant="body2">
-                                  <strong>Original Rank:</strong> {originalIndex !== -1 ? originalIndex + 1 : 'N/A'}
-                                </Typography>
-                                <Typography variant="body2">
-                                  <strong>Rank Change:</strong> {rankChange > 0 ? '+' : ''}{rankChange}
-                                </Typography>
-                                <Typography variant="body2">
-                                  <strong>Boost Score:</strong> {result.boosted_score !== undefined && result.boosted_score !== null ? result.boosted_score.toFixed(2) : 'N/A'}
-                                </Typography>
-                                {getJudgmentForTitle(result.title) !== null && (
-                                  <Typography variant="body2">
-                                    <strong>Quepid Judgment:</strong> {getJudgmentForTitle(result.title)}
-                                  </Typography>
-                                )}
-                                <Typography variant="body2">
-                                  <strong>Applied Boosts:</strong>
-                                </Typography>
-                                <Box component="ul" sx={{ mt: 0.5, pl: 2 }}>
-                                  {result.boost_factors && Object.entries(result.boost_factors).map(([key, value]) => (
-                                    <Typography component="li" variant="caption" key={key}>
-                                      {key}: {value !== undefined && value !== null && typeof value === 'number' ? value.toFixed(2) : value}
-                                    </Typography>
-                                  ))}
-                                </Box>
-                              </Box>
-                            }
-                            placement="right"
-                          >
-                            <ListItem 
-                              id={`boosted-item-${index}`}
-                              divider
-                              sx={{ 
-                                px: 2, 
-                                py: 1,
-                                position: 'relative',
-                                ...borderStyle,
-                                transition: 'background-color 0.3s ease',
-                                whiteSpace: 'normal'
-                              }}
-                            >
-                              <ListItemText
-                                primary={
-                                  <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                    <Typography 
-                                      variant="body2" 
-                                      component="span"
-                                      sx={{ 
-                                        minWidth: '24px',
-                                        fontWeight: 'bold',
-                                        mr: 1
-                                      }}
-                                    >
-                                      {index + 1}
-                                    </Typography>
-                                    <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                        {truncateText(result.title, 60)}
-                                      </Typography>
-                                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                        {result.year && (
-                                          <Chip 
-                                            label={`${result.year}`} 
-                                            size="small" 
-                                            variant="outlined"
-                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                          />
-                                        )}
-                                        {result.citation_count !== undefined && (
-                                          <Chip 
-                                            label={`Citations: ${result.citation_count}`} 
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                          />
-                                        )}
-                                        {result.boosted_score !== undefined && result.boosted_score !== null && (
-                                          <Chip 
-                                            label={`Boost: ${result.boosted_score.toFixed(1)}`} 
-                                            size="small"
-                                            color="primary"
-                                            sx={{ 
-                                              height: 20, 
-                                              '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
-                                              fontWeight: 'bold', 
-                                              bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
-                                            }}
-                                          />
-                                        )}
-                                        {renderJudgmentChip(result.title)}
-                                      </Box>
-                                    </Box>
-                                  </Box>
-                                }
-                              />
-                            </ListItem>
-                          </Tooltip>
-                        );
-                      })
+                      boostedResults.results.ads.map((result, index) => 
+                        renderResultItem(result, index, 'boosted')
+                      )
                     ) : (
                       <ListItem>
                         <ListItemText
@@ -1439,7 +1477,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {renderGoogleScholarResults()}
+                    {searchResults?.results?.scholar?.map((result, index) => 
+                      renderResultItem(result, index, 'scholar')
+                    )}
                   </List>
                 </Box>
 
@@ -1462,97 +1502,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     flexGrow: 1
                   }}>
                     {quepidResults ? (
-                      quepidResults.map((result, index) => {
-                        // Get judgment score from various possible field names
-                        const judgmentScore = result.judgment_score ?? result.score ?? result.rating ?? result.judgment;
-                        console.log('Rendering Quepid result:', { result, judgmentScore });
-                        
-                        return (
-                          <Tooltip
-                            key={result.bibcode || index}
-                            title={
-                              <Box>
-                                <Typography variant="subtitle2">{result.title}</Typography>
-                                <Typography variant="body2">
-                                  <strong>Authors:</strong> {formatAuthors(result.authors)}
-                                </Typography>
-                                {result.abstract && (
-                                  <Typography variant="body2">
-                                    <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
-                                  </Typography>
-                                )}
-                                <Typography variant="body2">
-                                  <strong>Judgment Score:</strong> {judgmentScore}
-                                </Typography>
-                              </Box>
-                            }
-                            placement="left"
-                          >
-                            <ListItem 
-                              id={`quepid-item-${index}`}
-                              divider
-                              sx={{ 
-                                px: 2, 
-                                py: 1,
-                                position: 'relative',
-                                transition: 'background-color 0.3s ease',
-                                whiteSpace: 'normal',
-                                bgcolor: judgmentScore > 0 ? 'success.lighter' : 'inherit'
-                              }}
-                            >
-                              <ListItemText
-                                primary={
-                                  <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                    <Typography 
-                                      variant="body2" 
-                                      component="span"
-                                      sx={{ 
-                                        minWidth: '24px',
-                                        fontWeight: 'bold',
-                                        mr: 1
-                                      }}
-                                    >
-                                      {index + 1}
-                                    </Typography>
-                                    <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                        {truncateText(result.title, 60)}
-                                      </Typography>
-                                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                        {result.year && (
-                                          <Chip 
-                                            label={`${result.year}`} 
-                                            size="small" 
-                                            variant="outlined"
-                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                          />
-                                        )}
-                                        {result.citation_count !== undefined && (
-                                          <Chip 
-                                            label={`Citations: ${result.citation_count}`} 
-                                            size="small"
-                                            variant="outlined"
-                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                          />
-                                        )}
-                                        {judgmentScore !== undefined && (
-                                          <Chip 
-                                            label={`Score: ${judgmentScore}`} 
-                                            size="small"
-                                            variant="outlined"
-                                            color={judgmentScore > 0 ? "success" : "default"}
-                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                          />
-                                        )}
-                                      </Box>
-                                    </Box>
-                                  </Box>
-                                }
-                              />
-                            </ListItem>
-                          </Tooltip>
-                        );
-                      })
+                      quepidResults.map((result, index) => 
+                        renderResultItem(result, index, 'quepid')
+                      )
                     ) : (
                       <ListItem>
                         <ListItemText
@@ -1571,6 +1523,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
           </Grid>
         </Grid>
       )}
+      
+      {renderExportDialog()}
     </Box>
   );
 };
