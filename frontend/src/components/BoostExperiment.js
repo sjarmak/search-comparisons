@@ -37,6 +37,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [quepidCaseId, setQuepidCaseId] = useState('');
   const [searchResults, setSearchResults] = useState(null);
   const [quepidResults, setQuepidResults] = useState(null);
+  const [judgmentMap, setJudgmentMap] = useState({});
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -268,8 +269,12 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   // Helper functions for title comparison
   const normalizeTitle = (title) => {
     if (!title) return '';
+    
+    // Convert to string if not already
+    const titleStr = String(title);
+    
     // Remove special characters, extra spaces, lowercase everything
-    return title.toLowerCase()
+    return titleStr.toLowerCase()
       .replace(/[^\w\s]/g, '') // Remove special chars
       .replace(/\s+/g, ' ')    // Replace multiple spaces with single space
       .trim();
@@ -901,6 +906,11 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
               </Typography>
             )}
+            {getJudgmentForTitle(result.title) !== null && (
+              <Typography variant="body2">
+                <strong>Quepid Judgment:</strong> {getJudgmentForTitle(result.title)}
+              </Typography>
+            )}
           </Box>
         }
         placement="left"
@@ -950,6 +960,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                         sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
                       />
                     )}
+                    {renderJudgmentChip(result.title)}
                   </Box>
                 </Box>
               </Box>
@@ -969,6 +980,85 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       </Tooltip>
     ));
   };
+  
+  // Add this effect to log Quepid results when they change
+  useEffect(() => {
+    if (quepidResults) {
+      console.log('Quepid Results Structure:', {
+        isArray: Array.isArray(quepidResults),
+        length: quepidResults.length,
+        firstResult: quepidResults[0],
+        allResults: quepidResults
+      });
+    }
+  }, [quepidResults]);
+
+  // Modify the createJudgmentMap function
+  const createJudgmentMap = useCallback((quepidResults) => {
+    if (!quepidResults) return {};
+    
+    const map = {};
+    console.log('Creating judgment map from Quepid results:', quepidResults);
+    
+    quepidResults.forEach(result => {
+      // Log the raw result structure
+      console.log('Processing Quepid result:', result);
+      
+      // Check for judgment score in different possible locations
+      const judgmentScore = result.judgment_score ?? result.score ?? result.rating ?? result.judgment;
+      const title = result.title;
+      
+      if (title && judgmentScore !== undefined) {
+        const normalizedTitle = normalizeTitle(title);
+        map[normalizedTitle] = judgmentScore;
+        console.log(`Added judgment for title: "${title}" -> "${normalizedTitle}" with score: ${judgmentScore}`);
+      } else {
+        console.log('Skipping result due to missing title or score:', result);
+      }
+    });
+    
+    console.log('Final judgment map:', map);
+    return map;
+  }, []);
+
+  // Add this effect to update the judgment map when Quepid results change
+  useEffect(() => {
+    if (quepidResults) {
+      console.log('Quepid results updated:', quepidResults);
+      const newMap = createJudgmentMap(quepidResults);
+      setJudgmentMap(newMap);
+    }
+  }, [quepidResults, createJudgmentMap]);
+
+  // Add this helper function to get judgment for a title
+  const getJudgmentForTitle = useCallback((title) => {
+    if (!title) return null;
+    const normalizedTitle = normalizeTitle(title);
+    const judgment = judgmentMap[normalizedTitle];
+    console.log(`Looking up judgment for title: "${title}" -> "${normalizedTitle}" -> ${judgment}`);
+    return judgment;
+  }, [judgmentMap]);
+
+  // Add this helper function to render judgment chip
+  const renderJudgmentChip = useCallback((title) => {
+    const judgment = getJudgmentForTitle(title);
+    if (judgment === undefined || judgment === null) return null;
+
+    let color = 'default';
+    if (judgment > 0) {
+      color = 'success';
+    }
+
+    return (
+      <Chip 
+        label={`Judgment: ${judgment}`} 
+        size="small"
+        variant="outlined"
+        color={color}
+        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+      />
+    );
+  }, [getJudgmentForTitle]);
   
   return (
     <Box sx={{ width: '100%', p: 2 }}>
@@ -1100,6 +1190,11 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                                 <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
                               </Typography>
                             )}
+                            {getJudgmentForTitle(result.title) !== null && (
+                              <Typography variant="body2">
+                                <strong>Quepid Judgment:</strong> {getJudgmentForTitle(result.title)}
+                              </Typography>
+                            )}
                           </Box>
                         }
                         placement="left"
@@ -1150,6 +1245,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                                         sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
                                       />
                                     )}
+                                    {renderJudgmentChip(result.title)}
                                   </Box>
                                 </Box>
                               </Box>
@@ -1225,6 +1321,11 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                                 <Typography variant="body2">
                                   <strong>Boost Score:</strong> {result.boosted_score !== undefined && result.boosted_score !== null ? result.boosted_score.toFixed(2) : 'N/A'}
                                 </Typography>
+                                {getJudgmentForTitle(result.title) !== null && (
+                                  <Typography variant="body2">
+                                    <strong>Quepid Judgment:</strong> {getJudgmentForTitle(result.title)}
+                                  </Typography>
+                                )}
                                 <Typography variant="body2">
                                   <strong>Applied Boosts:</strong>
                                 </Typography>
@@ -1299,6 +1400,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                                             }}
                                           />
                                         )}
+                                        {renderJudgmentChip(result.title)}
                                       </Box>
                                     </Box>
                                   </Box>
@@ -1360,91 +1462,97 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     flexGrow: 1
                   }}>
                     {quepidResults ? (
-                      quepidResults.map((result, index) => (
-                        <Tooltip
-                          key={result.bibcode || index}
-                          title={
-                            <Box>
-                              <Typography variant="subtitle2">{result.title}</Typography>
-                              <Typography variant="body2">
-                                <strong>Authors:</strong> {formatAuthors(result.authors)}
-                              </Typography>
-                              {result.abstract && (
+                      quepidResults.map((result, index) => {
+                        // Get judgment score from various possible field names
+                        const judgmentScore = result.judgment_score ?? result.score ?? result.rating ?? result.judgment;
+                        console.log('Rendering Quepid result:', { result, judgmentScore });
+                        
+                        return (
+                          <Tooltip
+                            key={result.bibcode || index}
+                            title={
+                              <Box>
+                                <Typography variant="subtitle2">{result.title}</Typography>
                                 <Typography variant="body2">
-                                  <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
+                                  <strong>Authors:</strong> {formatAuthors(result.authors)}
                                 </Typography>
-                              )}
-                              <Typography variant="body2">
-                                <strong>Judgment Score:</strong> {result.judgment_score}
-                              </Typography>
-                            </Box>
-                          }
-                          placement="left"
-                        >
-                          <ListItem 
-                            id={`quepid-item-${index}`}
-                            divider
-                            sx={{ 
-                              px: 2, 
-                              py: 1,
-                              position: 'relative',
-                              transition: 'background-color 0.3s ease',
-                              whiteSpace: 'normal',
-                              bgcolor: result.judgment_score > 0 ? 'success.lighter' : 'inherit'
-                            }}
-                          >
-                            <ListItemText
-                              primary={
-                                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                  <Typography 
-                                    variant="body2" 
-                                    component="span"
-                                    sx={{ 
-                                      minWidth: '24px',
-                                      fontWeight: 'bold',
-                                      mr: 1
-                                    }}
-                                  >
-                                    {index + 1}
+                                {result.abstract && (
+                                  <Typography variant="body2">
+                                    <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
                                   </Typography>
-                                  <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                      {truncateText(result.title, 60)}
+                                )}
+                                <Typography variant="body2">
+                                  <strong>Judgment Score:</strong> {judgmentScore}
+                                </Typography>
+                              </Box>
+                            }
+                            placement="left"
+                          >
+                            <ListItem 
+                              id={`quepid-item-${index}`}
+                              divider
+                              sx={{ 
+                                px: 2, 
+                                py: 1,
+                                position: 'relative',
+                                transition: 'background-color 0.3s ease',
+                                whiteSpace: 'normal',
+                                bgcolor: judgmentScore > 0 ? 'success.lighter' : 'inherit'
+                              }}
+                            >
+                              <ListItemText
+                                primary={
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                    <Typography 
+                                      variant="body2" 
+                                      component="span"
+                                      sx={{ 
+                                        minWidth: '24px',
+                                        fontWeight: 'bold',
+                                        mr: 1
+                                      }}
+                                    >
+                                      {index + 1}
                                     </Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                      {result.year && (
-                                        <Chip 
-                                          label={`${result.year}`} 
-                                          size="small" 
-                                          variant="outlined"
-                                          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                        />
-                                      )}
-                                      {result.citation_count !== undefined && (
-                                        <Chip 
-                                          label={`Citations: ${result.citation_count}`} 
-                                          size="small"
-                                          variant="outlined"
-                                          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                        />
-                                      )}
-                                      {result.judgment_score !== undefined && (
-                                        <Chip 
-                                          label={`Score: ${result.judgment_score}`} 
-                                          size="small"
-                                          variant="outlined"
-                                          color={result.judgment_score > 0 ? "success" : "default"}
-                                          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                        />
-                                      )}
+                                    <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                        {truncateText(result.title, 60)}
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                        {result.year && (
+                                          <Chip 
+                                            label={`${result.year}`} 
+                                            size="small" 
+                                            variant="outlined"
+                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                          />
+                                        )}
+                                        {result.citation_count !== undefined && (
+                                          <Chip 
+                                            label={`Citations: ${result.citation_count}`} 
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                          />
+                                        )}
+                                        {judgmentScore !== undefined && (
+                                          <Chip 
+                                            label={`Score: ${judgmentScore}`} 
+                                            size="small"
+                                            variant="outlined"
+                                            color={judgmentScore > 0 ? "success" : "default"}
+                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                          />
+                                        )}
+                                      </Box>
                                     </Box>
                                   </Box>
-                                </Box>
-                              }
-                            />
-                          </ListItem>
-                        </Tooltip>
-                      ))
+                                }
+                              />
+                            </ListItem>
+                          </Tooltip>
+                        );
+                      })
                     ) : (
                       <ListItem>
                         <ListItemText
