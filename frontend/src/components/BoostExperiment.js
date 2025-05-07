@@ -36,6 +36,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [quepidCaseId, setQuepidCaseId] = useState('');
   const [searchResults, setSearchResults] = useState(null);
+  const [quepidResults, setQuepidResults] = useState(null);
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -400,7 +401,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         },
         body: JSON.stringify({
           query: searchQuery,
-          sources: ['ads', 'scholar'],  // Explicitly request Google Scholar results
+          sources: ['ads', 'scholar'],
           metrics: ['ndcg@10', 'precision@10', 'recall@10'],
           fields: ['title', 'abstract', 'authors', 'year', 'citation_count', 'doctype'],
           max_results: 20,
@@ -423,6 +424,21 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       setSearchResults(data);
       // Reset boosted results when performing a new search
       setBoostedResults(null);
+      
+      // If we have a Quepid case ID, fetch the Quepid results
+      if (quepidCaseId) {
+        try {
+          const quepidResponse = await fetch(`${API_URL}/api/quepid/judgments/${quepidCaseId}?query=${encodeURIComponent(searchQuery)}`);
+          if (quepidResponse.ok) {
+            const quepidData = await quepidResponse.json();
+            setQuepidResults(quepidData);
+          }
+        } catch (err) {
+          console.error('Error fetching Quepid results:', err);
+        }
+      } else {
+        setQuepidResults(null);
+      }
     } catch (err) {
       console.error('Error performing search:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -1009,7 +1025,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
               <Box sx={{ display: 'flex', mb: 2 }}>
                 {/* Title Headers */}
-                <Box sx={{ width: '33%', pr: 1 }}>
+                <Box sx={{ width: '25%', pr: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Original Results
@@ -1019,7 +1035,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: '33%', px: 1 }}>
+                <Box sx={{ width: '25%', px: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Boosted Results
@@ -1029,7 +1045,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: '33%', pl: 1 }}>
+                <Box sx={{ width: '25%', px: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Google Scholar Results
@@ -1039,12 +1055,22 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
+                <Box sx={{ width: '25%', pl: 1 }}>
+                  <Paper sx={{ p: 1, bgcolor: 'success.light', color: 'success.contrastText', borderRadius: 1 }}>
+                    <Typography variant="subtitle1" align="center" fontWeight="bold">
+                      Quepid Results
+                    </Typography>
+                    <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                      Relevance judgments
+                    </Typography>
+                  </Paper>
+                </Box>
               </Box>
               
               <Box sx={{ display: 'flex', position: 'relative' }}>
                 {/* Original Results */}
                 <Box sx={{ 
-                  width: '33%', 
+                  width: '25%', 
                   pr: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1060,7 +1086,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {searchResults.results.ads.map((result, index) => (
+                    {searchResults?.results?.ads?.map((result, index) => (
                       <Tooltip
                         key={result.bibcode || index}
                         title={
@@ -1137,7 +1163,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 
                 {/* Boosted Results */}
                 <Box sx={{ 
-                  width: '33%', 
+                  width: '25%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1147,13 +1173,13 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   <List sx={{ 
                     bgcolor: 'background.paper', 
                     border: '1px solid', 
-                    borderColor: 'primary.light', 
+                    borderColor: 'divider', 
                     borderRadius: 1,
                     overflow: 'auto',
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {boostedResults && boostedResults.results && boostedResults.results.ads ? (
+                    {boostedResults?.results?.ads ? (
                       boostedResults.results.ads.map((result, index) => {
                         const originalResult = searchResults.results.ads.find(
                           r => r.bibcode === result.bibcode || r.title === result.title
@@ -1295,8 +1321,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
                 {/* Google Scholar Results */}
                 <Box sx={{ 
-                  width: '33%', 
-                  pl: 1, 
+                  width: '25%', 
+                  px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
                   display: 'flex',
@@ -1305,13 +1331,131 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   <List sx={{ 
                     bgcolor: 'background.paper', 
                     border: '1px solid', 
-                    borderColor: 'error.light', 
+                    borderColor: 'divider', 
                     borderRadius: 1,
                     overflow: 'auto',
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
                     {renderGoogleScholarResults()}
+                  </List>
+                </Box>
+
+                {/* Quepid Results */}
+                <Box sx={{ 
+                  width: '25%', 
+                  pl: 1, 
+                  height: '65vh', 
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} id="quepid-results-container">
+                  <List sx={{ 
+                    bgcolor: 'background.paper', 
+                    border: '1px solid', 
+                    borderColor: 'divider', 
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    overflowX: 'hidden',
+                    flexGrow: 1
+                  }}>
+                    {quepidResults ? (
+                      quepidResults.map((result, index) => (
+                        <Tooltip
+                          key={result.bibcode || index}
+                          title={
+                            <Box>
+                              <Typography variant="subtitle2">{result.title}</Typography>
+                              <Typography variant="body2">
+                                <strong>Authors:</strong> {formatAuthors(result.authors)}
+                              </Typography>
+                              {result.abstract && (
+                                <Typography variant="body2">
+                                  <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
+                                </Typography>
+                              )}
+                              <Typography variant="body2">
+                                <strong>Judgment Score:</strong> {result.judgment_score}
+                              </Typography>
+                            </Box>
+                          }
+                          placement="left"
+                        >
+                          <ListItem 
+                            id={`quepid-item-${index}`}
+                            divider
+                            sx={{ 
+                              px: 2, 
+                              py: 1,
+                              position: 'relative',
+                              transition: 'background-color 0.3s ease',
+                              whiteSpace: 'normal',
+                              bgcolor: result.judgment_score > 0 ? 'success.lighter' : 'inherit'
+                            }}
+                          >
+                            <ListItemText
+                              primary={
+                                <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                  <Typography 
+                                    variant="body2" 
+                                    component="span"
+                                    sx={{ 
+                                      minWidth: '24px',
+                                      fontWeight: 'bold',
+                                      mr: 1
+                                    }}
+                                  >
+                                    {index + 1}
+                                  </Typography>
+                                  <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                      {truncateText(result.title, 60)}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                      {result.year && (
+                                        <Chip 
+                                          label={`${result.year}`} 
+                                          size="small" 
+                                          variant="outlined"
+                                          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                        />
+                                      )}
+                                      {result.citation_count !== undefined && (
+                                        <Chip 
+                                          label={`Citations: ${result.citation_count}`} 
+                                          size="small"
+                                          variant="outlined"
+                                          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                        />
+                                      )}
+                                      {result.judgment_score !== undefined && (
+                                        <Chip 
+                                          label={`Score: ${result.judgment_score}`} 
+                                          size="small"
+                                          variant="outlined"
+                                          color={result.judgment_score > 0 ? "success" : "default"}
+                                          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                        />
+                                      )}
+                                    </Box>
+                                  </Box>
+                                </Box>
+                              }
+                            />
+                          </ListItem>
+                        </Tooltip>
+                      ))
+                    ) : (
+                      <ListItem>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" color="text.secondary" align="center">
+                              Enter a Quepid case ID to see relevance judgments
+                            </Typography>
+                          }
+                        />
+                      </ListItem>
+                    )}
                   </List>
                 </Box>
               </Box>
