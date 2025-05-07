@@ -791,7 +791,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       const quepidJudgment = getJudgmentForTitle(result.title);
       
       // Use local judgment if available, otherwise use Quepid judgment
-      const judgment = localJudgment?.judgment ?? quepidJudgment;
+      const judgment = localJudgment?.judgment !== undefined ? localJudgment.judgment : quepidJudgment;
       
       console.log(`NDCG calculation for ${source} - Record: ${result.title}`, {
         recordId,
@@ -1164,7 +1164,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
             </Select>
           </FormControl>
         </Box>
-        {currentJudgment !== null && currentJudgment !== undefined && (
+        {(currentJudgment !== null && currentJudgment !== undefined) && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <Button
               size="small"
@@ -1230,7 +1230,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       }
 
       // Only add if we have a valid judgment (including 0)
-      if (judgmentValue !== null && judgmentValue !== undefined && judgmentValue >= 0) {
+      if (judgmentValue !== null && judgmentValue !== undefined) {
         recordsWithJudgments.push({
           query: searchQuery,
           information_need: informationNeed,
@@ -1329,7 +1329,11 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     // Helper function to format a row with proper spacing
     const formatRow = (values, widths) => {
       const wrappedTitle = wrapText(values[0], widths[0]);
-      const otherValues = values.slice(1);
+      const otherValues = values.slice(1).map(value => {
+        // Ensure 0 is treated as a valid value and not converted to empty string
+        if (value === 0) return '0';
+        return value;
+      });
       
       // Format the first line
       const firstLine = [
