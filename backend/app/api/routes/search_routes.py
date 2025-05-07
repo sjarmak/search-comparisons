@@ -104,7 +104,8 @@ async def compare_search_engines(
                         "min_citations": search_request.boost_config.min_citations,
                         "recency_boost": search_request.boost_config.recency_boost,
                         "reference_year": search_request.boost_config.reference_year,
-                        "doctype_boosts": search_request.boost_config.doctype_boosts
+                        "doctype_boosts": search_request.boost_config.doctype_boosts,
+                        "field_boosts": search_request.boost_config.field_boosts
                     }
                     boosted_results = await apply_all_boosts(
                         source_results,
@@ -159,7 +160,8 @@ async def search(request: SearchRequestWithBoosts) -> SearchResponse:
                 "min_citations": request.boost_config.min_citations,
                 "recency_boost": request.boost_config.recency_boost,
                 "reference_year": request.boost_config.reference_year,
-                "doctype_boosts": request.boost_config.doctype_boosts
+                "doctype_boosts": request.boost_config.doctype_boosts,
+                "field_boosts": request.boost_config.field_boosts
             }
             results = await apply_all_boosts(
                 results,

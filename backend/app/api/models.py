@@ -42,6 +42,7 @@ class BoostConfig(BaseModel):
         recency_boost: Boost factor for publication recency
         reference_year: Reference year for recency calculations (optional)
         doctype_boosts: Dictionary mapping document types to boost factors
+        field_boosts: Dictionary mapping field names to boost factors
     """
     name: Optional[str] = "Default Boost Config"
     citation_boost: float = Field(default=0.0, ge=0.0)
@@ -49,6 +50,7 @@ class BoostConfig(BaseModel):
     recency_boost: float = Field(default=0.0, ge=0.0)
     reference_year: Optional[int] = None
     doctype_boosts: Dict[str, float] = Field(default_factory=dict)
+    field_boosts: Dict[str, float] = Field(default_factory=dict)
 
 
 class BoostFactors(BaseModel):
@@ -109,6 +111,8 @@ class SearchResult(BaseModel):
         original_rank: Original rank before boosts
         rank_change: Change in rank after boosts
         boost_factors: Dictionary of applied boost factors
+        _score: Internal score used for boosting
+        source_id: Unique identifier for the result source (original/boosted)
     """
     title: str
     author: List[str]
@@ -126,6 +130,8 @@ class SearchResult(BaseModel):
     original_rank: Optional[int] = None
     rank_change: Optional[int] = None
     boost_factors: Optional[Dict[str, float]] = None
+    _score: Optional[float] = None
+    source_id: Optional[str] = None
 
 
 class MetricResult(BaseModel):

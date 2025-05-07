@@ -16,67 +16,88 @@ from ..api.models import SearchResult
 logger = logging.getLogger(__name__)
 
 
-async def apply_all_boosts(
-    results: List[SearchResult],
-    boost_config: Dict[str, Any]
-) -> List[SearchResult]:
+async def apply_all_boosts(results: List[SearchResult], boost_config: Dict[str, Any]) -> List[SearchResult]:
     """
     Apply all configured boost factors to search results.
     
     Args:
         results: List of search results to boost
-        boost_config: Dictionary containing boost configuration:
-            citation_boost: Factor to boost citation counts
-            min_citations: Minimum number of citations to apply boost (optional)
-            recency_boost: Factor to boost recent publications
-            reference_year: Reference year for calculating recency (optional)
-            doctype_boosts: Dictionary mapping document types to boost factors
+        boost_config: Dictionary containing boost configuration
         
     Returns:
-        List[SearchResult]: Boosted search results
+        List[SearchResult]: List of boosted search results
     """
     if not results:
         return []
-    
-    # Create a deep copy to avoid modifying originals
-    boosted_results = deepcopy(results)
-    
+        
     try:
-        # Apply citation boost
-        if boost_config.get("citation_boost", 0.0) > 0:
-            min_citations = boost_config.get("min_citations", 0)
-            boosted_results = apply_citation_boost(
-                boosted_results,
-                boost_config["citation_boost"],
-                min_citations=min_citations
-            )
+        # Create a deep copy of results to avoid modifying originals
+        boosted_results = [deepcopy(result) for result in results]
         
-        # Apply recency boost
-        if boost_config.get("recency_boost", 0.0) > 0:
-            reference_year = boost_config.get("reference_year")
-            boosted_results = apply_recency_boost(
-                boosted_results,
-                boost_config["recency_boost"],
-                reference_year=reference_year
-            )
-        
-        # Apply document type boosts
-        doctype_boosts = boost_config.get("doctype_boosts", {})
-        if doctype_boosts:
-            boosted_results = apply_doctype_boosts(
-                boosted_results,
-                doctype_boosts
-            )
-        
-        # Sort results by boosted score
+        # Initialize scores and source_id for each result
         for i, result in enumerate(boosted_results):
-            # Make sure each result has a _score attribute
-            if not hasattr(result, '_score') or result._score is None:
-                # If no score exists, use 1.0 as default and adjust based on rank
-                result._score = 1.0 - (i / len(boosted_results))
-                
-        # Sort results by boosted score
+            # Initialize _score based on rank (higher rank = higher score)
+            result._score = 1.0 / (i + 1)  # Inverse of rank for initial score
+            result.source_id = 'boosted'  # Mark as boosted result
+            
+            # Initialize boost factors
+            result.boost_factors = {
+                'citation': 0.0,
+                'recency': 0.0,
+                'doctype': 0.0,
+                'field': 0.0
+            }
+            
+            # Store original score and rank
+            result.original_score = result._score
+            result.original_rank = i + 1
+        
+        # Apply citation boost if configured
+        if boost_config.get('citation_boost', 0.0) > 0:
+            min_citations = boost_config.get('min_citations', 1)
+            for result in boosted_results:
+                if result.citation_count and result.citation_count >= min_citations:
+                    boost_factor = min(result.citation_count / 100, 1.0) * boost_config['citation_boost']
+                    result._score *= (1.0 + boost_factor)
+                    result.boost_factors['citation'] = boost_factor
+        
+        # Apply recency boost if configured
+        if boost_config.get('recency_boost', 0.0) > 0:
+            reference_year = boost_config.get('reference_year', datetime.now().year)
+            for result in boosted_results:
+                if result.year:
+                    years_diff = reference_year - result.year
+                    if years_diff >= 0:
+                        boost_factor = (1.0 / (years_diff + 1)) * boost_config['recency_boost']
+                        result._score *= (1.0 + boost_factor)
+                        result.boost_factors['recency'] = boost_factor
+        
+        # Apply document type boost if configured
+        if boost_config.get('doctype_boosts'):
+            for result in boosted_results:
+                if result.doctype in boost_config['doctype_boosts']:
+                    boost_factor = boost_config['doctype_boosts'][result.doctype]
+                    if boost_factor > 0:
+                        result._score *= (1.0 + boost_factor)
+                        result.boost_factors['doctype'] = boost_factor
+        
+        # Apply field boosts if configured
+        if boost_config.get('field_boosts'):
+            for result in boosted_results:
+                field_boost_sum = 0.0
+                for field, boost in boost_config['field_boosts'].items():
+                    if boost > 0:
+                        field_boost_sum += boost
+                if field_boost_sum > 0:
+                    result._score *= (1.0 + field_boost_sum)
+                    result.boost_factors['field'] = field_boost_sum
+        
+        # Sort by boosted score and update ranks
         boosted_results.sort(key=lambda x: x._score, reverse=True)
+        for i, result in enumerate(boosted_results):
+            result.rank = i + 1
+            result.rank_change = result.original_rank - result.rank
+            result.boosted_score = result._score
         
         return boosted_results
         
@@ -178,5 +199,43 @@ def apply_doctype_boosts(
                 
             boost = 1 + doctype_boosts[doctype]
             result._score *= boost
+    
+    return results
+
+
+def apply_field_boosts(
+    results: List[SearchResult],
+    field_boosts: Dict[str, float]
+) -> List[SearchResult]:
+    """
+    Apply field-specific boosts to search results.
+    
+    Args:
+        results: List of search results
+        field_boosts: Dictionary mapping field names to boost factors
+        
+    Returns:
+        List[SearchResult]: Results with field boosts applied
+    """
+    for result in results:
+        for field, boost in field_boosts.items():
+            if boost > 0:
+                # Get the field value
+                field_value = getattr(result, field, None)
+                if field_value:
+                    # Make sure _score exists
+                    if not hasattr(result, '_score') or result._score is None:
+                        result._score = 1.0
+                    
+                    # Apply boost based on field value
+                    if isinstance(field_value, str):
+                        # For text fields, boost based on length
+                        result._score *= (1 + (boost * len(field_value) / 100))
+                    elif isinstance(field_value, (int, float)):
+                        # For numeric fields, apply direct boost
+                        result._score *= (1 + boost)
+                    elif isinstance(field_value, list):
+                        # For list fields (like authors), boost based on length
+                        result._score *= (1 + (boost * len(field_value) / 10))
     
     return results 

@@ -151,10 +151,6 @@ async def get_results_with_fallback(
     """
     Get search results from multiple sources with fallback mechanisms.
     
-    Attempts to retrieve results from each specified source, falling back
-    to alternative methods if the primary method fails or returns insufficient
-    results. Uses caching to avoid redundant API calls.
-    
     Args:
         query: Search query string
         sources: List of search engine sources to query
@@ -218,27 +214,17 @@ async def get_results_with_fallback(
             logger.info(f"Attempt {attempt_count} for {source}")
             
             try:
-                # Determine which query to use based on source
+                # Determine which query to use based on source and transformation settings
                 effective_query = query
-                if use_transformed_query and original_query:
+                if use_transformed_query:
                     if source == "ads":
-                        # For ADS, we need to modify the transformed query to be compatible with Solr
-                        # Extract the base terms without boost syntax
-                        base_terms = []
-                        for term in original_query.split():
-                            if term.startswith('"') and term.endswith('"'):
-                                # Handle quoted phrases
-                                base_terms.append(term)
-                            else:
-                                # Handle individual terms
-                                base_terms.append(term)
-                        
-                        # Create a simple Solr query
-                        effective_query = " OR ".join(base_terms)
-                        logger.info(f"Using simplified query for ADS Solr: {effective_query}")
+                        # For ADS, use the transformed query directly
+                        effective_query = query
+                        logger.info(f"Using transformed query for ADS: {effective_query}")
                     else:
-                        effective_query = original_query  # Use original query for other sources
-                        logger.info(f"Using original query for {source}: {original_query}")
+                        # For other sources, use the original query
+                        effective_query = original_query or query
+                        logger.info(f"Using original query for {source}: {effective_query}")
                 
                 if source == "ads":
                     source_results = await get_ads_results(effective_query, fields, num_results)
@@ -252,29 +238,22 @@ async def get_results_with_fallback(
                     source_results = await get_semantic_scholar_results(effective_query, fields, num_results)
                 elif source == "webOfScience":
                     source_results = await get_web_of_science_results(effective_query, fields, num_results)
-                else:
-                    logger.warning(f"Unknown source: {source}")
-                    break
                 
                 # Check if we got enough results
-                min_results = SERVICE_CONFIG.get(source, {}).get("min_results", 1)
-                if len(source_results) >= min_results:
+                if len(source_results) >= SERVICE_CONFIG[source]["min_results"]:
                     success = True
                     logger.info(f"Successfully retrieved {len(source_results)} results from {source}")
                 else:
-                    logger.warning(f"Insufficient results from {source}: got {len(source_results)}, need {min_results}")
-                    
-            except Exception as e:
-                logger.error(f"Error getting results from {source} (attempt {attempt_count}): {str(e)}", exc_info=True)
-                # Wait before retry
-                await asyncio.sleep(1.0)
-        
-        # If we got results, save to cache and add to results dict
-        if source_results:
-            # Save to cache
-            save_to_cache(cache_key, source_results)
+                    logger.warning(f"Insufficient results from {source}: {len(source_results)} < {SERVICE_CONFIG[source]['min_results']}")
             
-            # Add to results dictionary
+            except Exception as e:
+                logger.error(f"Error fetching results from {source}: {str(e)}")
+                if attempt_count == attempts:
+                    logger.error(f"All attempts failed for {source}")
+        
+        # Save results to cache if successful
+        if success and source_results:
+            save_to_cache(cache_key, source_results)
             results[source] = source_results
     
     return results

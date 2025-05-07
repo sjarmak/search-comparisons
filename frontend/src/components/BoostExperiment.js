@@ -477,31 +477,47 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       // Transform the query
       const transformedQuery = transformQuery(searchQuery);
       
+      // Debug logging for boost config
+      console.log('Current boost config:', boostConfig);
+      console.log('Field boosts:', boostConfig.fieldBoosts);
+      console.log('Citation boost:', boostConfig.citationBoost);
+      console.log('Recency boost:', boostConfig.recencyBoost);
+      console.log('Doctype boosts:', boostConfig.doctypeBoosts);
+      
       // Make the API request
+      const requestBody = {
+        query: transformedQuery,
+        originalQuery: searchQuery,
+        sources: ['ads'],
+        metrics: ['ndcg@10', 'precision@10', 'recall@10'],
+        fields: ['title', 'abstract', 'author', 'year', 'citation_count', 'doctype'],
+        max_results: 20,
+        useTransformedQuery: true,
+        boost_config: {
+          name: "Boosted Results",
+          citation_boost: parseFloat(boostConfig.citationBoost) || 0.0,
+          min_citations: 1,
+          recency_boost: parseFloat(boostConfig.recencyBoost) || 0.0,
+          reference_year: parseInt(boostConfig.referenceYear) || new Date().getFullYear(),
+          doctype_boosts: Object.fromEntries(
+            Object.entries(boostConfig.doctypeBoosts)
+              .map(([key, value]) => [key, parseFloat(value) || 0.0])
+          ),
+          field_boosts: Object.fromEntries(
+            Object.entries(boostConfig.fieldBoosts)
+              .map(([key, value]) => [key, parseFloat(value) || 0.0])
+          )
+        }
+      };
+      
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
+      
       const response = await fetch(`${API_URL}/api/search/compare`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          query: transformedQuery,
-          originalQuery: searchQuery,
-          sources: ['ads'],
-          metrics: ['ndcg@10', 'precision@10', 'recall@10'],
-          fields: ['title', 'abstract', 'author', 'year', 'citation_count', 'doctype'],
-          max_results: 20,
-          useTransformedQuery: true,
-          boost_config: {
-            name: "Boosted Results",
-            citation_boost: parseFloat(boostConfig.citationBoost),
-            recency_boost: parseFloat(boostConfig.recencyBoost),
-            reference_year: parseInt(boostConfig.referenceYear),
-            doctype_boosts: Object.fromEntries(
-              Object.entries(boostConfig.doctypeBoosts)
-                .map(([key, value]) => [key, parseFloat(value)])
-            )
-          }
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -510,6 +526,14 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       }
 
       const data = await response.json();
+      console.log('Boost experiment response:', data);
+      
+      // Process the results to add rank change information
+      if (data.results && data.results.ads) {
+        const processedResults = calculateRankChanges(searchResults.results.ads, data.results.ads);
+        data.results.ads = processedResults;
+      }
+      
       setBoostedResults(data);
       setTransformedQuery(transformedQuery);
     } catch (err) {
@@ -787,12 +811,41 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
     console.log(`Judged count for ${source}:`, judgedCount);
 
+    // Get all NDCG values for ranking
+    const allNdcgValues = [
+      { source: 'original', value: calculateNDCG(searchResults?.results?.ads) },
+      { source: 'boosted', value: calculateNDCG(boostedResults?.results?.ads) },
+      { source: 'scholar', value: calculateNDCG(searchResults?.results?.scholar) },
+      { source: 'quepid', value: calculateNDCG(quepidResults) }
+    ].filter(item => item.value !== null);
+
+    // Sort by NDCG value in descending order
+    allNdcgValues.sort((a, b) => b.value - a.value);
+
+    // Find the rank of current source
+    const currentRank = allNdcgValues.findIndex(item => item.source === source);
+
+    // Define border colors based on rank
+    const getBorderColor = (rank) => {
+      if (rank === 0) return '#4caf50'; // Bright green for highest
+      if (rank === 1) return '#2196f3'; // Blue for second
+      if (rank === 2) return '#ff9800'; // Orange for third
+      return '#f44336'; // Red for lowest
+    };
+
+    const borderColor = currentRank !== -1 ? getBorderColor(currentRank) : 'transparent';
+
     return (
-      <Paper sx={{ p: 1, bgcolor: source === 'original' ? 'grey.100' : 
-        source === 'boosted' ? 'primary.light' : 
-        source === 'scholar' ? 'error.light' : 'success.light',
+      <Paper sx={{ 
+        p: 1, 
+        bgcolor: source === 'original' ? 'grey.100' : 
+          source === 'boosted' ? 'primary.light' : 
+          source === 'scholar' ? 'error.light' : 'success.light',
         color: source === 'original' ? 'inherit' : 'primary.contrastText',
-        borderRadius: 1
+        borderRadius: 1,
+        border: '3px solid',
+        borderColor: borderColor,
+        transition: 'border-color 0.3s ease'
       }}>
         <Typography variant="subtitle1" align="center" fontWeight="bold">
           {title}
@@ -904,47 +957,68 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     }
   }, [quepidResults, createJudgmentMap]);
 
-  // Add this helper function to render judgment chip
-  const renderJudgmentChip = useCallback((title) => {
-    const judgment = getJudgmentForTitle(title);
-    if (judgment === undefined || judgment === null) return null;
-
-    let color = 'default';
-    if (judgment > 0) {
-      color = 'success';
-    }
-
-    return (
-      <Chip 
-        label={`Judgment: ${judgment}`} 
-        size="small"
-        variant="outlined"
-        color={color}
-        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-      />
-    );
-  }, [getJudgmentForTitle]);
-  
-  // Function to handle record expansion
-  const handleRecordExpand = (record) => {
-    setSelectedRecord(record);
-    setDetailsDialogOpen(true);
-  };
-
   // Function to handle judgment selection
-  const handleJudgmentSelect = (recordId, judgment) => {
+  const handleJudgmentSelect = (recordId, judgment, sourceId) => {
     setLocalJudgments(prev => {
       // If the judgment is empty string, remove the judgment
       if (judgment === '') {
         const newJudgments = { ...prev };
-        delete newJudgments[recordId];
+        delete newJudgments[`${sourceId}_${recordId}`];
         return newJudgments;
       }
       return {
         ...prev,
-        [recordId]: judgment
+        [`${sourceId}_${recordId}`]: judgment
       };
     });
+  };
+
+  // Function to render judgment selector
+  const renderJudgmentSelector = (record) => {
+    const recordId = record.bibcode || normalizeTitle(record.title);
+    const sourceId = record.source_id || 'original';
+    const quepidJudgment = getJudgmentForTitle(record.title);
+    const userJudgment = localJudgments[`${sourceId}_${recordId}`];
+    const currentJudgment = userJudgment !== undefined ? userJudgment : quepidJudgment;
+    const hasQuepidJudgment = quepidJudgment !== null;
+
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {hasQuepidJudgment && (
+          <Tooltip title={`Quepid Judgment: ${quepidJudgment}`}>
+            <Chip 
+              label="Quepid" 
+              size="small"
+              variant="outlined"
+              color="info"
+              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+            />
+          </Tooltip>
+        )}
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <Select
+            value={currentJudgment !== null && currentJudgment !== undefined ? currentJudgment : ''}
+            onChange={(e) => handleJudgmentSelect(recordId, e.target.value, sourceId)}
+            displayEmpty
+            sx={{ height: 20, fontSize: '0.7rem' }}
+          >
+            <MenuItem value="" disabled>
+              <em>Add Judgment</em>
+            </MenuItem>
+            <MenuItem value={0}>Poor (0)</MenuItem>
+            <MenuItem value={1}>Fair (1)</MenuItem>
+            <MenuItem value={2}>Good (2)</MenuItem>
+            <MenuItem value={3}>Perfect (3)</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+    );
+  };
+
+  // Function to handle record expansion
+  const handleRecordExpand = (record) => {
+    setSelectedRecord(record);
+    setDetailsDialogOpen(true);
   };
 
   // Function to export judgments to TXT
@@ -1004,47 +1078,6 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  // Function to render judgment selector
-  const renderJudgmentSelector = (record) => {
-    const recordId = record.bibcode || normalizeTitle(record.title);
-    const quepidJudgment = getJudgmentForTitle(record.title);
-    const userJudgment = localJudgments[recordId];
-    const currentJudgment = userJudgment !== undefined ? userJudgment : quepidJudgment;
-    const hasQuepidJudgment = quepidJudgment !== null;
-
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {hasQuepidJudgment && (
-          <Tooltip title={`Quepid Judgment: ${quepidJudgment}`}>
-            <Chip 
-              label="Quepid" 
-              size="small"
-              variant="outlined"
-              color="info"
-              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-            />
-          </Tooltip>
-        )}
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <Select
-            value={currentJudgment !== null && currentJudgment !== undefined ? currentJudgment : ''}
-            onChange={(e) => handleJudgmentSelect(recordId, e.target.value)}
-            displayEmpty
-            sx={{ height: 20, fontSize: '0.7rem' }}
-          >
-            <MenuItem value="" disabled>
-              <em>Add Judgment</em>
-            </MenuItem>
-            <MenuItem value={0}>Poor (0)</MenuItem>
-            <MenuItem value={1}>Fair (1)</MenuItem>
-            <MenuItem value={2}>Good (2)</MenuItem>
-            <MenuItem value={3}>Perfect (3)</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-    );
   };
 
   // Function to render expanded record details in a dialog
@@ -1218,9 +1251,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       <DialogTitle>Export Judgments</DialogTitle>
       <DialogContent>
         <Typography variant="body2" gutterBottom>
-          This will export only the judgments you have manually entered to a CSV file.
-          The file will include the search query, paper title, and judgment score.
-          Only records where you have entered a judgment will be included in the export.
+          This will export only the judgments you have manually entered to a text file. The file will include the search query, paper title, judgment score, and search engine source.
         </Typography>
       </DialogContent>
       <DialogActions>

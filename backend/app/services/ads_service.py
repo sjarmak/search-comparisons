@@ -173,7 +173,7 @@ async def query_ads_solr(
     Query the ADS Solr API for search results.
     
     Args:
-        query: The search query
+        query: The search query (can include field boosts)
         fields: List of fields to return
         num_results: Maximum number of results to return
         sort: Sort order for results
@@ -194,7 +194,10 @@ async def query_ads_solr(
             "q": query,
             "fl": ",".join(fields),
             "rows": num_results,
-            "sort": sort
+            "sort": sort,
+            "defType": "edismax",  # Use Extended Dismax parser for better field boosting
+            "qf": "title^3 abstract^2 author^1",  # Default field weights
+            "tie": "0.1"  # Tie breaker for scores
         }
         
         # Make request to ADS API
@@ -204,6 +207,7 @@ async def query_ads_solr(
                 "Content-Type": "application/json"
             }
             
+            logger.info(f"Querying ADS Solr with params: {params}")
             response = await client.get(
                 ADS_API_URL,
                 params=params,
@@ -240,7 +244,8 @@ async def query_ads_solr(
                         rank=idx,  # Set rank based on index
                         citation_count=doc.get("citation_count", 0),
                         doctype=doc.get("doctype", ""),
-                        property=doc.get("property", [])
+                        property=doc.get("property", []),
+                        _score=doc.get("score", 0.0)  # Store the raw score
                     )
                     results.append(result)
                 except Exception as e:
@@ -249,13 +254,12 @@ async def query_ads_solr(
             
             # Cache results if enabled
             if use_cache and results:
-                cache_key = get_cache_key("ads_solr", query, fields, num_results)
-                save_to_cache(cache_key, results)
+                save_to_cache(get_cache_key("ads", query, fields, num_results), results)
             
             return results
             
     except Exception as e:
-        logger.error(f"Error querying ADS Solr proxy: {str(e)}")
+        logger.error(f"Error querying ADS Solr: {str(e)}")
         return []
 
 
