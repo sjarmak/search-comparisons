@@ -45,6 +45,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [expandedRecords, setExpandedRecords] = useState({});
   const [localJudgments, setLocalJudgments] = useState({});
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [showBoostControls, setShowBoostControls] = useState(true);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -1068,11 +1071,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   }, [getJudgmentForTitle]);
   
   // Function to handle record expansion
-  const handleRecordExpand = (recordId) => {
-    setExpandedRecords(prev => ({
-      ...prev,
-      [recordId]: !prev[recordId]
-    }));
+  const handleRecordExpand = (record) => {
+    setSelectedRecord(record);
+    setDetailsDialogOpen(true);
   };
 
   // Function to handle judgment selection
@@ -1149,125 +1150,155 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     );
   };
 
-  // Function to render expanded record details
-  const renderExpandedDetails = (record) => {
-    const recordId = record.bibcode || normalizeTitle(record.title);
-    if (!expandedRecords[recordId]) return null;
-
-    return (
-      <Collapse in={expandedRecords[recordId]}>
-        <Box sx={{ pl: 4, pr: 2, py: 1, bgcolor: 'grey.50' }}>
-          <Typography variant="body2" gutterBottom>
-            <strong>Title:</strong> {record.title}
-          </Typography>
-          <Typography variant="body2" gutterBottom>
-            <strong>Authors:</strong> {formatAuthors(record.author)}
-          </Typography>
-          {record.abstract && (
-            <Typography variant="body2" gutterBottom>
-              <strong>Abstract:</strong> {record.abstract}
+  // Function to render expanded record details in a dialog
+  const renderDetailsDialog = () => (
+    <Dialog 
+      open={detailsDialogOpen} 
+      onClose={() => setDetailsDialogOpen(false)}
+      maxWidth="md"
+      fullWidth
+    >
+      {selectedRecord && (
+        <>
+          <DialogTitle>
+            <Typography variant="h6" component="div">
+              {selectedRecord.title}
             </Typography>
-          )}
-          <Box sx={{ mt: 1 }}>
-            {renderJudgmentSelector(record)}
-          </Box>
-        </Box>
-      </Collapse>
-    );
-  };
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                <strong>Authors:</strong> {formatAuthors(selectedRecord.author)}
+              </Typography>
+              {selectedRecord.abstract && (
+                <Typography variant="body1" paragraph>
+                  <strong>Abstract:</strong> {selectedRecord.abstract}
+                </Typography>
+              )}
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+                {selectedRecord.year && (
+                  <Chip 
+                    label={`Year: ${selectedRecord.year}`} 
+                    variant="outlined"
+                  />
+                )}
+                {selectedRecord.citation_count !== undefined && (
+                  <Chip 
+                    label={`Citations: ${selectedRecord.citation_count}`} 
+                    variant="outlined"
+                  />
+                )}
+                {selectedRecord.doctype && (
+                  <Chip 
+                    label={`Type: ${selectedRecord.doctype}`} 
+                    variant="outlined"
+                  />
+                )}
+              </Box>
+              <Box sx={{ mt: 3 }}>
+                {renderJudgmentSelector(selectedRecord)}
+              </Box>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDetailsDialogOpen(false)}>Close</Button>
+          </DialogActions>
+        </>
+      )}
+    </Dialog>
+  );
 
-  // Modify the ListItem rendering to include expansion and judgment selection
+  // Modify the renderResultItem function to remove inline expansion
   const renderResultItem = (result, index, containerId) => {
     const recordId = result.bibcode || normalizeTitle(result.title);
-    const isExpanded = expandedRecords[recordId];
 
     return (
-      <React.Fragment key={recordId}>
-        <ListItem 
-          id={`${containerId}-item-${index}`}
-          divider
-          sx={{ 
-            px: 2, 
-            py: 1,
-            position: 'relative',
-            transition: 'background-color 0.3s ease',
-            whiteSpace: 'normal'
-          }}
-        >
-          <ListItemText
-            primary={
-              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                <Typography 
-                  variant="body2" 
-                  component="span"
-                  sx={{ 
-                    minWidth: '24px',
-                    fontWeight: 'bold',
-                    mr: 1
-                  }}
-                >
-                  {index + 1}
-                </Typography>
-                <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        fontWeight: 'medium',
-                        flexGrow: 1,
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => handleRecordExpand(recordId)}
-                    >
-                      {truncateText(result.title, 60)}
-                    </Typography>
-                    <IconButton 
+      <ListItem 
+        id={`${containerId}-item-${index}`}
+        divider
+        sx={{ 
+          px: 2, 
+          py: 1,
+          position: 'relative',
+          transition: 'background-color 0.3s ease',
+          whiteSpace: 'normal'
+        }}
+      >
+        <ListItemText
+          primary={
+            <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+              <Typography 
+                variant="body2" 
+                component="span"
+                sx={{ 
+                  minWidth: '24px',
+                  fontWeight: 'bold',
+                  mr: 1
+                }}
+              >
+                {index + 1}
+              </Typography>
+              <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      fontWeight: 'medium',
+                      flexGrow: 1,
+                      cursor: 'pointer',
+                      '&:hover': {
+                        color: 'primary.main'
+                      }
+                    }}
+                    onClick={() => handleRecordExpand(result)}
+                  >
+                    {truncateText(result.title, 60)}
+                  </Typography>
+                  <IconButton 
+                    size="small" 
+                    onClick={() => handleRecordExpand(result)}
+                    sx={{ ml: 1 }}
+                  >
+                    <ExpandMoreIcon />
+                  </IconButton>
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                  {result.year && (
+                    <Chip 
+                      label={`${result.year}`} 
                       size="small" 
-                      onClick={() => handleRecordExpand(recordId)}
-                      sx={{ ml: 1 }}
-                    >
-                      {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                    </IconButton>
-                  </Box>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                    {result.year && (
-                      <Chip 
-                        label={`${result.year}`} 
-                        size="small" 
-                        variant="outlined"
-                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                      />
-                    )}
-                    {result.citation_count !== undefined && (
-                      <Chip 
-                        label={`Citations: ${result.citation_count}`} 
-                        size="small"
-                        variant="outlined"
-                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                      />
-                    )}
-                    {containerId === 'boosted' && result.boosted_score !== undefined && result.boosted_score !== null && (
-                      <Chip 
-                        label={`Boost: ${result.boosted_score.toFixed(1)}`} 
-                        size="small"
-                        color="primary"
-                        sx={{ 
-                          height: 20, 
-                          '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
-                          fontWeight: 'bold', 
-                          bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
-                        }}
-                      />
-                    )}
-                    {renderJudgmentSelector(result)}
-                  </Box>
+                      variant="outlined"
+                      sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                    />
+                  )}
+                  {result.citation_count !== undefined && (
+                    <Chip 
+                      label={`Citations: ${result.citation_count}`} 
+                      size="small"
+                      variant="outlined"
+                      sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                    />
+                  )}
+                  {containerId === 'boosted' && result.boosted_score !== undefined && result.boosted_score !== null && (
+                    <Chip 
+                      label={`Boost: ${result.boosted_score.toFixed(1)}`} 
+                      size="small"
+                      color="primary"
+                      sx={{ 
+                        height: 20, 
+                        '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                        fontWeight: 'bold', 
+                        bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
+                      }}
+                    />
+                  )}
+                  {renderJudgmentSelector(result)}
                 </Box>
               </Box>
-            }
-          />
-        </ListItem>
-        {renderExpandedDetails(result)}
-      </React.Fragment>
+            </Box>
+          }
+        />
+      </ListItem>
     );
   };
 
@@ -1303,6 +1334,19 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     </Dialog>
   );
   
+  // Add toggle button for boost controls
+  const renderBoostControlsToggle = () => (
+    <Button
+      startIcon={showBoostControls ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+      variant="outlined"
+      size="small"
+      onClick={() => setShowBoostControls(!showBoostControls)}
+      sx={{ ml: 2 }}
+    >
+      {showBoostControls ? 'Hide Boost Controls' : 'Show Boost Controls'}
+    </Button>
+  );
+
   return (
     <Box sx={{ width: '100%', p: 2 }}>
       {renderSearchForm()}
@@ -1328,12 +1372,14 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       ) : (
         <Grid container spacing={2}>
           {/* Boost Controls */}
-          <Grid item xs={12} md={4}>
-            {renderBoostControls()}
-          </Grid>
+          {showBoostControls && (
+            <Grid item xs={12} md={4}>
+              {renderBoostControls()}
+            </Grid>
+          )}
 
           {/* Results Panel */}
-          <Grid item xs={12} md={8}>
+          <Grid item xs={12} md={showBoostControls ? 8 : 12}>
             <Paper sx={{ p: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -1341,6 +1387,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 </Typography>
                 {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
                 {renderExportButton()}
+                {renderBoostControlsToggle()}
                 <Button
                   startIcon={<BugReportIcon />}
                   variant="outlined"
@@ -1359,7 +1406,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
               <Box sx={{ display: 'flex', mb: 2 }}>
                 {/* Title Headers */}
-                <Box sx={{ width: '25%', pr: 1 }}>
+                <Box sx={{ width: showBoostControls ? '20%' : '25%', pr: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Original Results
@@ -1369,7 +1416,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: '25%', px: 1 }}>
+                <Box sx={{ width: showBoostControls ? '20%' : '25%', px: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Boosted Results
@@ -1379,7 +1426,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: '25%', px: 1 }}>
+                <Box sx={{ width: showBoostControls ? '20%' : '25%', px: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Google Scholar Results
@@ -1389,7 +1436,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: '25%', pl: 1 }}>
+                <Box sx={{ width: showBoostControls ? '20%' : '25%', pl: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'success.light', color: 'success.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Quepid Results
@@ -1404,7 +1451,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
               <Box sx={{ display: 'flex', position: 'relative' }}>
                 {/* Original Results */}
                 <Box sx={{ 
-                  width: '25%', 
+                  width: showBoostControls ? '20%' : '25%', 
                   pr: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1428,7 +1475,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 
                 {/* Boosted Results */}
                 <Box sx={{ 
-                  width: '25%', 
+                  width: showBoostControls ? '20%' : '25%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1461,7 +1508,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
                 {/* Google Scholar Results */}
                 <Box sx={{ 
-                  width: '25%', 
+                  width: showBoostControls ? '20%' : '25%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1485,7 +1532,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
                 {/* Quepid Results */}
                 <Box sx={{ 
-                  width: '25%', 
+                  width: showBoostControls ? '20%' : '25%', 
                   pl: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1525,6 +1572,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       )}
       
       {renderExportDialog()}
+      {renderDetailsDialog()}
     </Box>
   );
 };
