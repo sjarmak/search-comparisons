@@ -721,34 +721,72 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     </Paper>
   );
   
-  // Function to calculate NDCG@10
+  // Add this helper function to get judgment for a title
+  const getJudgmentForTitle = useCallback((title) => {
+    if (!title) return null;
+    const normalizedTitle = normalizeTitle(title);
+    const judgment = judgmentMap[normalizedTitle];
+    console.log(`Looking up judgment for title: "${title}" -> "${normalizedTitle}" -> ${judgment}`);
+    return judgment === undefined ? null : judgment;
+  }, [judgmentMap]);
+
+  // Function to calculate NDCG
   const calculateNDCG = useCallback((results, k = 10) => {
-    if (!results || results.length === 0) return null;
+    if (!results || results.length === 0) {
+      console.log('No results available for NDCG calculation');
+      return null;
+    }
 
     // Get judgments for the first k results
     const judgments = results.slice(0, k).map(result => {
       const recordId = result.bibcode || normalizeTitle(result.title);
-      return localJudgments[recordId] ?? null;
-    }).filter(j => j !== null);
+      const judgment = localJudgments[recordId] ?? getJudgmentForTitle(result.title);
+      console.log(`Record: ${result.title}, Judgment: ${judgment}`);
+      return judgment;
+    }).filter(j => j !== null && j !== undefined);
 
-    if (judgments.length === 0) return null;
+    console.log('Judgments for NDCG calculation:', judgments);
+
+    if (judgments.length === 0) {
+      console.log('No judgments available for NDCG calculation');
+      return null;
+    }
 
     // Calculate DCG
     const dcg = judgments.reduce((sum, judgment, i) => {
-      return sum + (judgment / Math.log2(i + 2));
+      const dcgValue = judgment / Math.log2(i + 2);
+      console.log(`DCG calculation - position ${i + 1}, judgment: ${judgment}, DCG value: ${dcgValue}`);
+      return sum + dcgValue;
     }, 0);
 
     // Calculate IDCG (ideal case where all judgments are perfect)
     const idcg = judgments.reduce((sum, _, i) => {
-      return sum + (3 / Math.log2(i + 2)); // Assuming 3 is the maximum judgment value
+      const idcgValue = 3 / Math.log2(i + 2); // Assuming 3 is the maximum judgment value
+      console.log(`IDCG calculation - position ${i + 1}, IDCG value: ${idcgValue}`);
+      return sum + idcgValue;
     }, 0);
 
-    return idcg === 0 ? 0 : dcg / idcg;
-  }, [localJudgments]);
+    const ndcg = idcg === 0 ? 0 : dcg / idcg;
+    console.log('Final NDCG calculation:', { dcg, idcg, ndcg });
+    return ndcg;
+  }, [localJudgments, getJudgmentForTitle]);
 
   // Function to render column header with NDCG score
   const renderColumnHeader = (title, subtitle, results, source) => {
+    // Calculate NDCG@10 for the given results
     const ndcg = calculateNDCG(results);
+    console.log(`NDCG for ${source}:`, ndcg);
+    
+    // Get the count of judged records
+    const judgedCount = results ? results.slice(0, 10).filter(result => {
+      const recordId = result.bibcode || normalizeTitle(result.title);
+      const hasJudgment = localJudgments[recordId] !== undefined || getJudgmentForTitle(result.title) !== null;
+      console.log(`Record ${result.title} has judgment:`, hasJudgment);
+      return hasJudgment;
+    }).length : 0;
+
+    console.log(`Judged count for ${source}:`, judgedCount);
+
     return (
       <Paper sx={{ p: 1, bgcolor: source === 'original' ? 'grey.100' : 
         source === 'boosted' ? 'primary.light' : 
@@ -764,15 +802,20 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         }}>
           {subtitle}
         </Typography>
-        {ndcg !== null && (
+        <Box sx={{ mt: 0.5 }}>
           <Typography variant="caption" align="center" display="block" sx={{ 
-            mt: 0.5,
             color: source === 'original' ? 'text.secondary' : 'rgba(255,255,255,0.8)',
             fontWeight: 'bold'
           }}>
-            NDCG@10: {ndcg.toFixed(3)}
+            NDCG@10: {ndcg !== null ? ndcg.toFixed(3) : 'N/A'}
           </Typography>
-        )}
+          <Typography variant="caption" align="center" display="block" sx={{ 
+            color: source === 'original' ? 'text.secondary' : 'rgba(255,255,255,0.8)',
+            fontSize: '0.7rem'
+          }}>
+            ({judgedCount} judged records)
+          </Typography>
+        </Box>
       </Paper>
     );
   };
@@ -860,15 +903,6 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       setJudgmentMap(newMap);
     }
   }, [quepidResults, createJudgmentMap]);
-
-  // Add this helper function to get judgment for a title
-  const getJudgmentForTitle = useCallback((title) => {
-    if (!title) return null;
-    const normalizedTitle = normalizeTitle(title);
-    const judgment = judgmentMap[normalizedTitle];
-    console.log(`Looking up judgment for title: "${title}" -> "${normalizedTitle}" -> ${judgment}`);
-    return judgment === undefined ? null : judgment;
-  }, [judgmentMap]);
 
   // Add this helper function to render judgment chip
   const renderJudgmentChip = useCallback((title) => {
