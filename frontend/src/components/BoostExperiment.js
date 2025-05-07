@@ -4,16 +4,13 @@ import {
   Slider, FormControlLabel, Switch, Typography, FormControl,
   InputLabel, Select, MenuItem, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, Divider,
-  CircularProgress, Alert, Tooltip, IconButton, Collapse, List, ListItem, ListItemText, TextField,
+  CircularProgress, Alert, Tooltip, IconButton, List, ListItem, ListItemText, TextField,
   Dialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/material';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ReplayIcon from '@mui/icons-material/Replay';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
-import BugReportIcon from '@mui/icons-material/BugReport';
-import ArrowUpward from '@mui/icons-material/ArrowUpward';
-import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -33,12 +30,10 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [boostedResults, setBoostedResults] = useState(null);
-  const [debugMode, setDebugMode] = useState(false);
-  const [debugInfo, setDebugInfo] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [transformedQuery, setTransformedQuery] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [quepidCaseId, setQuepidCaseId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('triton');
+  const [quepidCaseId, setQuepidCaseId] = useState('8914');
   const [searchResults, setSearchResults] = useState(null);
   const [quepidResults, setQuepidResults] = useState(null);
   const [judgmentMap, setJudgmentMap] = useState({});
@@ -566,161 +561,6 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     return typeof value === 'number' ? value.toFixed(2) : String(value);
   };
   
-  // Enhanced debug component to inspect fields and values
-  const renderDebugPanel = () => {
-    if (!debugInfo || !debugInfo.firstResult) return null;
-    
-    return (
-      <Box sx={{ mt: 2, mb: 2, border: 1, borderColor: 'warning.light', p: 2, borderRadius: 1 }}>
-        <Typography variant="h6" color="warning.main" gutterBottom>
-          Debug Information
-        </Typography>
-        
-        <Typography variant="subtitle2" gutterBottom>Metadata Fields (Required for Boosts)</Typography>
-        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Field Name</TableCell>
-                <TableCell>Present</TableCell>
-                <TableCell>Value</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              <TableRow>
-                <TableCell>citation_count</TableCell>
-                <TableCell>
-                  {debugInfo.firstResult?.citation_count !== undefined ? (
-                    <Chip label="Yes" size="small" color="success" />
-                  ) : (
-                    <Chip label="No" size="small" color="error" />
-                  )}
-                </TableCell>
-                <TableCell>{debugInfo.firstResult?.citation_count !== undefined ? String(debugInfo.firstResult.citation_count) : 'N/A'}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>year</TableCell>
-                <TableCell>
-                  {debugInfo.firstResult?.year !== undefined ? (
-                    <Chip label="Yes" size="small" color="success" />
-                  ) : (
-                    <Chip label="No" size="small" color="error" />
-                  )}
-                </TableCell>
-                <TableCell>{debugInfo.firstResult?.year !== undefined ? String(debugInfo.firstResult.year) : 'N/A'}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>doctype</TableCell>
-                <TableCell>
-                  {debugInfo.firstResult?.doctype !== undefined ? (
-                    <Chip label="Yes" size="small" color="success" />
-                  ) : (
-                    <Chip label="No" size="small" color="error" />
-                  )}
-                </TableCell>
-                <TableCell>{debugInfo.firstResult?.doctype !== undefined ? String(debugInfo.firstResult.doctype) : 'N/A'}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>property</TableCell>
-                <TableCell>
-                  {debugInfo.firstResult?.property !== undefined ? (
-                    <Chip label="Yes" size="small" color="success" />
-                  ) : (
-                    <Chip label="No" size="small" color="error" />
-                  )}
-                </TableCell>
-                <TableCell>{debugInfo.firstResult?.property !== undefined ? 
-                  (Array.isArray(debugInfo.firstResult.property) ? 
-                    debugInfo.firstResult.property.join(', ') : 
-                    String(debugInfo.firstResult.property)) : 
-                  'N/A'}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <Typography variant="subtitle2" gutterBottom>Citation Fields</Typography>
-        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Field Name</TableCell>
-                <TableCell>Present</TableCell>
-                <TableCell>Value</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {Object.entries(debugInfo.citationFields || {}).map(([field, value]) => (
-                <TableRow key={field}>
-                  <TableCell>{field}</TableCell>
-                  <TableCell>
-                    {value !== undefined && value !== null ? (
-                      <Chip label="Yes" size="small" color="success" />
-                    ) : (
-                      <Chip label="No" size="small" color="error" />
-                    )}
-                  </TableCell>
-                  <TableCell>{value !== undefined && value !== null ? String(value) : 'N/A'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        <Typography variant="subtitle2" gutterBottom>Boost Fields</Typography>
-        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Field Name</TableCell>
-                <TableCell>Present</TableCell>
-                <TableCell>Value</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {Object.entries(debugInfo.boostFields || {}).map(([field, value]) => (
-                <TableRow key={field}>
-                  <TableCell>{field}</TableCell>
-                  <TableCell>
-                    {value !== undefined && value !== null ? (
-                      <Chip label="Yes" size="small" color="success" />
-                    ) : (
-                      <Chip label="No" size="small" color="error" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {field === 'boostFactors' && typeof value === 'object' ? (
-                      <Typography variant="caption" component="pre" sx={{ maxHeight: 100, overflow: 'auto' }}>
-                        {JSON.stringify(value, null, 2)}
-                      </Typography>
-                    ) : (
-                      value !== undefined && value !== null ? String(value) : 'N/A'
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        <Typography variant="subtitle2" gutterBottom>First Result Raw Data</Typography>
-        <Box 
-          component="pre" 
-          sx={{ 
-            maxHeight: 200, 
-            overflow: 'auto', 
-            fontSize: '0.75rem', 
-            bgcolor: 'grey.100', 
-            p: 1, 
-            borderRadius: 1 
-          }}
-        >
-          {JSON.stringify(debugInfo.firstResult, null, 2)}
-        </Box>
-      </Box>
-    );
-  };
-  
   // Function to render boost controls
   const renderBoostControls = () => (
     <Box sx={{ mb: 3 }}>
@@ -1092,47 +932,60 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     });
   };
 
-  // Function to export judgments to CSV
+  // Function to export judgments to TXT
   const handleExportJudgments = () => {
-    // Only get records that have user-entered judgments
-    const recordsWithJudgments = Object.entries(localJudgments)
-      .filter(([_, judgment]) => judgment !== undefined && judgment !== null)
-      .map(([recordId, judgment]) => {
-        // Find the corresponding record from search results
-        const record = searchResults?.results?.ads?.find(r => 
-          (r.bibcode && r.bibcode === recordId) || 
-          normalizeTitle(r.title) === recordId
-        );
-        
-        if (!record) return null;
-        
-        return {
+    // Get all records that have manually added judgments
+    const recordsWithJudgments = [];
+
+    // Check ADS results
+    searchResults?.results?.ads?.forEach(record => {
+      const recordId = record.bibcode || normalizeTitle(record.title);
+      const judgment = localJudgments[recordId];
+      if (judgment !== undefined && judgment !== null) {
+        recordsWithJudgments.push({
           query: searchQuery,
           title: record.title,
-          judgment: judgment
-        };
-      })
-      .filter(record => record !== null);
+          judgment: judgment,
+          source: 'ads'
+        });
+      }
+    });
+
+    // Check Google Scholar results
+    searchResults?.results?.scholar?.forEach(record => {
+      const recordId = normalizeTitle(record.title);
+      const judgment = localJudgments[recordId];
+      if (judgment !== undefined && judgment !== null) {
+        recordsWithJudgments.push({
+          query: searchQuery,
+          title: record.title,
+          judgment: judgment,
+          source: 'Google Scholar'
+        });
+      }
+    });
 
     if (recordsWithJudgments.length === 0) {
-      setError('No judgments to export');
+      setError('No manual judgments to export. Please add some judgments first.');
       return;
     }
 
-    const csvContent = [
-      ['Query', 'Title', 'Judgment'],
+    // Format as tab-separated text
+    const txtContent = [
+      'Query\tTitle\tJudgment\tSource',
       ...recordsWithJudgments.map(record => [
         record.query,
         record.title,
-        record.judgment
-      ])
-    ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+        record.judgment,
+        record.source
+      ].join('\t'))
+    ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `judgments_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `judgments_${new Date().toISOString().split('T')[0]}.txt`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1418,25 +1271,11 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
                 {renderExportButton()}
                 {renderBoostControlsToggle()}
-                <Button
-                  startIcon={<BugReportIcon />}
-                  variant="outlined"
-                  size="small"
-                  color="warning"
-                  onClick={() => setDebugMode(!debugMode)}
-                  sx={{ ml: 2 }}
-                >
-                  {debugMode ? 'Hide Debug' : 'Debug Mode'}
-                </Button>
               </Box>
-
-              <Collapse in={debugMode}>
-                {renderDebugPanel()}
-              </Collapse>
 
               <Box sx={{ display: 'flex', mb: 2 }}>
                 {/* Title Headers */}
-                <Box sx={{ width: showBoostControls ? '20%' : '25%', pr: 1 }}>
+                <Box sx={{ width: showBoostControls ? '25%' : '30%', pr: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Original Results
@@ -1446,7 +1285,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: showBoostControls ? '20%' : '25%', px: 1 }}>
+                <Box sx={{ width: showBoostControls ? '25%' : '30%', px: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Boosted Results
@@ -1456,7 +1295,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: showBoostControls ? '20%' : '25%', px: 1 }}>
+                <Box sx={{ width: showBoostControls ? '25%' : '30%', px: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Google Scholar Results
@@ -1466,7 +1305,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     </Typography>
                   </Paper>
                 </Box>
-                <Box sx={{ width: showBoostControls ? '20%' : '25%', pl: 1 }}>
+                <Box sx={{ width: showBoostControls ? '25%' : '30%', pl: 1 }}>
                   <Paper sx={{ p: 1, bgcolor: 'success.light', color: 'success.contrastText', borderRadius: 1 }}>
                     <Typography variant="subtitle1" align="center" fontWeight="bold">
                       Quepid Results
@@ -1481,7 +1320,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
               <Box sx={{ display: 'flex', position: 'relative' }}>
                 {/* Original Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '20%' : '25%', 
+                  width: showBoostControls ? '25%' : '30%', 
                   pr: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1505,7 +1344,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 
                 {/* Boosted Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '20%' : '25%', 
+                  width: showBoostControls ? '25%' : '30%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1538,7 +1377,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
                 {/* Google Scholar Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '20%' : '25%', 
+                  width: showBoostControls ? '25%' : '30%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1562,7 +1401,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
                 {/* Quepid Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '20%' : '25%', 
+                  width: showBoostControls ? '25%' : '30%', 
                   pl: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
