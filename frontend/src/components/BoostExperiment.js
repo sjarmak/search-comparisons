@@ -43,6 +43,12 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [showBoostControls, setShowBoostControls] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [visibleResults, setVisibleResults] = useState({
+    original: 10,
+    boosted: 10,
+    scholar: 10,
+    quepid: 10
+  });
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -715,133 +721,108 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     </Paper>
   );
   
-  // Update the Google Scholar results section
-  const renderGoogleScholarResults = () => {
-    if (!searchResults?.results) {
-      return (
-        <ListItem>
-          <ListItemText
-            primary="No Google Scholar results available"
-            secondary="Google Scholar results will appear here when available"
-          />
-        </ListItem>
-      );
-    }
+  // Function to calculate NDCG@10
+  const calculateNDCG = useCallback((results, k = 10) => {
+    if (!results || results.length === 0) return null;
 
-    const scholarResults = searchResults.results.scholar || [];
-    console.log('Google Scholar results:', scholarResults);
+    // Get judgments for the first k results
+    const judgments = results.slice(0, k).map(result => {
+      const recordId = result.bibcode || normalizeTitle(result.title);
+      return localJudgments[recordId] ?? null;
+    }).filter(j => j !== null);
 
-    if (scholarResults.length === 0) {
-      return (
-        <ListItem>
-          <ListItemText
-            primary="No Google Scholar results available"
-            secondary="No matching results found in Google Scholar"
-          />
-        </ListItem>
-      );
-    }
+    if (judgments.length === 0) return null;
 
-    return scholarResults.map((result, index) => (
-      <Tooltip
-        key={`scholar-${index}`}
-        title={
-          <Box>
-            <Typography variant="subtitle2">{result.title}</Typography>
-            <Typography variant="body2">
-              <strong>Authors:</strong> {formatAuthors(result.authors)}
-            </Typography>
-            {result.abstract && (
-              <Typography variant="body2">
-                <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
-              </Typography>
-            )}
-            {getJudgmentForTitle(result.title) !== null && (
-              <Typography variant="body2">
-                <strong>Quepid Judgment:</strong> {getJudgmentForTitle(result.title)}
-              </Typography>
-            )}
-          </Box>
-        }
-        placement="left"
-      >
-        <ListItem 
-          divider
-          sx={{ 
-            px: 2, 
-            py: 1,
-            position: 'relative',
-            transition: 'background-color 0.3s ease',
-            whiteSpace: 'normal'
-          }}
-        >
-          <ListItemText
-            primary={
-              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                <Typography 
-                  variant="body2" 
-                  component="span"
-                  sx={{ 
-                    minWidth: '24px',
-                    fontWeight: 'bold',
-                    mr: 1
-                  }}
-                >
-                  {index + 1}
-                </Typography>
-                <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                    {truncateText(result.title, 60)}
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                    {result.year && (
-                      <Chip 
-                        label={`${result.year}`} 
-                        size="small" 
-                        variant="outlined"
-                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                      />
-                    )}
-                    {result.citation_count !== undefined && (
-                      <Chip 
-                        label={`Citations: ${result.citation_count}`} 
-                        size="small"
-                        variant="outlined"
-                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                      />
-                    )}
-                    {renderJudgmentChip(result.title)}
-                  </Box>
-                </Box>
-              </Box>
-            }
-          />
-          {result.url && (
-            <IconButton 
-              size="small" 
-              href={result.url} 
-              target="_blank"
-              aria-label="Open in Google Scholar"
-            >
-              <LaunchIcon fontSize="small" />
-            </IconButton>
-          )}
-        </ListItem>
-      </Tooltip>
-    ));
+    // Calculate DCG
+    const dcg = judgments.reduce((sum, judgment, i) => {
+      return sum + (judgment / Math.log2(i + 2));
+    }, 0);
+
+    // Calculate IDCG (ideal case where all judgments are perfect)
+    const idcg = judgments.reduce((sum, _, i) => {
+      return sum + (3 / Math.log2(i + 2)); // Assuming 3 is the maximum judgment value
+    }, 0);
+
+    return idcg === 0 ? 0 : dcg / idcg;
+  }, [localJudgments]);
+
+  // Function to render column header with NDCG score
+  const renderColumnHeader = (title, subtitle, results, source) => {
+    const ndcg = calculateNDCG(results);
+    return (
+      <Paper sx={{ p: 1, bgcolor: source === 'original' ? 'grey.100' : 
+        source === 'boosted' ? 'primary.light' : 
+        source === 'scholar' ? 'error.light' : 'success.light',
+        color: source === 'original' ? 'inherit' : 'primary.contrastText',
+        borderRadius: 1
+      }}>
+        <Typography variant="subtitle1" align="center" fontWeight="bold">
+          {title}
+        </Typography>
+        <Typography variant="caption" align="center" display="block" sx={{ 
+          color: source === 'original' ? 'text.secondary' : 'rgba(255,255,255,0.8)' 
+        }}>
+          {subtitle}
+        </Typography>
+        {ndcg !== null && (
+          <Typography variant="caption" align="center" display="block" sx={{ 
+            mt: 0.5,
+            color: source === 'original' ? 'text.secondary' : 'rgba(255,255,255,0.8)',
+            fontWeight: 'bold'
+          }}>
+            NDCG@10: {ndcg.toFixed(3)}
+          </Typography>
+        )}
+      </Paper>
+    );
   };
-  
-  // Add this effect to log Quepid results when they change
-  useEffect(() => {
-    if (quepidResults) {
-      console.log('Quepid Results Structure:', {
-        isArray: Array.isArray(quepidResults),
-        length: quepidResults.length,
-        firstResult: quepidResults[0],
-        allResults: quepidResults
-      });
+
+  // Function to handle loading more results
+  const handleLoadMore = (source) => {
+    setVisibleResults(prev => ({
+      ...prev,
+      [source]: prev[source] + 10
+    }));
+  };
+
+  // Update the results rendering section
+  const renderResultsList = (results, source) => {
+    if (!results || results.length === 0) {
+      return (
+        <ListItem>
+          <ListItemText
+            primary={`No ${source} results available`}
+            secondary={source === 'boosted' ? 
+              "Configure and apply boost factors to see how they affect the ranking" :
+              source === 'quepid' ? 
+              "Enter a Quepid case ID to see relevance judgments" :
+              "No matching results found"}
+          />
+        </ListItem>
+      );
     }
-  }, [quepidResults]);
+
+    const visibleItems = results.slice(0, visibleResults[source]);
+
+    return (
+      <>
+        {visibleItems.map((result, index) => 
+          renderResultItem(result, index, source)
+        )}
+        {results.length > visibleResults[source] && (
+          <ListItem>
+            <Button
+              fullWidth
+              onClick={() => handleLoadMore(source)}
+              sx={{ mt: 1 }}
+            >
+              Load More
+            </Button>
+          </ListItem>
+        )}
+      </>
+    );
+  };
 
   // Modify the createJudgmentMap function
   const createJudgmentMap = useCallback((quepidResults) => {
@@ -1276,44 +1257,36 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
               <Box sx={{ display: 'flex', mb: 2 }}>
                 {/* Title Headers */}
                 <Box sx={{ width: showBoostControls ? '25%' : '30%', pr: 1 }}>
-                  <Paper sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-                    <Typography variant="subtitle1" align="center" fontWeight="bold">
-                      Original Results
-                    </Typography>
-                    <Typography variant="caption" align="center" display="block" color="text.secondary">
-                      Default ranking without boosts
-                    </Typography>
-                  </Paper>
+                  {renderColumnHeader(
+                    'Original Results',
+                    'Default ranking without boosts',
+                    searchResults?.results?.ads,
+                    'original'
+                  )}
                 </Box>
                 <Box sx={{ width: showBoostControls ? '25%' : '30%', px: 1 }}>
-                  <Paper sx={{ p: 1, bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 1 }}>
-                    <Typography variant="subtitle1" align="center" fontWeight="bold">
-                      Boosted Results
-                    </Typography>
-                    <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                      Re-ranked based on current boost settings
-                    </Typography>
-                  </Paper>
+                  {renderColumnHeader(
+                    'Boosted Results',
+                    'Re-ranked based on current boost settings',
+                    boostedResults?.results?.ads,
+                    'boosted'
+                  )}
                 </Box>
                 <Box sx={{ width: showBoostControls ? '25%' : '30%', px: 1 }}>
-                  <Paper sx={{ p: 1, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
-                    <Typography variant="subtitle1" align="center" fontWeight="bold">
-                      Google Scholar Results
-                    </Typography>
-                    <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                      For comparison
-                    </Typography>
-                  </Paper>
+                  {renderColumnHeader(
+                    'Google Scholar Results',
+                    'For comparison',
+                    searchResults?.results?.scholar,
+                    'scholar'
+                  )}
                 </Box>
                 <Box sx={{ width: showBoostControls ? '25%' : '30%', pl: 1 }}>
-                  <Paper sx={{ p: 1, bgcolor: 'success.light', color: 'success.contrastText', borderRadius: 1 }}>
-                    <Typography variant="subtitle1" align="center" fontWeight="bold">
-                      Quepid Results
-                    </Typography>
-                    <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                      Relevance judgments
-                    </Typography>
-                  </Paper>
+                  {renderColumnHeader(
+                    'Quepid Results',
+                    'Relevance judgments',
+                    quepidResults,
+                    'quepid'
+                  )}
                 </Box>
               </Box>
               
@@ -1336,9 +1309,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {searchResults?.results?.ads?.map((result, index) => 
-                      renderResultItem(result, index, 'original')
-                    )}
+                    {renderResultsList(searchResults?.results?.ads, 'original')}
                   </List>
                 </Box>
                 
@@ -1360,18 +1331,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {boostedResults?.results?.ads ? (
-                      boostedResults.results.ads.map((result, index) => 
-                        renderResultItem(result, index, 'boosted')
-                      )
-                    ) : (
-                      <ListItem>
-                        <ListItemText
-                          primary="No boosted results available"
-                          secondary="Configure and apply boost factors to see how they affect the ranking"
-                        />
-                      </ListItem>
-                    )}
+                    {renderResultsList(boostedResults?.results?.ads, 'boosted')}
                   </List>
                 </Box>
 
@@ -1393,9 +1353,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {searchResults?.results?.scholar?.map((result, index) => 
-                      renderResultItem(result, index, 'scholar')
-                    )}
+                    {renderResultsList(searchResults?.results?.scholar, 'scholar')}
                   </List>
                 </Box>
 
@@ -1417,21 +1375,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {quepidResults ? (
-                      quepidResults.map((result, index) => 
-                        renderResultItem(result, index, 'quepid')
-                      )
-                    ) : (
-                      <ListItem>
-                        <ListItemText
-                          primary={
-                            <Typography variant="body2" color="text.secondary" align="center">
-                              Enter a Quepid case ID to see relevance judgments
-                            </Typography>
-                          }
-                        />
-                      </ListItem>
-                    )}
+                    {renderResultsList(quepidResults, 'quepid')}
                   </List>
                 </Box>
               </Box>
