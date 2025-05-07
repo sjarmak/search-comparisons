@@ -40,6 +40,12 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [judgmentMap, setJudgmentMap] = useState({});
   const [expandedRecords, setExpandedRecords] = useState({});
   const [localJudgments, setLocalJudgments] = useState({});
+  const [judgmentCounts, setJudgmentCounts] = useState({
+    original: { quepid: 0, manual: 0, total: 0 },
+    boosted: { quepid: 0, manual: 0, total: 0 },
+    scholar: { quepid: 0, manual: 0, total: 0 },
+    quepid: { quepid: 0, manual: 0, total: 0 }
+  });
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [showBoostControls, setShowBoostControls] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -770,7 +776,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   }, [judgmentMap]);
 
   // Function to calculate NDCG
-  const calculateNDCG = useCallback((results, k = 10) => {
+  const calculateNDCG = useCallback((results, k = 10, source = 'original') => {
     if (!results || results.length === 0) {
       console.log('No results available for NDCG calculation');
       return null;
@@ -779,59 +785,121 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     // Get judgments for the first k results
     const judgments = results.slice(0, k).map(result => {
       const recordId = result.bibcode || normalizeTitle(result.title);
-      const judgment = localJudgments[recordId] ?? getJudgmentForTitle(result.title);
-      console.log(`Record: ${result.title}, Judgment: ${judgment}`);
+      // First check local judgments with the correct source ID
+      const localJudgment = localJudgments[`${source}_${recordId}`];
+      // Then check Quepid judgments
+      const quepidJudgment = getJudgmentForTitle(result.title);
+      
+      // Use local judgment if available, otherwise use Quepid judgment
+      const judgment = localJudgment?.judgment ?? quepidJudgment;
+      
+      console.log(`NDCG calculation for ${source} - Record: ${result.title}`, {
+        recordId,
+        localJudgment,
+        quepidJudgment,
+        finalJudgment: judgment
+      });
+      
       return judgment;
     }).filter(j => j !== null && j !== undefined);
 
-    console.log('Judgments for NDCG calculation:', judgments);
+    console.log(`${source} NDCG calculation - Found ${judgments.length} judgments:`, judgments);
 
     if (judgments.length === 0) {
-      console.log('No judgments available for NDCG calculation');
+      console.log(`No judgments available for ${source} NDCG calculation`);
       return null;
     }
 
     // Calculate DCG
     const dcg = judgments.reduce((sum, judgment, i) => {
       const dcgValue = judgment / Math.log2(i + 2);
-      console.log(`DCG calculation - position ${i + 1}, judgment: ${judgment}, DCG value: ${dcgValue}`);
+      console.log(`DCG calculation for ${source} - position ${i + 1}, judgment: ${judgment}, DCG value: ${dcgValue}`);
       return sum + dcgValue;
     }, 0);
 
     // Calculate IDCG (ideal case where all judgments are perfect)
     const idcg = judgments.reduce((sum, _, i) => {
       const idcgValue = 3 / Math.log2(i + 2); // Assuming 3 is the maximum judgment value
-      console.log(`IDCG calculation - position ${i + 1}, IDCG value: ${idcgValue}`);
+      console.log(`IDCG calculation for ${source} - position ${i + 1}, IDCG value: ${idcgValue}`);
       return sum + idcgValue;
     }, 0);
 
     const ndcg = idcg === 0 ? 0 : dcg / idcg;
-    console.log('Final NDCG calculation:', { dcg, idcg, ndcg });
+    console.log(`${source} Final NDCG calculation:`, { dcg, idcg, ndcg });
     return ndcg;
   }, [localJudgments, getJudgmentForTitle]);
+
+  // Add effect to update judgment counts when judgments change
+  useEffect(() => {
+    const updateJudgmentCounts = () => {
+      const newCounts = {
+        original: { quepid: 0, manual: 0, total: 0 },
+        boosted: { quepid: 0, manual: 0, total: 0 },
+        scholar: { quepid: 0, manual: 0, total: 0 },
+        quepid: { quepid: 0, manual: 0, total: 0 }
+      };
+
+      // Count judgments for each source
+      ['original', 'boosted', 'scholar', 'quepid'].forEach(source => {
+        const results = source === 'original' ? searchResults?.results?.ads :
+                       source === 'boosted' ? boostedResults?.results?.ads :
+                       source === 'scholar' ? searchResults?.results?.scholar :
+                       quepidResults;
+
+        if (results) {
+          results.slice(0, 10).forEach(result => {
+            const recordId = result.bibcode || normalizeTitle(result.title);
+            const hasQuepidJudgment = getJudgmentForTitle(result.title) !== null;
+            const hasManualJudgment = localJudgments[`${source}_${recordId}`] !== undefined;
+            
+            if (hasQuepidJudgment) newCounts[source].quepid++;
+            if (hasManualJudgment) newCounts[source].manual++;
+            if (hasQuepidJudgment || hasManualJudgment) newCounts[source].total++;
+          });
+        }
+      });
+
+      console.log('Updating judgment counts:', newCounts);
+      setJudgmentCounts(newCounts);
+    };
+
+    updateJudgmentCounts();
+  }, [localJudgments, searchResults, boostedResults, quepidResults, getJudgmentForTitle]);
 
   // Function to render column header with NDCG score
   const renderColumnHeader = (title, subtitle, results, source) => {
     // Calculate NDCG@10 for the given results
-    const ndcg = calculateNDCG(results);
-    console.log(`NDCG for ${source}:`, ndcg);
+    const ndcg = calculateNDCG(results, 10, source);
+    console.log(`NDCG calculation for ${source}:`, { ndcg, results: results?.length });
     
-    // Get the count of judged records
-    const judgedCount = results ? results.slice(0, 10).filter(result => {
+    // Calculate judgment counts directly
+    const counts = results ? results.slice(0, 10).reduce((acc, result) => {
       const recordId = result.bibcode || normalizeTitle(result.title);
-      const hasJudgment = localJudgments[recordId] !== undefined || getJudgmentForTitle(result.title) !== null;
-      console.log(`Record ${result.title} has judgment:`, hasJudgment);
-      return hasJudgment;
-    }).length : 0;
+      const hasQuepidJudgment = getJudgmentForTitle(result.title) !== null;
+      const hasManualJudgment = localJudgments[`${source}_${recordId}`] !== undefined;
+      
+      console.log(`Checking judgments for ${source} - ${result.title}:`, {
+        recordId,
+        hasQuepidJudgment,
+        hasManualJudgment,
+        manualJudgment: localJudgments[`${source}_${recordId}`]
+      });
+      
+      if (hasQuepidJudgment) acc.quepid++;
+      if (hasManualJudgment) acc.manual++;
+      if (hasQuepidJudgment || hasManualJudgment) acc.total++;
+      
+      return acc;
+    }, { quepid: 0, manual: 0, total: 0 }) : { quepid: 0, manual: 0, total: 0 };
 
-    console.log(`Judged count for ${source}:`, judgedCount);
+    console.log(`Final counts for ${source}:`, counts);
 
     // Get all NDCG values for ranking
     const allNdcgValues = [
-      { source: 'original', value: calculateNDCG(searchResults?.results?.ads) },
-      { source: 'boosted', value: calculateNDCG(boostedResults?.results?.ads) },
-      { source: 'scholar', value: calculateNDCG(searchResults?.results?.scholar) },
-      { source: 'quepid', value: calculateNDCG(quepidResults) }
+      { source: 'original', value: calculateNDCG(searchResults?.results?.ads, 10, 'original') },
+      { source: 'boosted', value: calculateNDCG(boostedResults?.results?.ads, 10, 'boosted') },
+      { source: 'scholar', value: calculateNDCG(searchResults?.results?.scholar, 10, 'scholar') },
+      { source: 'quepid', value: calculateNDCG(quepidResults, 10, 'quepid') }
     ].filter(item => item.value !== null);
 
     // Sort by NDCG value in descending order
@@ -879,9 +947,20 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
           </Typography>
           <Typography variant="caption" align="center" display="block" sx={{ 
             color: source === 'original' ? 'text.secondary' : 'rgba(255,255,255,0.8)',
-            fontSize: '0.7rem'
+            fontSize: '0.7rem',
+            fontWeight: counts.total > 0 ? 'bold' : 'normal'
           }}>
-            ({judgedCount} judged records)
+            {counts.total > 0 ? (
+              <>
+                Total Judgments: {counts.total}
+                {counts.quepid > 0 && ` (Quepid: ${counts.quepid}`}
+                {counts.quepid > 0 && counts.manual > 0 && ' | '}
+                {counts.manual > 0 && `Manual: ${counts.manual}`}
+                {counts.quepid > 0 && ')'}
+              </>
+            ) : (
+              'No judgments'
+            )}
           </Typography>
         </Box>
       </Paper>
@@ -974,11 +1053,17 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
   // Function to handle judgment selection
   const handleJudgmentSelect = (recordId, judgment, sourceId) => {
-    if (judgment === '') {
+    console.log('Handling judgment select:', { recordId, judgment, sourceId });
+    
+    // Convert judgment to number and check if it's a valid judgment value
+    const judgmentValue = judgment === '' ? null : Number(judgment);
+    
+    if (judgmentValue === null) {
       // If clearing the judgment, just remove it
       setLocalJudgments(prev => {
         const newJudgments = { ...prev };
         delete newJudgments[`${sourceId}_${recordId}`];
+        console.log('Cleared judgment, new state:', newJudgments);
         return newJudgments;
       });
       return;
@@ -988,17 +1073,20 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     setLocalJudgments(prev => {
       const existingJudgment = prev[`${sourceId}_${recordId}`];
       const judgmentType = existingJudgment === undefined ? 'new' : 
-                          existingJudgment.judgment !== judgment ? 'changed' : 'existing';
+                          existingJudgment.judgment !== judgmentValue ? 'changed' : 'existing';
 
-      return {
+      const newJudgments = {
         ...prev,
         [`${sourceId}_${recordId}`]: {
-          judgment,
+          judgment: judgmentValue,
           note: existingJudgment?.note || '',
           type: judgmentType,
           timestamp: new Date().toISOString()
         }
       };
+      
+      console.log('Updated judgments, new state:', newJudgments);
+      return newJudgments;
     });
   };
 
@@ -1042,7 +1130,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     const sourceId = record.source_id || 'original';
     const quepidJudgment = getJudgmentForTitle(record.title);
     const userJudgment = localJudgments[`${sourceId}_${recordId}`];
-    const currentJudgment = userJudgment?.judgment ?? quepidJudgment;
+    const currentJudgment = userJudgment?.judgment !== undefined ? userJudgment.judgment : quepidJudgment;
     const hasQuepidJudgment = quepidJudgment !== null;
 
     return (
@@ -1127,35 +1215,52 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
     // Helper function to add a record with judgment
     const addRecordWithJudgment = (record, judgment, source, judgmentType = 'existing') => {
-      recordsWithJudgments.push({
-        query: searchQuery,
-        information_need: informationNeed,
-        title: record.title,
-        judgment: judgment,
-        note: judgment?.note || '',
-        type: judgmentType,
-        source: source,
-        timestamp: judgment?.timestamp || new Date().toISOString(),
-        // Add boost information if available
-        boosts: source === 'boosted' ? {
-          field_boosts: boostConfig.fieldBoosts,
-          citation_boost: boostConfig.citationBoost,
-          recency_boost: boostConfig.recencyBoost,
-          doctype_boosts: boostConfig.doctypeBoosts,
-          reference_year: boostConfig.referenceYear
-        } : null
-      });
+      // Format the source name
+      const formattedSource = source === 'ads' ? 'ADS' : 
+                            source === 'quepid' ? 'Quepid' :
+                            source === 'boosted' ? 'Boosted' :
+                            source === 'scholar' ? 'Google Scholar' : source;
+
+      // Get the judgment value - explicitly check for null/undefined
+      let judgmentValue;
+      if (typeof judgment === 'object') {
+        judgmentValue = judgment.judgment;
+      } else {
+        judgmentValue = judgment;
+      }
+
+      // Only add if we have a valid judgment (including 0)
+      if (judgmentValue !== null && judgmentValue !== undefined && judgmentValue >= 0) {
+        recordsWithJudgments.push({
+          query: searchQuery,
+          information_need: informationNeed,
+          title: record.title,
+          judgment: judgmentValue,
+          note: judgment?.note || '',
+          type: judgmentType,
+          source: formattedSource,
+          timestamp: judgment?.timestamp || new Date().toISOString(),
+          // Add boost information if available
+          boosts: source === 'boosted' ? {
+            field_boosts: boostConfig.fieldBoosts,
+            citation_boost: boostConfig.citationBoost,
+            recency_boost: boostConfig.recencyBoost,
+            doctype_boosts: boostConfig.doctypeBoosts,
+            reference_year: boostConfig.referenceYear
+          } : null
+        });
+      }
     };
 
     // Check ADS results
     searchResults?.results?.ads?.forEach(record => {
       const recordId = record.bibcode || normalizeTitle(record.title);
-      const userJudgment = localJudgments[recordId];
+      const userJudgment = localJudgments[`original_${recordId}`];
       const quepidJudgment = getJudgmentForTitle(record.title);
 
-      if (userJudgment) {
+      if (userJudgment !== undefined) {
         addRecordWithJudgment(record, userJudgment, 'ads', userJudgment.type);
-      } else if (quepidJudgment !== null) {
+      } else if (quepidJudgment !== null && quepidJudgment !== undefined) {
         addRecordWithJudgment(record, { judgment: quepidJudgment }, 'ads', 'quepid');
       }
     });
@@ -1163,17 +1268,17 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     // Check Google Scholar results
     searchResults?.results?.scholar?.forEach(record => {
       const recordId = normalizeTitle(record.title);
-      const userJudgment = localJudgments[recordId];
-      if (userJudgment) {
-        addRecordWithJudgment(record, userJudgment, 'Google Scholar', userJudgment.type);
+      const userJudgment = localJudgments[`scholar_${recordId}`];
+      if (userJudgment !== undefined) {
+        addRecordWithJudgment(record, userJudgment, 'scholar', userJudgment.type);
       }
     });
 
     // Check boosted results
     boostedResults?.results?.ads?.forEach(record => {
       const recordId = record.bibcode || normalizeTitle(record.title);
-      const userJudgment = localJudgments[recordId];
-      if (userJudgment) {
+      const userJudgment = localJudgments[`boosted_${recordId}`];
+      if (userJudgment !== undefined) {
         addRecordWithJudgment(record, userJudgment, 'boosted', userJudgment.type);
       }
     });
@@ -1185,18 +1290,90 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
     // Calculate NDCG@10 scores for each source
     const ndcgScores = {
-      original: calculateNDCG(searchResults?.results?.ads),
-      boosted: calculateNDCG(boostedResults?.results?.ads),
-      scholar: calculateNDCG(searchResults?.results?.scholar),
-      quepid: calculateNDCG(quepidResults)
+      original: calculateNDCG(searchResults?.results?.ads, 10, 'original'),
+      boosted: calculateNDCG(boostedResults?.results?.ads, 10, 'boosted'),
+      scholar: calculateNDCG(searchResults?.results?.scholar, 10, 'scholar'),
+      quepid: calculateNDCG(quepidResults, 10, 'quepid')
     };
 
-    // Format as tab-separated text
-    const txtContent = [
+    // Helper function to pad string to fixed width
+    const padString = (str, width) => {
+      const strValue = String(str || '');
+      return strValue.padEnd(width);
+    };
+
+    // Helper function to wrap text to multiple lines
+    const wrapText = (text, width) => {
+      // Convert to string and handle null/undefined
+      const textStr = text?.toString() || '';
+      if (!textStr) return [''];
+      
+      const words = textStr.split(' ');
+      const lines = [];
+      let currentLine = '';
+      
+      words.forEach(word => {
+        if (currentLine.length + word.length + 1 <= width) {
+          currentLine += (currentLine ? ' ' : '') + word;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      });
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      return lines;
+    };
+
+    // Helper function to format a row with proper spacing
+    const formatRow = (values, widths) => {
+      const wrappedTitle = wrapText(values[0], widths[0]);
+      const otherValues = values.slice(1);
+      
+      // Format the first line
+      const firstLine = [
+        padString(wrappedTitle[0], widths[0]),
+        ...otherValues.map((value, index) => padString(value, widths[index + 1]))
+      ].join('  ');
+
+      // Format any additional lines for the title
+      const additionalLines = wrappedTitle.slice(1).map(line => 
+        padString(line, widths[0]) + '  ' + 
+        otherValues.map((_, index) => padString('', widths[index + 1])).join('  ')
+      );
+
+      return [firstLine, ...additionalLines].join('\n');
+    };
+
+    // Column widths
+    const columnWidths = {
+      title: 80,  // Increased width for title
+      judgment: 8,
+      note: 25,
+      type: 8,
+      source: 15,
+      timestamp: 24
+    };
+
+    // Group records by query and information need
+    const groupedRecords = recordsWithJudgments.reduce((acc, record) => {
+      const key = `${record.query}|${record.information_need}`;
+      if (!acc[key]) {
+        acc[key] = {
+          query: record.query,
+          information_need: record.information_need,
+          records: []
+        };
+      }
+      acc[key].records.push(record);
+      return acc;
+    }, {});
+
+    // Format as fixed-width text for the detailed report
+    const detailedReport = [
       // Header section with metadata
       '=== Search Configuration ===',
-      `Query: ${searchQuery}`,
-      `Information Need: ${informationNeed}`,
       `Timestamp: ${new Date().toISOString()}`,
       '',
       '=== NDCG@10 Scores ===',
@@ -1217,28 +1394,68 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       ...Object.entries(boostConfig.doctypeBoosts).map(([type, value]) => `  ${type}: ${value}`),
       '',
       '=== Judgments ===',
-      'Query\tInformation Need\tTitle\tJudgment\tNote\tType\tSource\tTimestamp\tBoost Configuration',
+      // Column headers
+      formatRow([
+        'Title',
+        'Judgment',
+        'Note',
+        'Type',
+        'Source',
+        'Timestamp'
+      ], Object.values(columnWidths)),
+      // Separator line
+      '-'.repeat(Object.values(columnWidths).reduce((a, b) => a + b + 2, 0)),
+      // Grouped records
+      ...Object.values(groupedRecords).flatMap(group => [
+        // Group header with extra newline
+        '',
+        `Query: ${group.query}`,
+        group.information_need ? `Information Need: ${group.information_need}` : '',
+        // Group records
+        ...group.records.map(record => formatRow([
+          record.title,
+          record.judgment,
+          record.note,
+          record.type,
+          record.source,
+          record.timestamp
+        ], Object.values(columnWidths)))
+      ])
+    ].join('\n');
+
+    // Create a simple version with just query, title, judgment, and source
+    const simpleReport = [
+      'Query\tTitle\tJudgment\tSource',
       ...recordsWithJudgments.map(record => [
         record.query,
-        record.information_need,
         record.title,
         record.judgment,
-        record.note,
-        record.type,
-        record.source,
-        record.timestamp,
-        record.boosts ? JSON.stringify(record.boosts) : ''
+        record.source
       ].join('\t'))
     ].join('\n');
 
-    const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `judgments_${new Date().toISOString().split('T')[0]}.txt`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Get timestamp for filenames
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    // Export detailed report
+    const detailedBlob = new Blob([detailedReport], { type: 'text/plain;charset=utf-8' });
+    const detailedLink = document.createElement('a');
+    const detailedUrl = URL.createObjectURL(detailedBlob);
+    detailedLink.setAttribute('href', detailedUrl);
+    detailedLink.setAttribute('download', `relevance_report_${timestamp}.txt`);
+    document.body.appendChild(detailedLink);
+    detailedLink.click();
+    document.body.removeChild(detailedLink);
+
+    // Export simple report
+    const simpleBlob = new Blob([simpleReport], { type: 'text/plain;charset=utf-8' });
+    const simpleLink = document.createElement('a');
+    const simpleUrl = URL.createObjectURL(simpleBlob);
+    simpleLink.setAttribute('href', simpleUrl);
+    simpleLink.setAttribute('download', `relevance_judgments_${timestamp}.txt`);
+    document.body.appendChild(simpleLink);
+    simpleLink.click();
+    document.body.removeChild(simpleLink);
   };
 
   // Function to render expanded record details in a dialog
@@ -1329,6 +1546,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   // Modify the renderResultItem function to remove inline expansion
   const renderResultItem = (result, index, containerId) => {
     const recordId = result.bibcode || normalizeTitle(result.title);
+    // Set the correct source ID based on the container
+    const sourceId = containerId === 'scholar' ? 'scholar' : containerId;
 
     return (
       <ListItem 
@@ -1416,7 +1635,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                       />
                     )}
                   </Box>
-                  {renderJudgmentSelector(result)}
+                  {renderJudgmentSelector({...result, source_id: sourceId})}
                 </Box>
               </Box>
             </Box>
