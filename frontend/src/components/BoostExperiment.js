@@ -1046,7 +1046,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     const normalizedTitle = normalizeTitle(title);
     const judgment = judgmentMap[normalizedTitle];
     console.log(`Looking up judgment for title: "${title}" -> "${normalizedTitle}" -> ${judgment}`);
-    return judgment;
+    return judgment === undefined ? null : judgment;
   }, [judgmentMap]);
 
   // Add this helper function to render judgment chip
@@ -1078,29 +1078,54 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
   // Function to handle judgment selection
   const handleJudgmentSelect = (recordId, judgment) => {
-    setLocalJudgments(prev => ({
-      ...prev,
-      [recordId]: judgment
-    }));
+    setLocalJudgments(prev => {
+      // If the judgment is empty string, remove the judgment
+      if (judgment === '') {
+        const newJudgments = { ...prev };
+        delete newJudgments[recordId];
+        return newJudgments;
+      }
+      return {
+        ...prev,
+        [recordId]: judgment
+      };
+    });
   };
 
   // Function to export judgments to CSV
   const handleExportJudgments = () => {
-    const allJudgments = { ...judgmentMap, ...localJudgments };
-    const records = searchResults?.results?.ads || [];
-    
-    const csvContent = [
-      ['Query', 'Title', 'Authors', 'Year', 'Judgment'],
-      ...records.map(record => {
-        const judgment = allJudgments[normalizeTitle(record.title)];
-        return [
-          searchQuery,
-          record.title,
-          formatAuthors(record.author),
-          record.year,
-          judgment !== undefined ? judgment : ''
-        ];
+    // Only get records that have user-entered judgments
+    const recordsWithJudgments = Object.entries(localJudgments)
+      .filter(([_, judgment]) => judgment !== undefined && judgment !== null)
+      .map(([recordId, judgment]) => {
+        // Find the corresponding record from search results
+        const record = searchResults?.results?.ads?.find(r => 
+          (r.bibcode && r.bibcode === recordId) || 
+          normalizeTitle(r.title) === recordId
+        );
+        
+        if (!record) return null;
+        
+        return {
+          query: searchQuery,
+          title: record.title,
+          judgment: judgment
+        };
       })
+      .filter(record => record !== null);
+
+    if (recordsWithJudgments.length === 0) {
+      setError('No judgments to export');
+      return;
+    }
+
+    const csvContent = [
+      ['Query', 'Title', 'Judgment'],
+      ...recordsWithJudgments.map(record => [
+        record.query,
+        record.title,
+        record.judgment
+      ])
     ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1116,37 +1141,41 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   // Function to render judgment selector
   const renderJudgmentSelector = (record) => {
     const recordId = record.bibcode || normalizeTitle(record.title);
-    const currentJudgment = localJudgments[recordId] ?? getJudgmentForTitle(record.title);
-
-    if (currentJudgment !== null && currentJudgment !== undefined) {
-      return (
-        <Chip 
-          label={`Score: ${currentJudgment}`} 
-          size="small"
-          variant="outlined"
-          color={currentJudgment > 0 ? "success" : "default"}
-          sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-        />
-      );
-    }
+    const quepidJudgment = getJudgmentForTitle(record.title);
+    const userJudgment = localJudgments[recordId];
+    const currentJudgment = userJudgment !== undefined ? userJudgment : quepidJudgment;
+    const hasQuepidJudgment = quepidJudgment !== null;
 
     return (
-      <FormControl size="small" sx={{ minWidth: 120 }}>
-        <Select
-          value=""
-          onChange={(e) => handleJudgmentSelect(recordId, e.target.value)}
-          displayEmpty
-          sx={{ height: 20, fontSize: '0.7rem' }}
-        >
-          <MenuItem value="" disabled>
-            <em>Add Judgment</em>
-          </MenuItem>
-          <MenuItem value={0}>Poor (0)</MenuItem>
-          <MenuItem value={1}>Fair (1)</MenuItem>
-          <MenuItem value={2}>Good (2)</MenuItem>
-          <MenuItem value={3}>Perfect (3)</MenuItem>
-        </Select>
-      </FormControl>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {hasQuepidJudgment && (
+          <Tooltip title={`Quepid Judgment: ${quepidJudgment}`}>
+            <Chip 
+              label="Quepid" 
+              size="small"
+              variant="outlined"
+              color="info"
+              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+            />
+          </Tooltip>
+        )}
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <Select
+            value={currentJudgment !== null && currentJudgment !== undefined ? currentJudgment : ''}
+            onChange={(e) => handleJudgmentSelect(recordId, e.target.value)}
+            displayEmpty
+            sx={{ height: 20, fontSize: '0.7rem' }}
+          >
+            <MenuItem value="" disabled>
+              <em>Add Judgment</em>
+            </MenuItem>
+            <MenuItem value={0}>Poor (0)</MenuItem>
+            <MenuItem value={1}>Fair (1)</MenuItem>
+            <MenuItem value={2}>Good (2)</MenuItem>
+            <MenuItem value={3}>Perfect (3)</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
     );
   };
 
@@ -1321,8 +1350,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       <DialogTitle>Export Judgments</DialogTitle>
       <DialogContent>
         <Typography variant="body2" gutterBottom>
-          This will export all judgments (both from Quepid and manually added) to a CSV file.
-          The file will include the search query, paper title, authors, year, and judgment score.
+          This will export only the judgments you have manually entered to a CSV file.
+          The file will include the search query, paper title, and judgment score.
+          Only records where you have entered a judgment will be included in the export.
         </Typography>
       </DialogContent>
       <DialogActions>
