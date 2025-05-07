@@ -23,12 +23,9 @@ import { TransformedQuery } from './TransformedQuery';
  * Component for experimenting with different boost factors and their impact on ranking
  * 
  * @param {Object} props - Component props
- * @param {Array} props.originalResults - The original search results to re-rank
- * @param {string} props.query - The search query used to retrieve results
- * @param {function} props.onRunNewSearch - Callback function when user wants to run a new search
- * @param {Object} props.results - Full search results including Google Scholar for comparison
+ * @param {string} props.API_URL - The API URL for making requests
  */
-const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, onRunNewSearch, results }) => {
+const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [boostedResults, setBoostedResults] = useState(null);
@@ -36,6 +33,9 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
   const [debugInfo, setDebugInfo] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [transformedQuery, setTransformedQuery] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [quepidCaseId, setQuepidCaseId] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -98,7 +98,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
         console.log("Extracted original query term:", cleanQuery);
       } else {
         // If we can't extract the original term, use the original query from props
-        cleanQuery = query;
+        cleanQuery = searchQuery;
         console.log("Using original prop query:", cleanQuery);
       }
     }
@@ -185,7 +185,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     const result = parts.join(" OR ");
     console.log("Final transformed query:", result);
     return result;
-  }, [boostConfig, query]);
+  }, [boostConfig, searchQuery]);
   
   // Helper function to generate combinations
   const getCombinations = (arr, size) => {
@@ -211,30 +211,29 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
   // Debug logging
   useEffect(() => {
     console.log('BoostExperiment mounted with:', {
-      originalResultsLength: originalResults?.length,
-      query,
+      searchQuery,
       boostConfig
     });
     
     // Log the transformed query for debugging
-    if (query) {
-      const transformedQuery = transformQuery(query);
+    if (searchQuery) {
+      const transformedQuery = transformQuery(searchQuery);
       console.log('Transformed query:', transformedQuery);
     }
     
-    if (originalResults?.length > 0) {
+    if (searchResults?.results?.ads?.length > 0) {
       // COMPREHENSIVE LOGGING: Log the entire first result to see the complete structure
-      console.log("CRITICAL: Complete structure of first result:", JSON.stringify(originalResults[0], null, 2));
+      console.log("CRITICAL: Complete structure of first result:", JSON.stringify(searchResults.results.ads[0], null, 2));
       
       // Log much more detailed information about the original search results
-      const yearTypes = originalResults.map(r => typeof r.year).filter((v, i, a) => a.indexOf(v) === i);
-      const sampleYears = originalResults.slice(0, 5).map(r => r.year);
-      const hasArrayYears = originalResults.some(r => Array.isArray(r.year));
+      const yearTypes = searchResults.results.ads.map(r => typeof r.year).filter((v, i, a) => a.indexOf(v) === i);
+      const sampleYears = searchResults.results.ads.slice(0, 5).map(r => r.year);
+      const hasArrayYears = searchResults.results.ads.some(r => Array.isArray(r.year));
       const yearStructure = {
         types_present: yearTypes,
         sample_values: sampleYears,
         any_arrays: hasArrayYears,
-        original_display: originalResults.slice(0, 5).map(r => ({
+        original_display: searchResults.results.ads.slice(0, 5).map(r => ({
           title: truncateText(r.title, 30),
           year_display: r.year,
           year_type: typeof r.year,
@@ -245,7 +244,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
       console.log("CRITICAL DEBUGGING - Years in original results:", yearStructure);
       
       // Check for alternative fields that might contain year information
-      const alternativeFields = originalResults.slice(0, 3).map(r => ({
+      const alternativeFields = searchResults.results.ads.slice(0, 3).map(r => ({
         title: truncateText(r.title, 30),
         pub_year: r.pub_year,
         date: r.date,
@@ -256,14 +255,14 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
       console.log("CHECKING ALTERNATIVE YEAR FIELDS:", alternativeFields);
       
       console.log("Sample result metadata:", {
-        citation: originalResults[0].citation_count,
-        year: originalResults[0].year,
-        year_type: typeof originalResults[0].year,
-        doctype: originalResults[0].doctype,
-        properties: originalResults[0].property
+        citation: searchResults.results.ads[0].citation_count,
+        year: searchResults.results.ads[0].year,
+        year_type: typeof searchResults.results.ads[0].year,
+        doctype: searchResults.results.ads[0].doctype,
+        properties: searchResults.results.ads[0].property
       });
     }
-  }, [originalResults, query, boostConfig]);
+  }, [searchResults, searchQuery, boostConfig]);
   
   // Helper functions for title comparison
   const normalizeTitle = (title) => {
@@ -383,13 +382,68 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     });
   }, []);
   
+  // Function to handle the initial search
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setError('Please enter a search query');
+      return;
+    }
+
+    setSearchLoading(true);
+    setError(null);
+    try {
+      console.log('Making search request with query:', searchQuery);
+      const response = await fetch(`${API_URL}/api/search/compare`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: searchQuery,
+          sources: ['ads', 'scholar'],  // Explicitly request Google Scholar results
+          metrics: ['ndcg@10', 'precision@10', 'recall@10'],
+          fields: ['title', 'abstract', 'authors', 'year', 'citation_count', 'doctype'],
+          max_results: 20,
+          quepid_case_id: quepidCaseId || undefined
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to perform search');
+      }
+
+      const data = await response.json();
+      console.log('Search response:', data);
+      
+      if (!data.results || !data.results.ads || data.results.ads.length === 0) {
+        throw new Error('No results found for the given query');
+      }
+
+      setSearchResults(data);
+      // Reset boosted results when performing a new search
+      setBoostedResults(null);
+    } catch (err) {
+      console.error('Error performing search:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setSearchResults(null);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+  
   // Function to handle running the boost experiment
   const handleRunBoostExperiment = async () => {
+    if (!searchResults?.results?.ads) {
+      setError('Please perform a search first');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       // Transform the query
-      const transformedQuery = transformQuery(query);
+      const transformedQuery = transformQuery(searchQuery);
       
       // Make the API request
       const response = await fetch(`${API_URL}/api/search/compare`, {
@@ -399,7 +453,7 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
         },
         body: JSON.stringify({
           query: transformedQuery,
-          originalQuery: query,
+          originalQuery: searchQuery,
           sources: ['ads'],
           metrics: ['ndcg@10', 'precision@10', 'recall@10'],
           fields: ['title', 'abstract', 'authors', 'year', 'citation_count', 'doctype'],
@@ -636,14 +690,6 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     );
   };
   
-  if (!originalResults || originalResults.length === 0) {
-    return (
-      <Alert severity="warning">
-        No results available for boost experiment. Please perform a search first.
-      </Alert>
-    );
-  }
-  
   // Function to render boost controls
   const renderBoostControls = () => (
     <Box sx={{ mb: 3 }}>
@@ -742,13 +788,13 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
       </Box>
 
       {/* Transformed Query Display */}
-      <TransformedQuery query={query} fieldBoosts={boostConfig.fieldBoosts} />
+      <TransformedQuery query={searchQuery} fieldBoosts={boostConfig.fieldBoosts} />
 
       {/* Run Experiment Button */}
       <Button
         variant="contained"
         onClick={handleRunBoostExperiment}
-        disabled={loading || !query}
+        disabled={loading || !searchResults?.results?.ads}
         sx={{ mt: 2 }}
       >
         {loading ? <CircularProgress size={24} /> : 'Run Boost Experiment'}
@@ -756,11 +802,179 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
     </Box>
   );
   
+  // Add the search form section at the top of the component
+  const renderSearchForm = () => (
+    <Paper sx={{ p: 2, mb: 3 }}>
+      <Typography variant="h6" gutterBottom>
+        Search Configuration
+      </Typography>
+      <Grid container spacing={2} alignItems="center">
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            label="Search Query"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Enter your search query"
+            disabled={searchLoading}
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <TextField
+            fullWidth
+            label="Quepid Case ID (Optional)"
+            value={quepidCaseId}
+            onChange={(e) => setQuepidCaseId(e.target.value)}
+            placeholder="Enter Quepid case ID"
+            disabled={searchLoading}
+          />
+        </Grid>
+        <Grid item xs={12} md={2}>
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={handleSearch}
+            disabled={searchLoading || !searchQuery.trim()}
+            startIcon={searchLoading ? <CircularProgress size={20} /> : <SearchIcon />}
+          >
+            {searchLoading ? 'Searching...' : 'Search'}
+          </Button>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+  
+  // Update the Google Scholar results section
+  const renderGoogleScholarResults = () => {
+    if (!searchResults?.results) {
+      return (
+        <ListItem>
+          <ListItemText
+            primary="No Google Scholar results available"
+            secondary="Google Scholar results will appear here when available"
+          />
+        </ListItem>
+      );
+    }
+
+    const scholarResults = searchResults.results.scholar || [];
+    console.log('Google Scholar results:', scholarResults);
+
+    if (scholarResults.length === 0) {
+      return (
+        <ListItem>
+          <ListItemText
+            primary="No Google Scholar results available"
+            secondary="No matching results found in Google Scholar"
+          />
+        </ListItem>
+      );
+    }
+
+    return scholarResults.map((result, index) => (
+      <Tooltip
+        key={`scholar-${index}`}
+        title={
+          <Box>
+            <Typography variant="subtitle2">{result.title}</Typography>
+            <Typography variant="body2">
+              <strong>Authors:</strong> {formatAuthors(result.authors)}
+            </Typography>
+            {result.abstract && (
+              <Typography variant="body2">
+                <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
+              </Typography>
+            )}
+          </Box>
+        }
+        placement="left"
+      >
+        <ListItem 
+          divider
+          sx={{ 
+            px: 2, 
+            py: 1,
+            position: 'relative',
+            transition: 'background-color 0.3s ease',
+            whiteSpace: 'normal'
+          }}
+        >
+          <ListItemText
+            primary={
+              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                <Typography 
+                  variant="body2" 
+                  component="span"
+                  sx={{ 
+                    minWidth: '24px',
+                    fontWeight: 'bold',
+                    mr: 1
+                  }}
+                >
+                  {index + 1}
+                </Typography>
+                <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                    {truncateText(result.title, 60)}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                    {result.year && (
+                      <Chip 
+                        label={`${result.year}`} 
+                        size="small" 
+                        variant="outlined"
+                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                      />
+                    )}
+                    {result.citation_count !== undefined && (
+                      <Chip 
+                        label={`Citations: ${result.citation_count}`} 
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                      />
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+            }
+          />
+          {result.url && (
+            <IconButton 
+              size="small" 
+              href={result.url} 
+              target="_blank"
+              aria-label="Open in Google Scholar"
+            >
+              <LaunchIcon fontSize="small" />
+            </IconButton>
+          )}
+        </ListItem>
+      </Tooltip>
+    ));
+  };
+  
   return (
     <Box sx={{ width: '100%', p: 2 }}>
-      {!originalResults || originalResults.length === 0 ? (
-        <Alert severity="warning">
-          No results available for boost experiment. Please perform a search first.
+      {renderSearchForm()}
+      
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      {searchLoading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      )}
+
+      {!searchLoading && (!searchResults || !searchResults.results || !searchResults.results.ads || searchResults.results.ads.length === 0) ? (
+        <Alert severity="info">
+          {searchResults === null ? 
+            'Enter a search query and click Search to begin experimenting with boost factors.' :
+            'No results found for the given query. Please try a different search term.'}
         </Alert>
       ) : (
         <Grid container spacing={2}>
@@ -789,528 +1003,318 @@ const BoostExperiment = ({ originalResults, query, API_URL = DEFAULT_API_URL, on
                 </Button>
               </Box>
 
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              )}
-
-              {searchLoading && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  Fetching new results with updated field weights...
-                </Alert>
-              )}
-
               <Collapse in={debugMode}>
                 {renderDebugPanel()}
               </Collapse>
 
-              {boostedResults && boostedResults.results && Object.keys(boostedResults.results).length > 0 ? (
-                <>
-                  <Box sx={{ display: 'flex', mb: 2 }}>
-                    {/* Title Headers */}
-                    <Box sx={{ width: '33%', pr: 1 }}>
-                      <Paper sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-                        <Typography variant="subtitle1" align="center" fontWeight="bold">
-                          Original Results
-                        </Typography>
-                        <Typography variant="caption" align="center" display="block" color="text.secondary">
-                          Default ranking without boosts
-                        </Typography>
-                      </Paper>
-                    </Box>
-                    <Box sx={{ width: '33%', px: 1 }}>
-                      <Paper sx={{ p: 1, bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 1 }}>
-                        <Typography variant="subtitle1" align="center" fontWeight="bold">
-                          Boosted Results
-                        </Typography>
-                        <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                          Re-ranked based on current boost settings
-                        </Typography>
-                      </Paper>
-                    </Box>
-                    <Box sx={{ width: '33%', pl: 1 }}>
-                      <Paper sx={{ p: 1, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
-                        <Typography variant="subtitle1" align="center" fontWeight="bold">
-                          Google Scholar Results
-                        </Typography>
-                        <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                          For comparison
-                        </Typography>
-                      </Paper>
-                    </Box>
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', position: 'relative' }}>
-                    {/* Original Results */}
-                    <Box sx={{ 
-                      width: '33%', 
-                      pr: 1, 
-                      height: '65vh', 
-                      overflow: 'hidden',  // Change from 'auto' to 'hidden'
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }} id="original-results-container">
-                      <List sx={{ 
-                        bgcolor: 'background.paper', 
-                        border: '1px solid', 
-                        borderColor: 'divider', 
-                        borderRadius: 1,
-                        overflow: 'auto',  // Allow only vertical scrolling inside the list
-                        overflowX: 'hidden',  // Hide horizontal scrolling
-                        flexGrow: 1
-                      }}>
-                        {originalResults.map((result, index) => {
-                          return (
-                            <Tooltip
-                              key={result.bibcode || index}
-                              title={
-                                <Box>
-                                  <Typography variant="subtitle2">{result.title}</Typography>
-                                  <Typography variant="body2">
-                                    <strong>Authors:</strong> {formatAuthors(result.author)}
+              <Box sx={{ display: 'flex', mb: 2 }}>
+                {/* Title Headers */}
+                <Box sx={{ width: '33%', pr: 1 }}>
+                  <Paper sx={{ p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
+                    <Typography variant="subtitle1" align="center" fontWeight="bold">
+                      Original Results
+                    </Typography>
+                    <Typography variant="caption" align="center" display="block" color="text.secondary">
+                      Default ranking without boosts
+                    </Typography>
+                  </Paper>
+                </Box>
+                <Box sx={{ width: '33%', px: 1 }}>
+                  <Paper sx={{ p: 1, bgcolor: 'primary.light', color: 'primary.contrastText', borderRadius: 1 }}>
+                    <Typography variant="subtitle1" align="center" fontWeight="bold">
+                      Boosted Results
+                    </Typography>
+                    <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                      Re-ranked based on current boost settings
+                    </Typography>
+                  </Paper>
+                </Box>
+                <Box sx={{ width: '33%', pl: 1 }}>
+                  <Paper sx={{ p: 1, bgcolor: 'error.light', color: 'error.contrastText', borderRadius: 1 }}>
+                    <Typography variant="subtitle1" align="center" fontWeight="bold">
+                      Google Scholar Results
+                    </Typography>
+                    <Typography variant="caption" align="center" display="block" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                      For comparison
+                    </Typography>
+                  </Paper>
+                </Box>
+              </Box>
+              
+              <Box sx={{ display: 'flex', position: 'relative' }}>
+                {/* Original Results */}
+                <Box sx={{ 
+                  width: '33%', 
+                  pr: 1, 
+                  height: '65vh', 
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} id="original-results-container">
+                  <List sx={{ 
+                    bgcolor: 'background.paper', 
+                    border: '1px solid', 
+                    borderColor: 'divider', 
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    overflowX: 'hidden',
+                    flexGrow: 1
+                  }}>
+                    {searchResults.results.ads.map((result, index) => (
+                      <Tooltip
+                        key={result.bibcode || index}
+                        title={
+                          <Box>
+                            <Typography variant="subtitle2">{result.title}</Typography>
+                            <Typography variant="body2">
+                              <strong>Authors:</strong> {formatAuthors(result.author)}
+                            </Typography>
+                            {result.abstract && (
+                              <Typography variant="body2">
+                                <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                        placement="left"
+                      >
+                        <ListItem 
+                          id={`original-item-${index}`}
+                          divider
+                          sx={{ 
+                            px: 2, 
+                            py: 1,
+                            position: 'relative',
+                            transition: 'background-color 0.3s ease',
+                            whiteSpace: 'normal'
+                          }}
+                        >
+                          <ListItemText
+                            primary={
+                              <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                <Typography 
+                                  variant="body2" 
+                                  component="span"
+                                  sx={{ 
+                                    minWidth: '24px',
+                                    fontWeight: 'bold',
+                                    mr: 1
+                                  }}
+                                >
+                                  {index + 1}
+                                </Typography>
+                                <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                    {truncateText(result.title, 60)}
                                   </Typography>
-                                  {result.abstract && (
-                                    <Typography variant="body2">
-                                      <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              }
-                              placement="left"
-                            >
-                              <ListItem 
-                                id={`original-item-${index}`}
-                                key={result.bibcode || result.title} 
-                                divider
-                                sx={{ 
-                                  px: 2, 
-                                  py: 1,
-                                  position: 'relative',
-                                  transition: 'background-color 0.3s ease',
-                                  whiteSpace: 'normal'  // Allow text to wrap
-                                }}
-                              >
-                                <ListItemText
-                                  primary={
-                                    <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                      <Typography 
-                                        variant="body2" 
-                                        component="span"
-                                        sx={{ 
-                                          minWidth: '24px',
-                                          fontWeight: 'bold',
-                                          mr: 1
-                                        }}
-                                      >
-                                        {index + 1}
-                                      </Typography>
-                                      <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                          {truncateText(result.title, 60)}
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                          {result.year && (
-                                            <Chip 
-                                              label={`${result.year}`} 
-                                              size="small" 
-                                              variant="outlined"
-                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                            />
-                                          )}
-                                          {result.citation_count !== undefined && (
-                                            <Chip 
-                                              label={`Citations: ${result.citation_count}`} 
-                                              size="small"
-                                              variant="outlined"
-                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                            />
-                                          )}
-                                        </Box>
-                                      </Box>
-                                    </Box>
-                                  }
-                                />
-                                {boostedResults && boostedResults.results && Array.isArray(boostedResults.results) && (
-                                  <Box 
-                                    className="connector-point"
-                                    data-target={`boosted-item-${boostedResults.results.findIndex(
-                                      r => r.bibcode === result.bibcode || r.title === result.title
-                                    )}`}
-                                    sx={{ 
-                                      position: 'absolute', 
-                                      right: 0, 
-                                      height: '100%', 
-                                      width: 4
-                                    }} 
-                                  />
-                                )}
-                              </ListItem>
-                            </Tooltip>
-                          );
-                        })}
-                      </List>
-                    </Box>
-                    
-                    {/* Boosted Results */}
-                    <Box sx={{ 
-                      width: '33%', 
-                      px: 1, 
-                      height: '65vh', 
-                      overflow: 'hidden',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }} id="boosted-results-container">
-                      <List sx={{ 
-                        bgcolor: 'background.paper', 
-                        border: '1px solid', 
-                        borderColor: 'primary.light', 
-                        borderRadius: 1,
-                        overflow: 'auto',
-                        overflowX: 'hidden',
-                        flexGrow: 1
-                      }}>
-                        {boostedResults && boostedResults.results && Object.keys(boostedResults.results).length > 0 ? (
-                          Object.values(boostedResults.results)[0].map((result, index) => {
-                            // Find the original result
-                            const originalResult = originalResults.find(
-                              r => r.bibcode === result.bibcode || r.title === result.title
-                            );
-                            const originalIndex = originalResult ? originalResults.indexOf(originalResult) : -1;
-                            const rankChange = originalIndex !== -1 ? originalIndex - index : 0;
-                            
-                            // Determine border style based on magnitude of change
-                            let borderStyle = {};
-                            if (Math.abs(rankChange) >= 5) {
-                              borderStyle = {
-                                borderLeft: rankChange !== 0 ? '6px solid' : 'none',
-                                borderLeftColor: rankChange > 0 ? 'success.main' : rankChange < 0 ? 'error.main' : 'transparent',
-                                bgcolor: rankChange !== 0 ? (rankChange > 0 ? 'success.50' : 'error.50') : 'transparent'
-                              };
-                            } else if (rankChange !== 0) {
-                              borderStyle = {
-                                borderLeft: '4px solid',
-                                borderLeftColor: rankChange > 0 ? 'success.main' : 'error.main',
-                              };
-                            }
-                            
-                            return (
-                              <Tooltip
-                                key={result.bibcode || index}
-                                title={
-                                  <Box>
-                                    <Typography variant="subtitle2">{result.title}</Typography>
-                                    <Typography variant="body2">
-                                      <strong>Authors:</strong> {formatAuthors(result.author)}
-                                    </Typography>
-                                    {result.abstract && (
-                                      <Typography variant="body2">
-                                        <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
-                                      </Typography>
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                    {result.year && (
+                                      <Chip 
+                                        label={`${result.year}`} 
+                                        size="small" 
+                                        variant="outlined"
+                                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                      />
                                     )}
-                                    <Divider sx={{ my: 1 }} />
-                                    <Typography variant="body2">
-                                      <strong>Original Rank:</strong> {originalIndex !== -1 ? originalIndex + 1 : 'N/A'}
+                                    {result.citation_count !== undefined && (
+                                      <Chip 
+                                        label={`Citations: ${result.citation_count}`} 
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                      />
+                                    )}
+                                  </Box>
+                                </Box>
+                              </Box>
+                            }
+                          />
+                        </ListItem>
+                      </Tooltip>
+                    ))}
+                  </List>
+                </Box>
+                
+                {/* Boosted Results */}
+                <Box sx={{ 
+                  width: '33%', 
+                  px: 1, 
+                  height: '65vh', 
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} id="boosted-results-container">
+                  <List sx={{ 
+                    bgcolor: 'background.paper', 
+                    border: '1px solid', 
+                    borderColor: 'primary.light', 
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    overflowX: 'hidden',
+                    flexGrow: 1
+                  }}>
+                    {boostedResults && boostedResults.results && boostedResults.results.ads ? (
+                      boostedResults.results.ads.map((result, index) => {
+                        const originalResult = searchResults.results.ads.find(
+                          r => r.bibcode === result.bibcode || r.title === result.title
+                        );
+                        const originalIndex = originalResult ? searchResults.results.ads.indexOf(originalResult) : -1;
+                        const rankChange = originalIndex !== -1 ? originalIndex - index : 0;
+                        
+                        let borderStyle = {};
+                        if (Math.abs(rankChange) >= 5) {
+                          borderStyle = {
+                            borderLeft: rankChange !== 0 ? '6px solid' : 'none',
+                            borderLeftColor: rankChange > 0 ? 'success.main' : rankChange < 0 ? 'error.main' : 'transparent',
+                            bgcolor: rankChange !== 0 ? (rankChange > 0 ? 'success.50' : 'error.50') : 'transparent'
+                          };
+                        } else if (rankChange !== 0) {
+                          borderStyle = {
+                            borderLeft: '4px solid',
+                            borderLeftColor: rankChange > 0 ? 'success.main' : 'error.main',
+                          };
+                        }
+                        
+                        return (
+                          <Tooltip
+                            key={result.bibcode || index}
+                            title={
+                              <Box>
+                                <Typography variant="subtitle2">{result.title}</Typography>
+                                <Typography variant="body2">
+                                  <strong>Authors:</strong> {formatAuthors(result.author)}
+                                </Typography>
+                                {result.abstract && (
+                                  <Typography variant="body2">
+                                    <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
+                                  </Typography>
+                                )}
+                                <Divider sx={{ my: 1 }} />
+                                <Typography variant="body2">
+                                  <strong>Original Rank:</strong> {originalIndex !== -1 ? originalIndex + 1 : 'N/A'}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Rank Change:</strong> {rankChange > 0 ? '+' : ''}{rankChange}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Boost Score:</strong> {result.boosted_score !== undefined && result.boosted_score !== null ? result.boosted_score.toFixed(2) : 'N/A'}
+                                </Typography>
+                                <Typography variant="body2">
+                                  <strong>Applied Boosts:</strong>
+                                </Typography>
+                                <Box component="ul" sx={{ mt: 0.5, pl: 2 }}>
+                                  {result.boost_factors && Object.entries(result.boost_factors).map(([key, value]) => (
+                                    <Typography component="li" variant="caption" key={key}>
+                                      {key}: {value !== undefined && value !== null && typeof value === 'number' ? value.toFixed(2) : value}
                                     </Typography>
-                                    <Typography variant="body2">
-                                      <strong>Rank Change:</strong> {rankChange > 0 ? '+' : ''}{rankChange}
+                                  ))}
+                                </Box>
+                              </Box>
+                            }
+                            placement="right"
+                          >
+                            <ListItem 
+                              id={`boosted-item-${index}`}
+                              divider
+                              sx={{ 
+                                px: 2, 
+                                py: 1,
+                                position: 'relative',
+                                ...borderStyle,
+                                transition: 'background-color 0.3s ease',
+                                whiteSpace: 'normal'
+                              }}
+                            >
+                              <ListItemText
+                                primary={
+                                  <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                                    <Typography 
+                                      variant="body2" 
+                                      component="span"
+                                      sx={{ 
+                                        minWidth: '24px',
+                                        fontWeight: 'bold',
+                                        mr: 1
+                                      }}
+                                    >
+                                      {index + 1}
                                     </Typography>
-                                    <Typography variant="body2">
-                                      <strong>Boost Score:</strong> {result.boosted_score !== undefined && result.boosted_score !== null ? result.boosted_score.toFixed(2) : 'N/A'}
-                                    </Typography>
-                                    <Typography variant="body2">
-                                      <strong>Applied Boosts:</strong>
-                                    </Typography>
-                                    <Box component="ul" sx={{ mt: 0.5, pl: 2 }}>
-                                      {result.boost_factors && Object.entries(result.boost_factors).map(([key, value]) => (
-                                        <Typography component="li" variant="caption" key={key}>
-                                          {key}: {value !== undefined && value !== null && typeof value === 'number' ? value.toFixed(2) : value}
-                                        </Typography>
-                                      ))}
+                                    <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
+                                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                        {truncateText(result.title, 60)}
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                        {result.year && (
+                                          <Chip 
+                                            label={`${result.year}`} 
+                                            size="small" 
+                                            variant="outlined"
+                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                          />
+                                        )}
+                                        {result.citation_count !== undefined && (
+                                          <Chip 
+                                            label={`Citations: ${result.citation_count}`} 
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+                                          />
+                                        )}
+                                        {result.boosted_score !== undefined && result.boosted_score !== null && (
+                                          <Chip 
+                                            label={`Boost: ${result.boosted_score.toFixed(1)}`} 
+                                            size="small"
+                                            color="primary"
+                                            sx={{ 
+                                              height: 20, 
+                                              '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
+                                              fontWeight: 'bold', 
+                                              bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
+                                            }}
+                                          />
+                                        )}
+                                      </Box>
                                     </Box>
                                   </Box>
                                 }
-                                placement="right"
-                              >
-                                <ListItem 
-                                  id={`boosted-item-${index}`}
-                                  key={result.bibcode || result.title} 
-                                  divider
-                                  sx={{ 
-                                    px: 2, 
-                                    py: 1,
-                                    position: 'relative',
-                                    ...borderStyle,
-                                    transition: 'background-color 0.3s ease',
-                                    whiteSpace: 'normal'
-                                  }}
-                                >
-                                  <ListItemText
-                                    primary={
-                                      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                        <Typography 
-                                          variant="body2" 
-                                          component="span"
-                                          sx={{ 
-                                            minWidth: '24px',
-                                            fontWeight: 'bold',
-                                            mr: 1
-                                          }}
-                                        >
-                                          {index + 1}
-                                        </Typography>
-                                        <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                            {truncateText(result.title, 60)}
-                                          </Typography>
-                                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                            {result.year && (
-                                              <Chip 
-                                                label={`${result.year}`} 
-                                                size="small" 
-                                                variant="outlined"
-                                                sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                              />
-                                            )}
-                                            {result.citation_count !== undefined && (
-                                              <Chip 
-                                                label={`Citations: ${result.citation_count}`} 
-                                                size="small"
-                                                variant="outlined"
-                                                sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                              />
-                                            )}
-                                            {result.boosted_score !== undefined && result.boosted_score !== null && (
-                                              <Chip 
-                                                label={`Boost: ${result.boosted_score.toFixed(1)}`} 
-                                                size="small"
-                                                color="primary"
-                                                sx={{ 
-                                                  height: 20, 
-                                                  '& .MuiChip-label': { px: 1, fontSize: '0.7rem' },
-                                                  fontWeight: 'bold', 
-                                                  bgcolor: `rgba(25, 118, 210, ${Math.min(result.boosted_score / 20, 1)})`
-                                                }}
-                                              />
-                                            )}
-                                          </Box>
-                                        </Box>
-                                      </Box>
-                                    }
-                                  />
-                                  {originalIndex !== -1 && (
-                                    <Box 
-                                      className="connector-point"
-                                      data-target={`original-item-${originalIndex}`}
-                                      data-change={rankChange}
-                                      sx={{ 
-                                        position: 'absolute', 
-                                        left: 0, 
-                                        height: '100%', 
-                                        width: 4
-                                      }} 
-                                    />
-                                  )}
-                                </ListItem>
-                              </Tooltip>
-                            );
-                          })
-                        ) : (
-                          <ListItem>
-                            <ListItemText
-                              primary="No boosted results available"
-                              secondary="Please run a boost experiment to see the results"
-                            />
-                          </ListItem>
-                        )}
-                      </List>
-                    </Box>
+                              />
+                            </ListItem>
+                          </Tooltip>
+                        );
+                      })
+                    ) : (
+                      <ListItem>
+                        <ListItemText
+                          primary="No boosted results available"
+                          secondary="Configure and apply boost factors to see how they affect the ranking"
+                        />
+                      </ListItem>
+                    )}
+                  </List>
+                </Box>
 
-                    {/* Google Scholar Results */}
-                    <Box sx={{ 
-                      width: '33%', 
-                      pl: 1, 
-                      height: '65vh', 
-                      overflow: 'hidden',  // Change from 'auto' to 'hidden'
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }} id="google-scholar-container">
-                      <List sx={{ 
-                        bgcolor: 'background.paper', 
-                        border: '1px solid', 
-                        borderColor: 'error.light', 
-                        borderRadius: 1,
-                        overflow: 'auto',  // Allow vertical scrolling inside the list
-                        overflowX: 'hidden',  // Hide horizontal scrolling
-                        flexGrow: 1
-                      }}>
-                        {results && results.results && results.results.scholar ? (
-                          results.results.scholar.map((result, index) => (
-                            <Tooltip
-                              key={`scholar-${index}`}
-                              title={
-                                <Box>
-                                  <Typography variant="subtitle2">{result.title}</Typography>
-                                  <Typography variant="body2">
-                                    <strong>Authors:</strong> {formatAuthors(result.authors)}
-                                  </Typography>
-                                  {result.abstract && (
-                                    <Typography variant="body2">
-                                      <strong>Abstract:</strong> {truncateText(result.abstract, 200)}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              }
-                              placement="left"
-                            >
-                              <ListItem 
-                                divider
-                                sx={{ 
-                                  px: 2, 
-                                  py: 1,
-                                  position: 'relative',
-                                  transition: 'background-color 0.3s ease',
-                                  whiteSpace: 'normal'  // Allow text to wrap
-                                }}
-                              >
-                                <ListItemText
-                                  primary={
-                                    <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
-                                      <Typography 
-                                        variant="body2" 
-                                        component="span"
-                                        sx={{ 
-                                          minWidth: '24px',
-                                          fontWeight: 'bold',
-                                          mr: 1
-                                        }}
-                                      >
-                                        {index + 1}
-                                      </Typography>
-                                      <Box sx={{ width: '100%', wordBreak: 'break-word' }}>
-                                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                          {truncateText(result.title, 60)}
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                          {result.year && (
-                                            <Chip 
-                                              label={`${result.year}`} 
-                                              size="small" 
-                                              variant="outlined"
-                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                            />
-                                          )}
-                                          {result.citation_count !== undefined && (
-                                            <Chip 
-                                              label={`Citations: ${result.citation_count}`} 
-                                              size="small"
-                                              variant="outlined"
-                                              sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
-                                            />
-                                          )}
-                                        </Box>
-                                      </Box>
-                                    </Box>
-                                  }
-                                />
-                                {result.url && (
-                                  <IconButton 
-                                    size="small" 
-                                    href={result.url} 
-                                    target="_blank"
-                                    aria-label="Open in Google Scholar"
-                                  >
-                                    <LaunchIcon fontSize="small" />
-                                  </IconButton>
-                                )}
-                              </ListItem>
-                            </Tooltip>
-                          ))
-                        ) : (
-                          <ListItem>
-                            <ListItemText
-                              primary="No Google Scholar results available"
-                              secondary="Please run a search with Google Scholar enabled to see comparison results"
-                            />
-                          </ListItem>
-                        )}
-                      </List>
-                    </Box>
-                  </Box>
-                  
-                  {/* Add useEffect to draw connecting lines between matching items */}
-                  <Box component="script" dangerouslySetInnerHTML={{ __html: `
-                    // Draw connecting lines between matching items when the component mounts
-                    setTimeout(function() {
-                      // Remove any existing connectors
-                      document.querySelectorAll('.result-connector').forEach(el => el.remove());
-                      
-                      // For each boosted result, find its original position and draw a line
-                      document.querySelectorAll('#boosted-results-container .connector-point').forEach(point => {
-                        const targetId = point.getAttribute('data-target');
-                        const rankChange = parseInt(point.getAttribute('data-change') || '0');
-                        
-                        if (!targetId) return;
-                        
-                        const targetEl = document.getElementById(targetId);
-                        if (!targetEl) return;
-                        
-                        // Get positions
-                        const boostedRect = point.getBoundingClientRect();
-                        const originalRect = targetEl.getBoundingClientRect();
-                        
-                        // Create connector
-                        const connector = document.createElement('div');
-                        connector.className = 'result-connector';
-                        
-                        // Set style
-                        connector.style.position = 'absolute';
-                        connector.style.zIndex = '10';
-                        connector.style.height = '2px';
-                        connector.style.opacity = '0.7';
-                        connector.style.pointerEvents = 'none';
-                        
-                        // Set color based on rank change
-                        if (rankChange > 0) {
-                          connector.style.backgroundColor = '#4caf50'; // success.main
-                        } else if (rankChange < 0) {
-                          connector.style.backgroundColor = '#f44336'; // error.main
-                        } else {
-                          connector.style.backgroundColor = '#9e9e9e'; // grey.500
-                        }
-                        
-                        // Get parent container
-                        const container = document.querySelector('.MuiGrid-container');
-                        
-                        // Calculate positions relative to the container
-                        const rect = container.getBoundingClientRect();
-                        
-                        const fromX = boostedRect.left - rect.left;
-                        const fromY = boostedRect.top - rect.top + boostedRect.height / 2;
-                        const toX = originalRect.right - rect.left;
-                        const toY = originalRect.top - rect.top + originalRect.height / 2;
-                        
-                        const length = Math.sqrt(Math.pow(toX - fromX, 2) + Math.pow(toY - fromY, 2));
-                        const angle = Math.atan2(toY - fromY, toX - fromX) * 180 / Math.PI;
-                        
-                        // Apply styles
-                        connector.style.width = length + 'px';
-                        connector.style.left = fromX + 'px';
-                        connector.style.top = fromY + 'px';
-                        connector.style.transform = 'rotate(' + angle + 'deg)';
-                        connector.style.transformOrigin = '0 0';
-                        
-                        // Add to document
-                        container.appendChild(connector);
-                      });
-                    }, 500);
-                  `}} />
-                </>
-              ) : (
-                <Alert severity="info">
-                  Configure and apply boost factors to see how they affect the ranking.
-                </Alert>
-              )}
+                {/* Google Scholar Results */}
+                <Box sx={{ 
+                  width: '33%', 
+                  pl: 1, 
+                  height: '65vh', 
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} id="google-scholar-container">
+                  <List sx={{ 
+                    bgcolor: 'background.paper', 
+                    border: '1px solid', 
+                    borderColor: 'error.light', 
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    overflowX: 'hidden',
+                    flexGrow: 1
+                  }}>
+                    {renderGoogleScholarResults()}
+                  </List>
+                </Box>
+              </Box>
             </Paper>
           </Grid>
         </Grid>
