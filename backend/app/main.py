@@ -126,10 +126,15 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins during development
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "https://search.sjarmak.ai",
+        "https://search-tool-api.onrender.com"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
