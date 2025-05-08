@@ -45,29 +45,38 @@ services:
   - type: web
     name: search-comparisons-backend
     env: python
+    region: oregon
+    plan: standard
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: LLM_PROVIDER
         value: ollama
       - key: LLM_MODEL_NAME
-        value: qwen2:7b
+        value: phi:2.7b
       - key: LLM_TEMPERATURE
-        value: 0.1
+        value: 0.7
       - key: LLM_MAX_TOKENS
-        value: 1024
-      - key: LLM_API_ENDPOINT
-        value: http://ollama:11434/api/generate
-      - key: ADS_API_TOKEN
-        sync: false
-      - key: SOLR_URL
-        value: https://api.adsabs.harvard.edu/v1/search/query
-      - key: CORS_ORIGINS
-        value: https://search-comparisons-frontend.onrender.com
-      - key: ENVIRONMENT
-        value: production
-    depends_on:
-      - ollama
+        value: 1000
+      - key: CACHE_TTL
+        value: 3600
+      - key: CACHE_MAX_SIZE
+        value: 1000
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONOPTIMIZE
+        value: "2"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: models
+      mountPath: /opt/render/project/src/backend/app/services/query_intent/models
+      sizeGB: 10
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+      memoryMB: 2048
+      cpu: 1.0
 
   - type: web
     name: ollama
@@ -88,6 +97,8 @@ services:
   - type: web
     name: search-comparisons-frontend
     env: node
+    region: oregon
+    plan: standard
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
@@ -95,3 +106,10 @@ services:
         value: https://search-comparisons-backend.onrender.com
       - key: NODE_ENV
         value: production
+    healthCheckPath: /
+    autoDeploy: true
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+      memoryMB: 1024
+      cpu: 0.5

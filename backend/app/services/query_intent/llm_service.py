@@ -38,6 +38,7 @@ class LLMService:
     """
     
     _instance = None
+    _model_loaded = False
     
     def __new__(cls, *args, **kwargs):
         """
@@ -52,7 +53,7 @@ class LLMService:
     
     def __init__(
         self,
-        model_name: str = DEFAULT_MODEL,
+        model_name: str = "phi:2.7b",  # Changed default to smaller model
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         provider: str = "ollama",
@@ -70,70 +71,14 @@ class LLMService:
             api_endpoint: API endpoint URL for the LLM provider
             prompt_template: Optional custom prompt template for query understanding
         """
-        # Only initialize if not already initialized
         if not hasattr(self, 'initialized'):
             self.model_name = model_name
             self.temperature = temperature
             self.max_tokens = max_tokens
             self.provider = provider
             self.docs_service = DocumentationService()
-            
-            # Get model-specific prompt template if available
-            model_config = LLM_CONFIG.get("models", {}).get(model_name, {})
-            model_prompt_template = model_config.get("default_prompt_template")
-            
-            # Use provided template, model-specific template, or default template
-            self.prompt_template = prompt_template or model_prompt_template or """
-            You are an expert at interpreting search queries and transforming them into effective ADS (Astrophysics Data System) queries.
-            Your task is to understand the user's intent and transform their query into a precise ADS query using the available fields and operators.
-            
-            Here is the ADS search syntax documentation:
-            {documentation}
-            
-            Important rules for query transformation:
-            1. Always maintain the original intent of the query
-            2. Use the most appropriate field(s) based on the intent
-            3. For general topic searches, prefer title and abstract fields
-            4. For author searches:
-               - Use the author field with proper format: author:"Lastname, F"
-               - For full names, use author:"Lastname, Firstname"
-               - For multiple authors, use AND between author terms
-               - For papers by a specific author, use author:"Lastname, F" OR author:"Lastname, Firstname"
-            5. For recent papers, use year ranges
-            6. For specific types of papers, use doctype or property fields
-            7. Do NOT use functions like trending(), similar(), or related()
-            8. Do NOT use sort:, boost:, or other query parameters
-            9. Keep the query simple and focused on the original intent
-            10. For topic searches, use the abstract field with the main topic terms
-            
-            Examples of good transformations:
-            Original: "papers about black holes"
-            Intent: Looking for research papers about black holes
-            Explanation: Using abstract field to find papers discussing black holes
-            Transformed: abs:black holes
-            
-            Original: "papers by Stephanie Jarmak"
-            Intent: Looking for papers authored by Stephanie Jarmak
-            Explanation: Using author field with proper format for author name
-            Transformed: author:"Jarmak, S" OR author:"Jarmak, Stephanie"
-            
-            Original: "recent papers by Stephen Hawking"
-            Intent: Looking for recent papers authored by Stephen Hawking
-            Explanation: Using author field with proper format and year range for recent papers
-            Transformed: (author:"Hawking, S" OR author:"Hawking, Stephen") AND year:[2020 TO *]
-            
-            Original: "highly cited papers on dark matter"
-            Intent: Looking for influential papers about dark matter
-            Explanation: Using abstract field and property filter for refereed papers
-            Transformed: abs:dark matter AND property:refereed
-            
-            Now transform this query: {query}
-            
-            Return your response in this exact format:
-            Intent: [brief description of the intent]
-            Explanation: [brief explanation of the transformation]
-            Transformed Query: [the transformed query]
-            """
+            self.prompt_template = prompt_template
+            self.initialized = True
             
             # Initialize API endpoint based on provider if not specified
             if api_endpoint:
@@ -148,7 +93,6 @@ class LLMService:
                 raise ValueError(f"Unsupported provider: {provider}")
                 
             logger.info(f"Initialized LLM service with {provider} provider using model {model_name}")
-            self.initialized = True
     
     @classmethod
     def from_config(cls) -> "LLMService":
@@ -479,6 +423,29 @@ class LLMService:
         logger.info(f"Formatted prompt with query: {query}")
         return prompt
     
+    async def _ensure_model_loaded(self) -> None:
+        """
+        Ensure the model is loaded before making requests.
+        This implements lazy loading to reduce memory usage.
+        """
+        if not self._model_loaded:
+            try:
+                # For Ollama, we can check if the model is available
+                if self.provider == "ollama":
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(f"{self.api_endpoint}/tags") as response:
+                            if response.status == 200:
+                                models = await response.json()
+                                if not any(m['name'] == self.model_name for m in models.get('models', [])):
+                                    logger.warning(f"Model {self.model_name} not found, falling back to phi:2.7b")
+                                    self.model_name = "phi:2.7b"
+                
+                self._model_loaded = True
+                logger.info(f"Model {self.model_name} is ready for use")
+            except Exception as e:
+                logger.error(f"Error loading model: {str(e)}")
+                raise
+
     async def query_llm(self, prompt: str) -> Optional[str]:
         """
         Send a query to the LLM provider and get the response.
@@ -490,6 +457,8 @@ class LLMService:
             Optional[str]: LLM response text or None if the request failed
         """
         try:
+            await self._ensure_model_loaded()
+            
             logger.info(f"Sending request to LLM provider: {self.provider}")
             logger.info(f"Using model: {self.model_name}")
             logger.info(f"Temperature: {self.temperature}")
@@ -570,14 +539,16 @@ class LLMService:
     
     async def interpret_query(self, query: str) -> QueryIntent:
         """
-        Interpret a search query using the LLM.
+        Interpret a query using the LLM service.
         
         Args:
-            query: The search query to interpret
+            query: The query to interpret
             
         Returns:
             QueryIntent: The interpreted query intent
         """
+        await self._ensure_model_loaded()
+        
         try:
             # Check if query already has valid field prefixes
             valid_fields = ["author:", "abs:", "title:", "year:", "citation_count:"]
