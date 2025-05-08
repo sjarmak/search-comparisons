@@ -19,6 +19,22 @@ from app.services.session_service import get_current_rater_id
 router = APIRouter(prefix="/judgements", tags=["judgements"])
 
 
+@router.get("/query/all", response_model=List[JudgementResponse])
+async def get_all_judgements(
+    db: Session = Depends(get_db),
+) -> List[JudgementResponse]:
+    """Get all judgements in the database.
+
+    Args:
+        db: Database session.
+
+    Returns:
+        List[JudgementResponse]: List of all judgements.
+    """
+    service = JudgementService(db)
+    return service.get_all_judgements()
+
+
 @router.post("", response_model=JudgementResponse)
 async def create_judgement(
     judgement: JudgementCreate,

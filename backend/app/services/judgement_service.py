@@ -25,6 +25,14 @@ class JudgementService:
         """
         self.db = db
 
+    def get_all_judgements(self) -> List[Judgement]:
+        """Get all judgements in the database.
+
+        Returns:
+            List[Judgement]: List of all judgements.
+        """
+        return self.db.query(Judgement).all()
+
     def create_judgement(
         self,
         rater_id: UUID,
@@ -63,6 +71,8 @@ class JudgementService:
             record_source=record_source,
             judgement_score=judgement_score,
             judgement_note=judgement_note,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
         )
         self.db.add(judgement)
         self.db.commit()

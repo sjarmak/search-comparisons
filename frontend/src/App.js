@@ -21,13 +21,13 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 
 import { searchService, experimentService } from './services/api';
 import BoostExperiment from './components/BoostExperiment';
-import QuepidEvaluation from './components/QuepidEvaluation';
 import SimilarityTests from './components/SimilarityTests';
 import QueryIntent from './components/QueryIntent';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import StableInput from './components/StableInput';
 import { useAuth, DEFAULT_PASSWORD } from './contexts/AuthContext';
+import JudgementsDatabase from './components/JudgementsDatabase';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const APP_VERSION = "1.0.0";
@@ -369,8 +369,8 @@ function App() {
             variant="fullWidth"
             sx={{ mb: 0 }}
           >
-            <Tab label="Boost Experiment" value={0} />
-            <Tab label="Quepid Evaluation" value={1} />
+            <Tab label="Relevance Judgements" value={0} />
+            <Tab label="Judgements Database" value={1} />
             <Tab label="Similarity Tests" value={2} />
             <Tab label="Query Intent" value={3} />
           </Tabs>
@@ -379,7 +379,7 @@ function App() {
         {experimentTab === 0 && (
           <Box>
             <Typography variant="h5" gutterBottom>
-              Boost Experiment
+              Relevance Judgements
             </Typography>
             <Typography paragraph>
               Apply configurable boost factors to search results based on citation count, publication year, document type, and more.
@@ -396,7 +396,7 @@ function App() {
         )}
         
         {experimentTab === 1 && (
-          <QuepidEvaluation />
+          <JudgementsDatabase />
         )}
         
         {experimentTab === 2 && (

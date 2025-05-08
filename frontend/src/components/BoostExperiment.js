@@ -63,6 +63,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [showPreviousJudgments, setShowPreviousJudgments] = useState(false);
+  const [previousJudgments, setPreviousJudgments] = useState({});
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -413,6 +415,54 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     });
   }, []);
   
+  // Function to fetch previous judgments
+  const fetchPreviousJudgments = async (query, results) => {
+    if (!showPreviousJudgments || !results || results.length === 0) return;
+
+    try {
+      console.log('Fetching previous judgments for query:', query);
+      console.log('Records to check:', results.map(r => ({ title: r.title, bibcode: r.bibcode })));
+
+      const response = await fetch(`${API_URL}/api/judgements/query/${encodeURIComponent(query)}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch previous judgments');
+      }
+
+      const data = await response.json();
+      console.log('Received previous judgments:', data);
+
+      // Transform the data into a more usable format
+      const transformedData = {};
+      data.forEach(judgment => {
+        const recordId = judgment.record_bibcode || normalizeTitle(judgment.record_title);
+        if (!transformedData[recordId]) {
+          transformedData[recordId] = [];
+        }
+        transformedData[recordId].push({
+          judgment_score: judgment.judgement_score,
+          note: judgment.judgement_note,
+          source: judgment.record_source,
+          timestamp: judgment.created_at
+        });
+      });
+
+      console.log('Transformed previous judgments:', transformedData);
+      setPreviousJudgments(transformedData);
+    } catch (err) {
+      console.error('Error fetching previous judgments:', err);
+    }
+  };
+
+  // Add effect to refetch previous judgments when toggle changes
+  useEffect(() => {
+    if (showPreviousJudgments && searchResults?.results?.ads) {
+      fetchPreviousJudgments(searchQuery, searchResults.results.ads);
+    } else {
+      setPreviousJudgments({});
+    }
+  }, [showPreviousJudgments]);
+
   // Function to handle the initial search
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -454,6 +504,12 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       setSearchResults(data);
       // Reset boosted results when performing a new search
       setBoostedResults(null);
+      
+      // Fetch previous judgments if enabled
+      if (showPreviousJudgments) {
+        console.log('Fetching previous judgments after search...');
+        await fetchPreviousJudgments(searchQuery, data.results.ads);
+      }
       
       // If we have a Quepid case ID, fetch the Quepid results
       if (quepidCaseId) {
@@ -767,6 +823,25 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
             {searchLoading ? 'Searching...' : 'Search'}
           </Button>
         </Grid>
+        <Grid item xs={12}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showPreviousJudgments}
+                onChange={(e) => setShowPreviousJudgments(e.target.checked)}
+                disabled={searchLoading}
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography>Show Previous Judgments</Typography>
+                <Tooltip title="When enabled, previous judgments for the same query and records will be shown and used in NDCG calculations">
+                  <HelpOutlineIcon fontSize="small" />
+                </Tooltip>
+              </Box>
+            }
+          />
+        </Grid>
       </Grid>
     </Paper>
   );
@@ -794,14 +869,25 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       const localJudgment = localJudgments[`${source}_${recordId}`];
       // Then check Quepid judgments
       const quepidJudgment = getJudgmentForTitle(result.title);
+      // Then check previous judgments if enabled
+      const prevJudgments = showPreviousJudgments ? previousJudgments[recordId] || [] : [];
       
-      // Use local judgment if available, otherwise use Quepid judgment
-      const judgment = localJudgment?.judgment !== undefined ? localJudgment.judgment : quepidJudgment;
+      // Calculate average of previous judgments if they exist
+      const avgPrevJudgment = prevJudgments.length > 0
+        ? prevJudgments.reduce((sum, j) => sum + j.judgment_score, 0) / prevJudgments.length
+        : null;
+      
+      // Use local judgment if available, otherwise use Quepid judgment, then previous judgments
+      const judgment = localJudgment?.judgment !== undefined ? localJudgment.judgment :
+                      quepidJudgment !== null ? quepidJudgment :
+                      avgPrevJudgment !== null ? avgPrevJudgment : null;
       
       console.log(`NDCG calculation for ${source} - Record: ${result.title}`, {
         recordId,
         localJudgment,
         quepidJudgment,
+        prevJudgments,
+        avgPrevJudgment,
         finalJudgment: judgment
       });
       
@@ -832,7 +918,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     const ndcg = idcg === 0 ? 0 : dcg / idcg;
     console.log(`${source} Final NDCG calculation:`, { dcg, idcg, ndcg });
     return ndcg;
-  }, [localJudgments, getJudgmentForTitle]);
+  }, [localJudgments, getJudgmentForTitle, showPreviousJudgments, previousJudgments]);
 
   // Add effect to update judgment counts when judgments change
   useEffect(() => {
@@ -1140,8 +1226,25 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     const sourceId = record.source_id || 'original';
     const quepidJudgment = getJudgmentForTitle(record.title);
     const userJudgment = localJudgments[`${sourceId}_${recordId}`];
+    const prevJudgments = previousJudgments[recordId] || [];
     const currentJudgment = userJudgment?.judgment !== undefined ? userJudgment.judgment : quepidJudgment;
     const hasQuepidJudgment = quepidJudgment !== null;
+    const hasPreviousJudgments = prevJudgments.length > 0;
+
+    // Debug logging for judgment selector
+    console.log('Rendering judgment selector for record:', {
+      title: record.title,
+      recordId,
+      sourceId,
+      prevJudgments,
+      hasPreviousJudgments,
+      previousJudgments
+    });
+
+    // Calculate average of previous judgments
+    const avgPreviousJudgment = hasPreviousJudgments 
+      ? prevJudgments.reduce((sum, j) => sum + j.judgment_score, 0) / prevJudgments.length 
+      : null;
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -1153,6 +1256,17 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 size="small"
                 variant="outlined"
                 color="info"
+                sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
+              />
+            </Tooltip>
+          )}
+          {hasPreviousJudgments && (
+            <Tooltip title={`Previous Judgments: ${prevJudgments.length} (Avg: ${avgPreviousJudgment.toFixed(2)})`}>
+              <Chip 
+                label={`Prev (${avgPreviousJudgment.toFixed(1)})`} 
+                size="small"
+                variant="outlined"
+                color="success"
                 sx={{ height: 20, '& .MuiChip-label': { px: 1, fontSize: '0.7rem' } }}
               />
             </Tooltip>
