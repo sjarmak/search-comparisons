@@ -121,7 +121,7 @@ const QuepidEvaluation = () => {
       query: query.trim(),
       case_id: parseInt(caseId),
       max_results: maxResults,
-      sources: ['ads'],  // Always use ADS
+      sources: ['ads', 'scholar', 'semanticScholar', 'webOfScience'],  // Use all available sources
       boost_configs: [
         {
           name: "Base Results",

@@ -426,7 +426,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         },
         body: JSON.stringify({
           query: searchQuery,
-          sources: ['ads', 'scholar'],
+          sources: ['ads', 'scholar', 'semanticScholar', 'webOfScience'],
           metrics: ['ndcg@10', 'precision@10', 'recall@10'],
           fields: ['title', 'abstract', 'author', 'year', 'citation_count', 'doctype'],
           max_results: 20,
@@ -899,6 +899,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       { source: 'original', value: calculateNDCG(searchResults?.results?.ads, 10, 'original') },
       { source: 'boosted', value: calculateNDCG(boostedResults?.results?.ads, 10, 'boosted') },
       { source: 'scholar', value: calculateNDCG(searchResults?.results?.scholar, 10, 'scholar') },
+      { source: 'semanticScholar', value: calculateNDCG(searchResults?.results?.semanticScholar, 10, 'semanticScholar') },
+      { source: 'webOfScience', value: calculateNDCG(searchResults?.results?.webOfScience, 10, 'webOfScience') },
       { source: 'quepid', value: calculateNDCG(quepidResults, 10, 'quepid') }
     ].filter(item => item.value !== null);
 
@@ -923,7 +925,10 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         p: 1, 
         bgcolor: source === 'original' ? 'grey.100' : 
           source === 'boosted' ? 'primary.light' : 
-          source === 'scholar' ? 'error.light' : 'success.light',
+          source === 'scholar' ? 'error.light' : 
+          source === 'semanticScholar' ? 'success.light' :
+          source === 'webOfScience' ? 'warning.light' :
+          'info.light',
         color: source === 'original' ? 'inherit' : 'primary.contrastText',
         borderRadius: 1,
         border: '3px solid',
@@ -1764,7 +1769,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
               <Box sx={{ display: 'flex', mb: 2 }}>
                 {/* Title Headers */}
-                <Box sx={{ width: showBoostControls ? '25%' : '30%', pr: 1 }}>
+                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', pr: 1 }}>
                   {renderColumnHeader(
                     'Original Results',
                     'Default ranking without boosts',
@@ -1772,7 +1777,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     'original'
                   )}
                 </Box>
-                <Box sx={{ width: showBoostControls ? '25%' : '30%', px: 1 }}>
+                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
                   {renderColumnHeader(
                     'Boosted Results',
                     'Re-ranked based on current boost settings',
@@ -1780,7 +1785,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     'boosted'
                   )}
                 </Box>
-                <Box sx={{ width: showBoostControls ? '25%' : '30%', px: 1 }}>
+                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
                   {renderColumnHeader(
                     'Google Scholar Results',
                     'For comparison',
@@ -1788,7 +1793,23 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     'scholar'
                   )}
                 </Box>
-                <Box sx={{ width: showBoostControls ? '25%' : '30%', pl: 1 }}>
+                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
+                  {renderColumnHeader(
+                    'Semantic Scholar Results',
+                    'For comparison',
+                    searchResults?.results?.semanticScholar,
+                    'semanticScholar'
+                  )}
+                </Box>
+                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
+                  {renderColumnHeader(
+                    'Web of Science Results',
+                    'For comparison',
+                    searchResults?.results?.webOfScience,
+                    'webOfScience'
+                  )}
+                </Box>
+                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', pl: 1 }}>
                   {renderColumnHeader(
                     'Quepid Results',
                     'Relevance judgments',
@@ -1801,7 +1822,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
               <Box sx={{ display: 'flex', position: 'relative' }}>
                 {/* Original Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '25%' : '30%', 
+                  width: showBoostControls ? '16.66%' : '20%', 
                   pr: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1823,7 +1844,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 
                 {/* Boosted Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '25%' : '30%', 
+                  width: showBoostControls ? '16.66%' : '20%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1845,7 +1866,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
                 {/* Google Scholar Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '25%' : '30%', 
+                  width: showBoostControls ? '16.66%' : '20%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1865,9 +1886,53 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   </List>
                 </Box>
 
+                {/* Semantic Scholar Results */}
+                <Box sx={{ 
+                  width: showBoostControls ? '16.66%' : '20%', 
+                  px: 1, 
+                  height: '65vh', 
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} id="semantic-scholar-container">
+                  <List sx={{ 
+                    bgcolor: 'background.paper', 
+                    border: '1px solid', 
+                    borderColor: 'divider', 
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    overflowX: 'hidden',
+                    flexGrow: 1
+                  }}>
+                    {renderResultsList(searchResults?.results?.semanticScholar, 'semanticScholar')}
+                  </List>
+                </Box>
+
+                {/* Web of Science Results */}
+                <Box sx={{ 
+                  width: showBoostControls ? '16.66%' : '20%', 
+                  px: 1, 
+                  height: '65vh', 
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }} id="web-of-science-container">
+                  <List sx={{ 
+                    bgcolor: 'background.paper', 
+                    border: '1px solid', 
+                    borderColor: 'divider', 
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    overflowX: 'hidden',
+                    flexGrow: 1
+                  }}>
+                    {renderResultsList(searchResults?.results?.webOfScience, 'webOfScience')}
+                  </List>
+                </Box>
+
                 {/* Quepid Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '25%' : '30%', 
+                  width: showBoostControls ? '16.66%' : '20%', 
                   pl: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
