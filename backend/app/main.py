@@ -177,19 +177,27 @@ async def health_check() -> Dict[str, Any]:
     }
 
 
-@app.get("/")
+@app.get("/", include_in_schema=False)
 async def root() -> Dict[str, Any]:
     """
-    Root endpoint that redirects to the API documentation.
+    Root endpoint that provides basic API information.
     
     Returns:
-        Dict[str, Any]: Redirect information
+        Dict[str, Any]: API information
     """
     return {
         "message": "Welcome to Search Comparisons API",
         "docs_url": "/api/docs",
         "health_check": "/api/health"
     }
+
+@app.head("/", include_in_schema=False)
+async def root_head() -> None:
+    """
+    HEAD request handler for the root endpoint.
+    Used by health checks.
+    """
+    return None
 
 
 # Register routes
