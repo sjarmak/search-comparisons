@@ -120,7 +120,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
-    debug=os.getenv("DEBUG", "True").lower() in ("true", "1", "t", "yes")
+    debug=False  # Disable debug mode in production
 )
 
 # Configure CORS
@@ -174,6 +174,21 @@ async def health_check() -> Dict[str, Any]:
         "status": "ok",
         "version": "1.0.0",
         "environment": os.getenv("ENVIRONMENT", "local"),
+    }
+
+
+@app.get("/")
+async def root() -> Dict[str, Any]:
+    """
+    Root endpoint that redirects to the API documentation.
+    
+    Returns:
+        Dict[str, Any]: Redirect information
+    """
+    return {
+        "message": "Welcome to Search Comparisons API",
+        "docs_url": "/api/docs",
+        "health_check": "/api/health"
     }
 
 

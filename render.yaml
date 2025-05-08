@@ -100,10 +100,10 @@ services:
     region: oregon
     plan: standard
     buildCommand: npm install && npm run build
-    startCommand: npm start
+    startCommand: npx serve -s build
     envVars:
       - key: REACT_APP_API_URL
-        value: https://search-comparisons-backend.onrender.com
+        value: https://search-tool-api.onrender.com
       - key: NODE_ENV
         value: production
     healthCheckPath: /
