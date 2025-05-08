@@ -40,6 +40,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   const [judgmentMap, setJudgmentMap] = useState({});
   const [expandedRecords, setExpandedRecords] = useState({});
   const [localJudgments, setLocalJudgments] = useState({});
+  const [selectedComparisonEngine, setSelectedComparisonEngine] = useState('scholar');
   const [judgmentCounts, setJudgmentCounts] = useState({
     original: { quepid: 0, manual: 0, total: 0 },
     boosted: { quepid: 0, manual: 0, total: 0 },
@@ -1724,6 +1725,36 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     </Button>
   );
 
+  // Add comparison engine selector
+  const renderComparisonEngineSelector = () => (
+    <FormControl size="small" sx={{ minWidth: 200, ml: 2 }}>
+      <InputLabel>Comparison Engine</InputLabel>
+      <Select
+        value={selectedComparisonEngine}
+        onChange={(e) => setSelectedComparisonEngine(e.target.value)}
+        label="Comparison Engine"
+      >
+        <MenuItem value="scholar">Google Scholar</MenuItem>
+        <MenuItem value="semanticScholar">Semantic Scholar</MenuItem>
+        <MenuItem value="webOfScience">Web of Science</MenuItem>
+      </Select>
+    </FormControl>
+  );
+
+  // Add function to get comparison engine name
+  const getComparisonEngineName = (engine) => {
+    switch (engine) {
+      case 'scholar':
+        return 'Google Scholar';
+      case 'semanticScholar':
+        return 'Semantic Scholar';
+      case 'webOfScience':
+        return 'Web of Science';
+      default:
+        return engine;
+    }
+  };
+
   return (
     <Box sx={{ width: '100%', p: 2 }}>
       {renderSearchForm()}
@@ -1765,11 +1796,12 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
                 {renderExportButton()}
                 {renderBoostControlsToggle()}
+                {renderComparisonEngineSelector()}
               </Box>
 
               <Box sx={{ display: 'flex', mb: 2 }}>
                 {/* Title Headers */}
-                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', pr: 1 }}>
+                <Box sx={{ width: '33.33%', pr: 1 }}>
                   {renderColumnHeader(
                     'Original Results',
                     'Default ranking without boosts',
@@ -1777,7 +1809,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     'original'
                   )}
                 </Box>
-                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
+                <Box sx={{ width: '33.33%', px: 1 }}>
                   {renderColumnHeader(
                     'Boosted Results',
                     'Re-ranked based on current boost settings',
@@ -1785,36 +1817,12 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     'boosted'
                   )}
                 </Box>
-                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
+                <Box sx={{ width: '33.33%', pl: 1 }}>
                   {renderColumnHeader(
-                    'Google Scholar Results',
+                    `${getComparisonEngineName(selectedComparisonEngine)} Results`,
                     'For comparison',
-                    searchResults?.results?.scholar,
-                    'scholar'
-                  )}
-                </Box>
-                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
-                  {renderColumnHeader(
-                    'Semantic Scholar Results',
-                    'For comparison',
-                    searchResults?.results?.semanticScholar,
-                    'semanticScholar'
-                  )}
-                </Box>
-                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', px: 1 }}>
-                  {renderColumnHeader(
-                    'Web of Science Results',
-                    'For comparison',
-                    searchResults?.results?.webOfScience,
-                    'webOfScience'
-                  )}
-                </Box>
-                <Box sx={{ width: showBoostControls ? '16.66%' : '20%', pl: 1 }}>
-                  {renderColumnHeader(
-                    'Quepid Results',
-                    'Relevance judgments',
-                    quepidResults,
-                    'quepid'
+                    searchResults?.results?.[selectedComparisonEngine],
+                    selectedComparisonEngine
                   )}
                 </Box>
               </Box>
@@ -1822,7 +1830,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
               <Box sx={{ display: 'flex', position: 'relative' }}>
                 {/* Original Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '16.66%' : '20%', 
+                  width: '33.33%', 
                   pr: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1844,7 +1852,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 
                 {/* Boosted Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '16.66%' : '20%', 
+                  width: '33.33%', 
                   px: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
@@ -1864,81 +1872,15 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   </List>
                 </Box>
 
-                {/* Google Scholar Results */}
+                {/* Selected Comparison Engine Results */}
                 <Box sx={{ 
-                  width: showBoostControls ? '16.66%' : '20%', 
-                  px: 1, 
-                  height: '65vh', 
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }} id="google-scholar-container">
-                  <List sx={{ 
-                    bgcolor: 'background.paper', 
-                    border: '1px solid', 
-                    borderColor: 'divider', 
-                    borderRadius: 1,
-                    overflow: 'auto',
-                    overflowX: 'hidden',
-                    flexGrow: 1
-                  }}>
-                    {renderResultsList(searchResults?.results?.scholar, 'scholar')}
-                  </List>
-                </Box>
-
-                {/* Semantic Scholar Results */}
-                <Box sx={{ 
-                  width: showBoostControls ? '16.66%' : '20%', 
-                  px: 1, 
-                  height: '65vh', 
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }} id="semantic-scholar-container">
-                  <List sx={{ 
-                    bgcolor: 'background.paper', 
-                    border: '1px solid', 
-                    borderColor: 'divider', 
-                    borderRadius: 1,
-                    overflow: 'auto',
-                    overflowX: 'hidden',
-                    flexGrow: 1
-                  }}>
-                    {renderResultsList(searchResults?.results?.semanticScholar, 'semanticScholar')}
-                  </List>
-                </Box>
-
-                {/* Web of Science Results */}
-                <Box sx={{ 
-                  width: showBoostControls ? '16.66%' : '20%', 
-                  px: 1, 
-                  height: '65vh', 
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column'
-                }} id="web-of-science-container">
-                  <List sx={{ 
-                    bgcolor: 'background.paper', 
-                    border: '1px solid', 
-                    borderColor: 'divider', 
-                    borderRadius: 1,
-                    overflow: 'auto',
-                    overflowX: 'hidden',
-                    flexGrow: 1
-                  }}>
-                    {renderResultsList(searchResults?.results?.webOfScience, 'webOfScience')}
-                  </List>
-                </Box>
-
-                {/* Quepid Results */}
-                <Box sx={{ 
-                  width: showBoostControls ? '16.66%' : '20%', 
+                  width: '33.33%', 
                   pl: 1, 
                   height: '65vh', 
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column'
-                }} id="quepid-results-container">
+                }} id={`${selectedComparisonEngine}-results-container`}>
                   <List sx={{ 
                     bgcolor: 'background.paper', 
                     border: '1px solid', 
@@ -1948,7 +1890,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                     overflowX: 'hidden',
                     flexGrow: 1
                   }}>
-                    {renderResultsList(quepidResults, 'quepid')}
+                    {renderResultsList(searchResults?.results?.[selectedComparisonEngine], selectedComparisonEngine)}
                   </List>
                 </Box>
               </Box>
