@@ -430,17 +430,30 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       }
 
       const data = await response.json();
-      console.log('Received previous judgments:', data);
+      console.log('Raw previous judgments from API:', data);
 
       // Transform the data into a more usable format
       const transformedData = {};
       data.forEach(judgment => {
+        // Convert judgment score from 0-1 scale to 0-3 scale if needed
+        const judgmentScore = judgment.judgement_score <= 1 ? judgment.judgement_score * 3 : judgment.judgement_score;
+        
         const recordId = judgment.record_bibcode || normalizeTitle(judgment.record_title);
+        console.log('Processing judgment:', {
+          record_title: judgment.record_title,
+          record_bibcode: judgment.record_bibcode,
+          normalized_title: normalizeTitle(judgment.record_title),
+          recordId,
+          original_score: judgment.judgement_score,
+          converted_score: judgmentScore,
+          source: judgment.record_source
+        });
+
         if (!transformedData[recordId]) {
           transformedData[recordId] = [];
         }
         transformedData[recordId].push({
-          judgment_score: judgment.judgement_score,
+          judgment_score: judgmentScore,
           note: judgment.judgement_note,
           source: judgment.record_source,
           timestamp: judgment.created_at
