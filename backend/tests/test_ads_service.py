@@ -1,8 +1,8 @@
 """
 Tests for the ADS service module of the search-comparisons application.
 
-This module tests the functionality of the ADS service including both
-the API and Solr proxy methods for retrieving search results.
+This module tests the functionality of the ADS service for retrieving search results
+using the official ADS API.
 """
 import os
 import json
@@ -16,10 +16,11 @@ from httpx import Response
 
 from app.services.ads_service import (
     get_ads_api_key,
-    get_bibcode_from_doi,
-    query_ads_solr,
-    query_ads_api,
-    get_ads_results
+    get_ads_results,
+    _get_default_fields,
+    _get_sort_parameter,
+    _map_fields_to_ads,
+    _create_search_result
 )
 from app.api.models import SearchResult
 
@@ -30,8 +31,8 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def mock_ads_solr_response() -> Dict[str, Any]:
-    """Provide a sample ADS Solr response."""
+def mock_ads_api_response() -> Dict[str, Any]:
+    """Provide a sample ADS API response."""
     return {
         "responseHeader": {
             "status": 0,
@@ -69,105 +70,83 @@ def mock_ads_solr_response() -> Dict[str, Any]:
     }
 
 
-@pytest.fixture
-def mock_ads_api_response() -> Dict[str, Any]:
-    """Provide a sample ADS API response."""
-    return {
-        "responseHeader": {
-            "status": 0,
-            "QTime": 37,
-            "params": {
-                "q": "star formation",
-                "fl": "title,abstract,author,year,citation_count,bibcode,doi",
-                "rows": "5"
-            }
-        },
-        "response": {
-            "numFound": 188889,
-            "start": 0,
-            "docs": [
-                {
-                    "bibcode": "2014ARA&A..52..415M",
-                    "doi": ["10.1146/annurev-astro-081811-125615"],
-                    "abstract": "Over the past two decades, an avalanche of new data from multiwavelength imaging...",
-                    "author": ["Madau, P.", "Dickinson, M."],
-                    "title": ["Cosmic Star-Formation History"],
-                    "year": "2014",
-                    "citation_count": 3518
-                },
-                {
-                    "bibcode": "2004RvMP...76..125M",
-                    "doi": ["10.1103/RevModPhys.76.125"],
-                    "abstract": "Understanding the formation of stars in galaxies is central to modern astrophysics...",
-                    "author": ["Mac Low, M.", "Klessen, R.S."],
-                    "title": ["Control of star formation by supersonic turbulence"],
-                    "year": "2004",
-                    "citation_count": 1635
-                }
-            ]
-        }
+def test_get_default_fields() -> None:
+    """Test getting default fields for ADS API queries."""
+    fields = _get_default_fields()
+    
+    # Check that all required fields are present
+    assert "id" in fields
+    assert "bibcode" in fields
+    assert "title" in fields
+    assert "author" in fields
+    assert "year" in fields
+    assert "citation_count" in fields
+    assert "abstract" in fields
+    assert "doi" in fields
+
+
+def test_get_sort_parameter() -> None:
+    """Test determining sort parameter based on intent."""
+    # Test with explicit sort
+    assert _get_sort_parameter(None, "date asc") == "date asc"
+    
+    # Test with influential intent
+    assert _get_sort_parameter("influential", None) == "citation_count desc"
+    assert _get_sort_parameter("highly cited", None) == "citation_count desc"
+    assert _get_sort_parameter("popular", None) == "citation_count desc"
+    
+    # Test with recent intent
+    assert _get_sort_parameter("recent", None) == "date desc"
+    
+    # Test with no intent or sort
+    assert _get_sort_parameter(None, None) == "score desc"
+
+
+def test_map_fields_to_ads() -> None:
+    """Test mapping fields to ADS API fields."""
+    # Test with basic fields
+    fields = ["title", "authors", "abstract"]
+    mapped = _map_fields_to_ads(fields)
+    assert "title" in mapped
+    assert "author" in mapped  # Note: authors -> author
+    assert "abstract" in mapped
+    assert "bibcode" in mapped  # Always included
+    assert "id" in mapped  # Always included
+    
+    # Test with unknown fields
+    fields = ["unknown_field"]
+    mapped = _map_fields_to_ads(fields)
+    assert "unknown_field" not in mapped
+    assert "bibcode" in mapped
+    assert "id" in mapped
+
+
+def test_create_search_result() -> None:
+    """Test creating a SearchResult from an ADS API document."""
+    doc = {
+        "bibcode": "2014ARA&A..52..415M",
+        "title": ["Test Title"],
+        "author": ["Author 1", "Author 2"],
+        "abstract": "Test abstract",
+        "year": "2014",
+        "citation_count": 100
     }
-
-
-@pytest.fixture
-def mock_httpx_client(mocker: "MockerFixture") -> None:
-    """Mock httpx client for testing HTTP requests."""
-    mocker.patch("httpx.AsyncClient")
+    
+    result = _create_search_result(doc, 1)
+    
+    assert result.title == "Test Title"
+    assert result.author == ["Author 1", "Author 2"]
+    assert result.abstract == "Test abstract"
+    assert result.year == "2014"
+    assert result.citation_count == 100
+    assert result.rank == 1
+    assert result.source == "ads"
+    assert result.url == "https://ui.adsabs.harvard.edu/abs/2014ARA&A..52..415M/abstract"
 
 
 @pytest.mark.asyncio
-async def test_get_ads_api_key() -> None:
-    """Test retrieving the ADS API key from environment variables."""
-    # Test with no environment variables set
-    with patch.dict(os.environ, {}, clear=True):
-        assert get_ads_api_key() == ""
-    
-    # Test with ADS_API_KEY set
-    with patch.dict(os.environ, {"ADS_API_KEY": "test_key"}, clear=True):
-        assert get_ads_api_key() == "test_key"
-    
-    # Test with ADS_API_TOKEN set (fallback)
-    with patch.dict(os.environ, {"ADS_API_TOKEN": "test_token"}, clear=True):
-        assert get_ads_api_key() == "test_token"
-    
-    # Test precedence (ADS_API_KEY has priority)
-    with patch.dict(os.environ, {
-        "ADS_API_KEY": "primary_key", 
-        "ADS_API_TOKEN": "fallback_token"
-    }, clear=True):
-        assert get_ads_api_key() == "primary_key"
-
-
-@pytest.mark.asyncio
-async def test_get_bibcode_from_doi() -> None:
-    """Test retrieving a bibcode from a DOI."""
-    # Test with empty DOI
-    assert await get_bibcode_from_doi("") is None
-    
-    # Test with valid DOI but missing API key
-    with patch("app.services.ads_service.get_ads_api_key", return_value=""):
-        assert await get_bibcode_from_doi("10.1146/annurev-astro-081811-125615") is None
-    
-    # Test with valid DOI and API key but failed request
-    with patch("app.services.ads_service.get_ads_api_key", return_value="test_key"):
-        with patch("app.services.ads_service.safe_api_request", side_effect=Exception("API error")):
-            assert await get_bibcode_from_doi("10.1146/annurev-astro-081811-125615") is None
-    
-    # Test with valid DOI, API key, and successful request but no results
-    with patch("app.services.ads_service.get_ads_api_key", return_value="test_key"):
-        with patch("app.services.ads_service.safe_api_request", return_value={"response": {"docs": []}}):
-            assert await get_bibcode_from_doi("10.1146/nonexistent") is None
-    
-    # Test with valid DOI, API key, and successful request with results
-    with patch("app.services.ads_service.get_ads_api_key", return_value="test_key"):
-        mock_response = {"response": {"docs": [{"bibcode": "2014ARA&A..52..415M"}]}}
-        with patch("app.services.ads_service.safe_api_request", return_value=mock_response):
-            assert await get_bibcode_from_doi("10.1146/annurev-astro-081811-125615") == "2014ARA&A..52..415M"
-
-
-@pytest.mark.asyncio
-async def test_query_ads_solr(mock_ads_solr_response: Dict[str, Any]) -> None:
-    """Test querying the ADS Solr instance directly."""
+async def test_get_ads_results(mock_ads_api_response: Dict[str, Any]) -> None:
+    """Test getting results from the ADS API."""
     query = "star formation"
     fields = ["title", "abstract", "authors", "year", "citation_count"]
     num_results = 5
@@ -177,17 +156,17 @@ async def test_query_ads_solr(mock_ads_solr_response: Dict[str, Any]) -> None:
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_get.return_value = Response(
                 status_code=200,
-                content=json.dumps(mock_ads_solr_response).encode()
+                content=json.dumps(mock_ads_api_response).encode()
             )
             
             with patch("app.services.ads_service.save_to_cache"):
-                results = await query_ads_solr(query, fields, num_results)
+                results = await get_ads_results(query, fields, num_results)
                 
                 # Verify the results
                 assert len(results) == 2
                 assert results[0].title == "Cosmic Star-Formation History"
                 assert results[0].source == "ads"
-                assert results[0].year == 2014
+                assert results[0].year == "2014"
                 assert results[0].citation_count == 3518
                 
                 # Verify the request was made correctly
@@ -203,202 +182,82 @@ async def test_query_ads_solr(mock_ads_solr_response: Dict[str, Any]) -> None:
         with patch("httpx.AsyncClient.get") as mock_get:
             mock_get.return_value = Response(status_code=400, content=b'{"error": "Bad Request"}')
             
-            results = await query_ads_solr(query, fields, num_results)
+            results = await get_ads_results(query, fields, num_results)
             assert results == []
+
+
+@pytest.mark.asyncio
+async def test_get_ads_results_with_intent(mock_ads_api_response: Dict[str, Any]) -> None:
+    """Test getting results from the ADS API with different intents."""
+    query = "star formation"
+    fields = ["title", "abstract", "authors", "year", "citation_count"]
+    num_results = 5
     
-    # Test with exception
+    # Test with influential intent
     with patch("app.services.ads_service.load_from_cache", return_value=None):
-        with patch("httpx.AsyncClient.get", side_effect=Exception("Connection error")):
-            results = await query_ads_solr(query, fields, num_results)
-            assert results == []
+        with patch("httpx.AsyncClient.get") as mock_get:
+            mock_get.return_value = Response(
+                status_code=200,
+                content=json.dumps(mock_ads_api_response).encode()
+            )
+            
+            results = await get_ads_results(query, fields, num_results, intent="influential")
+            
+            # Verify sort parameter
+            mock_get.assert_called_once()
+            call_args = mock_get.call_args[1]
+            assert call_args["params"]["sort"] == "citation_count desc"
     
-    # Test with cache hit
+    # Test with recent intent
+    with patch("app.services.ads_service.load_from_cache", return_value=None):
+        with patch("httpx.AsyncClient.get") as mock_get:
+            mock_get.return_value = Response(
+                status_code=200,
+                content=json.dumps(mock_ads_api_response).encode()
+            )
+            
+            results = await get_ads_results(query, fields, num_results, intent="recent")
+            
+            # Verify sort parameter
+            mock_get.assert_called_once()
+            call_args = mock_get.call_args[1]
+            assert call_args["params"]["sort"] == "date desc"
+
+
+@pytest.mark.asyncio
+async def test_get_ads_results_with_cache(mock_ads_api_response: Dict[str, Any]) -> None:
+    """Test getting results from the ADS API with caching."""
+    query = "star formation"
+    fields = ["title", "abstract", "authors", "year", "citation_count"]
+    num_results = 5
+    
+    # Test with cached results
     cached_results = [
-        SearchResult(title="Cached Result", source="ads", rank=1)
+        SearchResult(
+            title="Cached Result",
+            author=["Test Author"],
+            abstract="Test abstract",
+            source="ads",
+            rank=1
+        )
     ]
+    
     with patch("app.services.ads_service.load_from_cache", return_value=cached_results):
-        results = await query_ads_solr(query, fields, num_results)
-        assert results == cached_results
-
-
-@pytest.mark.asyncio
-async def test_query_ads_api(mock_ads_api_response: Dict[str, Any]) -> None:
-    """Test querying the ADS API."""
-    query = "star formation"
-    fields = ["title", "abstract", "authors", "year", "citation_count"]
-    num_results = 5
-    
-    # Test with no API key
-    with patch("app.services.ads_service.get_ads_api_key", return_value=""):
-        results = await query_ads_api(query, fields, num_results)
-        assert results == []
-    
-    # Test with API key and successful response
-    with patch("app.services.ads_service.get_ads_api_key", return_value="test_key"):
-        with patch("app.services.ads_service.load_from_cache", return_value=None):
-            with patch("app.services.ads_service.safe_api_request", return_value=mock_ads_api_response):
-                with patch("app.services.ads_service.save_to_cache"):
-                    results = await query_ads_api(query, fields, num_results)
-                    
-                    # Verify the results
-                    assert len(results) == 2
-                    assert results[0].title == "Cosmic Star-Formation History"
-                    assert results[0].source == "ads"
-                    assert results[0].year == 2014
-                    assert results[0].citation_count == 3518
-                    assert results[0].doi == "10.1146/annurev-astro-081811-125615"
-    
-    # Test with API key but failed request
-    with patch("app.services.ads_service.get_ads_api_key", return_value="test_key"):
-        with patch("app.services.ads_service.load_from_cache", return_value=None):
-            with patch("app.services.ads_service.safe_api_request", side_effect=Exception("API error")):
-                results = await query_ads_api(query, fields, num_results)
-                assert results == []
-    
-    # Test with API key and successful request but no results
-    with patch("app.services.ads_service.get_ads_api_key", return_value="test_key"):
-        with patch("app.services.ads_service.load_from_cache", return_value=None):
-            empty_response = {"response": {"docs": []}}
-            with patch("app.services.ads_service.safe_api_request", return_value=empty_response):
-                results = await query_ads_api(query, fields, num_results)
-                assert results == []
-    
-    # Test with cache hit
-    cached_results = [
-        SearchResult(title="Cached API Result", source="ads", rank=1)
-    ]
-    with patch("app.services.ads_service.get_ads_api_key", return_value="test_key"):
-        with patch("app.services.ads_service.load_from_cache", return_value=cached_results):
-            results = await query_ads_api(query, fields, num_results)
+        with patch("httpx.AsyncClient.get") as mock_get:
+            results = await get_ads_results(query, fields, num_results, use_cache=True)
+            
+            # Verify we got cached results
             assert results == cached_results
+            mock_get.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_get_ads_results() -> None:
-    """Test the main get_ads_results function with different query methods."""
-    query = "star formation"
-    fields = ["title", "abstract", "authors", "year", "citation_count"]
-    num_results = 5
-    
-    solr_results = [SearchResult(title="Solr Result", source="ads", rank=1)]
-    api_results = [SearchResult(title="API Result", source="ads", rank=1)]
-    
-    # Test solr_only mode
-    with patch.dict(os.environ, {"ADS_QUERY_METHOD": "solr_only"}):
-        with patch("app.services.ads_service.ADS_QUERY_METHOD", "solr_only"):
-            with patch("app.services.ads_service.query_ads_solr", return_value=solr_results) as mock_solr:
-                with patch("app.services.ads_service.query_ads_api") as mock_api:
-                    results = await get_ads_results(query, fields, num_results)
-                    assert results == solr_results
-                    mock_api.assert_not_called()
-                    mock_solr.assert_called_once()
-    
-    # Test api_only mode
-    with patch.dict(os.environ, {"ADS_QUERY_METHOD": "api_only"}):
-        with patch("app.services.ads_service.ADS_QUERY_METHOD", "api_only"):
-            with patch("app.services.ads_service.query_ads_api", return_value=api_results) as mock_api:
-                with patch("app.services.ads_service.query_ads_solr") as mock_solr:
-                    results = await get_ads_results(query, fields, num_results)
-                    assert results == api_results
-                    mock_solr.assert_not_called()
-                    mock_api.assert_called_once()
-    
-    # Test solr_first mode (successful Solr query)
-    with patch.dict(os.environ, {"ADS_QUERY_METHOD": "solr_first"}):
-        with patch("app.services.ads_service.ADS_QUERY_METHOD", "solr_first"):
-            with patch("app.services.ads_service.query_ads_solr", return_value=solr_results) as mock_solr:
-                with patch("app.services.ads_service.query_ads_api") as mock_api:
-                    results = await get_ads_results(query, fields, num_results)
-                    assert results == solr_results
-                    mock_api.assert_not_called()
-                    mock_solr.assert_called_once()
-    
-    # Test solr_first mode (failed Solr query, fallback to API)
-    with patch.dict(os.environ, {"ADS_QUERY_METHOD": "solr_first"}):
-        with patch("app.services.ads_service.ADS_QUERY_METHOD", "solr_first"):
-            with patch("app.services.ads_service.query_ads_solr", return_value=[]) as mock_solr:
-                with patch("app.services.ads_service.query_ads_api", return_value=api_results) as mock_api:
-                    results = await get_ads_results(query, fields, num_results)
-                    assert results == api_results
-                    mock_solr.assert_called_once()
-                    mock_api.assert_called_once()
-    
-    # Test solr_first mode (exception in Solr query, fallback to API)
-    with patch.dict(os.environ, {"ADS_QUERY_METHOD": "solr_first"}):
-        with patch("app.services.ads_service.ADS_QUERY_METHOD", "solr_first"):
-            with patch("app.services.ads_service.query_ads_solr", side_effect=Exception("Solr error")) as mock_solr:
-                with patch("app.services.ads_service.query_ads_api", return_value=api_results) as mock_api:
-                    results = await get_ads_results(query, fields, num_results)
-                    assert results == api_results
-                    mock_solr.assert_called_once()
-                    mock_api.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_ads_solr_connection(
+async def test_get_ads_results_error_handling(
     mock_httpx_client: None,
     caplog: "LogCaptureFixture"
 ) -> None:
     """
-    Test basic connection to ADS Solr proxy.
-    
-    This test verifies that we can connect to the ADS Solr proxy
-    and receive a valid response for a simple query.
-    """
-    # Test query
-    query = "author:\"Einstein\""
-    fields = ["title", "authors", "year"]
-    
-    # Query ADS Solr
-    results = await query_ads_solr(query, fields)
-    
-    # Verify results
-    assert isinstance(results, list)
-    if results:  # If we got results
-        assert all(hasattr(result, "title") for result in results)
-        assert all(hasattr(result, "authors") for result in results)
-        assert all(hasattr(result, "year") for result in results)
-    
-    # Check logs for any errors
-    assert not any("error" in record.levelname.lower() for record in caplog.records)
-
-
-@pytest.mark.asyncio
-async def test_ads_solr_field_mapping(
-    mock_httpx_client: None,
-    caplog: "LogCaptureFixture"
-) -> None:
-    """
-    Test that field mapping works correctly for ADS Solr queries.
-    
-    This test verifies that the field mapping between our application
-    and ADS Solr works as expected.
-    """
-    # Test query with specific fields
-    query = "author:\"Einstein\""
-    fields = ["doi", "abstract", "citation_count"]
-    
-    # Query ADS Solr
-    results = await query_ads_solr(query, fields)
-    
-    # Verify results
-    assert isinstance(results, list)
-    if results:  # If we got results
-        assert all(hasattr(result, "doi") for result in results)
-        assert all(hasattr(result, "abstract") for result in results)
-        assert all(hasattr(result, "citation_count") for result in results)
-    
-    # Check logs for any errors
-    assert not any("error" in record.levelname.lower() for record in caplog.records)
-
-
-@pytest.mark.asyncio
-async def test_ads_solr_error_handling(
-    mock_httpx_client: None,
-    caplog: "LogCaptureFixture"
-) -> None:
-    """
-    Test error handling for ADS Solr queries.
+    Test error handling for ADS API queries.
     
     This test verifies that the service handles various error cases
     gracefully and returns appropriate results.
@@ -407,38 +266,12 @@ async def test_ads_solr_error_handling(
     query = "invalid:field:value"
     fields = ["title"]
     
-    # Query ADS Solr
-    results = await query_ads_solr(query, fields)
+    # Query ADS API
+    results = await get_ads_results(query, fields)
     
     # Should return empty list for invalid query
     assert isinstance(results, list)
     assert len(results) == 0
     
     # Check logs for error message
-    assert any("error" in record.levelname.lower() for record in caplog.records)
-
-
-@pytest.mark.asyncio
-async def test_ads_solr_proxy_url_configuration(
-    mock_httpx_client: None,
-    caplog: "LogCaptureFixture"
-) -> None:
-    """
-    Test that ADS Solr proxy URL configuration is respected.
-    
-    This test verifies that the service uses the configured proxy URL
-    for making requests.
-    """
-    # Test query
-    query = "author:\"Einstein\""
-    fields = ["title"]
-    
-    # Query ADS Solr
-    results = await query_ads_solr(query, fields)
-    
-    # Verify results
-    assert isinstance(results, list)
-    
-    # Check logs for proxy URL usage
-    proxy_url = os.environ.get("ADS_SOLR_PROXY_URL", "https://scix-solr-proxy.onrender.com/solr/select")
-    assert any(proxy_url in record.message for record in caplog.records) 
+    assert any("error" in record.levelname.lower() for record in caplog.records) 

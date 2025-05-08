@@ -226,25 +226,40 @@ async def get_results_with_fallback(
                         effective_query = original_query or query
                         logger.info(f"Using original query for {source}: {effective_query}")
                 
-                if source == "ads":
-                    source_results = await get_ads_results(effective_query, fields, num_results)
-                elif source == "scholar":
-                    if attempt_count == 1:
-                        source_results = await get_scholar_results(effective_query, fields, num_results)
+                # Set timeout based on service config
+                timeout = SERVICE_CONFIG[source]["timeout"] if source in SERVICE_CONFIG else 15
+                
+                # Create a task for the source query with timeout
+                async def query_source():
+                    if source == "ads":
+                        return await get_ads_results(effective_query, fields, num_results)
+                    elif source == "scholar":
+                        if attempt_count == 1:
+                            return await get_scholar_results(effective_query, fields, num_results)
+                        else:
+                            return await get_scholar_results_fallback(effective_query, num_results)
+                    elif source == "semanticScholar":
+                        return await get_semantic_scholar_results(effective_query, fields, num_results)
+                    elif source == "webOfScience":
+                        return await get_web_of_science_results(effective_query, fields, num_results)
                     else:
-                        # Fallback method for scholar
-                        source_results = await get_scholar_results_fallback(effective_query, num_results)
-                elif source == "semanticScholar":
-                    source_results = await get_semantic_scholar_results(effective_query, fields, num_results)
-                elif source == "webOfScience":
-                    source_results = await get_web_of_science_results(effective_query, fields, num_results)
+                        logger.error(f"Unknown source: {source}")
+                        return []
+                
+                # Execute query with timeout
+                try:
+                    source_results = await asyncio.wait_for(query_source(), timeout=timeout)
+                except asyncio.TimeoutError:
+                    logger.error(f"Timeout after {timeout} seconds for {source}")
+                    continue
                 
                 # Check if we got enough results
-                if len(source_results) >= SERVICE_CONFIG[source]["min_results"]:
+                min_results = SERVICE_CONFIG[source]["min_results"] if source in SERVICE_CONFIG else 1
+                if len(source_results) >= min_results:
                     success = True
                     logger.info(f"Successfully retrieved {len(source_results)} results from {source}")
                 else:
-                    logger.warning(f"Insufficient results from {source}: {len(source_results)} < {SERVICE_CONFIG[source]['min_results']}")
+                    logger.warning(f"Insufficient results from {source}: {len(source_results)} < {min_results}")
             
             except Exception as e:
                 logger.error(f"Error fetching results from {source}: {str(e)}")

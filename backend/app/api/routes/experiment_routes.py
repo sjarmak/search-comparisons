@@ -22,7 +22,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request, Backgroun
 from pydantic import BaseModel, Field
 
 from ...services import search_service
-from ...services.ads_service import get_ads_results, query_ads_solr
+from ...services.ads_service import get_ads_results
 from ...services.quepid_service import (
     evaluate_search_results, 
     load_case_with_judgments, 
@@ -46,6 +46,7 @@ from ..models import (
     BoostConfig
 )
 from ...services.boost_service import apply_all_boosts
+from ...services.query_intent.service import QueryIntentService
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -66,6 +67,9 @@ back_compat_router = APIRouter(
 
 # Initialize QuepidService
 quepid_service = QuepidService()
+
+# Initialize QueryIntentService
+query_intent_service = QueryIntentService()
 
 
 class BoostFactors(BaseModel):
@@ -120,6 +124,24 @@ class BoostResult(BaseModel):
     boosted_results: List[BoostedSearchResult]
     boost_config: BoostConfig
     stats: Dict[str, Any]
+
+
+class ExperimentRequest(BaseModel):
+    """Request model for experiment endpoints."""
+    query: str
+    num_results: int = 20
+    use_cache: bool = False
+    intent: Optional[str] = None
+
+
+class ExperimentResponse(BaseModel):
+    """Response model for experiment endpoints."""
+    query: str
+    transformed_query: str
+    intent: str
+    explanation: str
+    results: List[Dict[str, Any]]
+    metadata: Dict[str, Any]
 
 
 def find_closest_query(query: str, available_queries: List[str]) -> Optional[str]:
@@ -883,4 +905,78 @@ async def boost_experiment_legacy(
         
     except Exception as e:
         logger.error(f"Error in boost experiment: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/search", response_model=ExperimentResponse)
+async def run_experiment(request: ExperimentRequest) -> Dict[str, Any]:
+    """
+    Run a search experiment using the query intent service.
+    
+    Args:
+        request: Experiment request parameters
+        
+    Returns:
+        Dict[str, Any]: Search results with metadata
+    """
+    try:
+        # Transform query using LLM
+        transformed_query = await query_intent_service.llm_service.interpret_query(request.query)
+        
+        # Search using ADS API
+        results = await get_ads_results(
+            query=transformed_query.transformed_query,
+            intent=transformed_query.intent,
+            num_results=request.num_results,
+            use_cache=request.use_cache
+        )
+        
+        # Prepare response
+        response = {
+            "query": request.query,
+            "transformed_query": transformed_query.transformed_query,
+            "intent": transformed_query.intent,
+            "explanation": transformed_query.explanation,
+            "results": [result.dict() for result in results],
+            "metadata": {
+                "num_results": len(results),
+                "service": "ads",
+                "cache_used": request.use_cache
+            }
+        }
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error in experiment search: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error running experiment: {str(e)}"
+        )
+
+
+@router.get("/health")
+async def health_check() -> Dict[str, Any]:
+    """
+    Check the health of the experiment service.
+    
+    Returns:
+        Dict[str, Any]: Health status information
+    """
+    try:
+        # Check query intent service health
+        health = await query_intent_service.health_check()
+        
+        return {
+            "status": "healthy",
+            "services": {
+                "query_intent": health
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        } 

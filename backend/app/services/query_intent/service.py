@@ -5,15 +5,29 @@ This module provides functionality to interpret user queries and transform them
 into effective ADS search queries using LLM-based intent detection.
 """
 import logging
-import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TypedDict
+
 from .llm_service import LLMService
 from .cache_service import CacheService
-from app.services.solr_service import SolrService
 from app.core.config import settings
+from app.services.ads_service import get_ads_results
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
+
+class QueryInterpretation(TypedDict):
+    """Type definition for query interpretation results."""
+    transformed_query: str
+    intent: str
+    explanation: str
+
+class SearchResponse(TypedDict):
+    """Type definition for search response."""
+    original_query: str
+    transformed_query: str
+    intent: str
+    explanation: str
+    results: List[Any]
 
 class QueryIntentService:
     """Service for interpreting and transforming search queries."""
@@ -32,23 +46,14 @@ class QueryIntentService:
         # Initialize cache service if not provided
         self.cache_service = cache_service or CacheService()
         
-        # Initialize Solr service with environment variables
-        solr_password = os.environ.get("ADS_SOLR_PASSWORD")
-        if not solr_password:
-            logger.error("ADS_SOLR_PASSWORD not found in environment variables")
-        else:
-            logger.info("ADS_SOLR_PASSWORD found in environment variables")
-        
-        self.solr_service = SolrService()
-        
         logger.info(f"Initialized QueryIntentService with LLM: {settings.LLM_ENABLED}")
     
     async def search(
         self,
         query: str,
         num_results: int = 20,
-        use_cache: bool = False  # Added parameter to control caching
-    ) -> Dict[str, Any]:
+        use_cache: bool = False
+    ) -> SearchResponse:
         """
         Perform a search using the query intent service.
         
@@ -58,17 +63,7 @@ class QueryIntentService:
             use_cache: Whether to use cached results
         
         Returns:
-            Dict[str, Any]: Search results with query interpretation in format:
-                {
-                    "original_query": str,
-                    "transformed_query": str,
-                    "intent": str,
-                    "explanation": str,
-                    "results": {
-                        "numFound": int,
-                        "docs": List[Dict]
-                    }
-                }
+            SearchResponse: Search results with query interpretation
         """
         try:
             # Check cache first if enabled
@@ -81,20 +76,21 @@ class QueryIntentService:
             # Transform query using LLM
             transformed_query = await self.llm_service.interpret_query(query)
             
-            # Search using Solr service
-            results = await self.solr_service.search(
+            # Search using ADS API
+            results = await get_ads_results(
                 query=transformed_query.transformed_query,
                 intent=transformed_query.intent,
-                rows=num_results
+                num_results=num_results,
+                use_cache=use_cache
             )
             
             # Prepare response
-            response = {
+            response: SearchResponse = {
                 "original_query": query,
                 "transformed_query": transformed_query.transformed_query,
                 "intent": transformed_query.intent,
                 "explanation": transformed_query.explanation,
-                "results": results  # Return the full results object
+                "results": results
             }
             
             # Cache results if enabled
@@ -110,10 +106,7 @@ class QueryIntentService:
                 "transformed_query": query,  # Fallback to original query
                 "intent": "unknown",
                 "explanation": f"Error processing query: {str(e)}",
-                "results": {
-                    "numFound": 0,
-                    "docs": []
-                }
+                "results": []
             }
     
     async def health_check(self) -> Dict[str, Any]:
@@ -127,13 +120,9 @@ class QueryIntentService:
             # Check LLM service health
             llm_health = await self.llm_service.health_check()
             
-            # Check Solr service health
-            solr_health = await self.solr_service.health_check()
-            
             return {
                 "status": "healthy",
-                "llm": llm_health,
-                "solr": solr_health
+                "llm": llm_health
             }
             
         except Exception as e:

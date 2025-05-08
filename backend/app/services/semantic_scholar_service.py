@@ -26,6 +26,8 @@ SEMANTIC_SCHOLAR_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "")
 NUM_RESULTS = 20
 TIMEOUT_SECONDS = 30  # Increased timeout
 MAX_RETRIES = 5
+INITIAL_RETRY_DELAY = 2  # Initial delay in seconds
+MAX_RETRY_DELAY = 32  # Maximum delay in seconds
 
 # Field mappings to convert API response fields to our model fields
 FIELD_MAPPING = {
@@ -77,7 +79,10 @@ async def get_semantic_scholar_results(
         return cached_results
     
     # Set headers with API key if available
-    headers = {}
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    }
     if SEMANTIC_SCHOLAR_API_KEY:
         headers["x-api-key"] = SEMANTIC_SCHOLAR_API_KEY
     
@@ -89,15 +94,17 @@ async def get_semantic_scholar_results(
     }
     
     # Implement progressive backoff for retries
-    base_delay = 2  # seconds
+    retry_delay = INITIAL_RETRY_DELAY
     
     for attempt in range(MAX_RETRIES):
         try:
-            # Add delay on retries - exponential backoff
+            # Add delay on retries - exponential backoff with jitter
             if attempt > 0:
-                retry_delay = base_delay * (2 ** (attempt - 1)) + random.random()  # 2, 4, 8, 16... + jitter
-                logger.info(f"Semantic Scholar retry {attempt+1}/{MAX_RETRIES}, waiting {retry_delay:.2f}s")
-                await asyncio.sleep(retry_delay)
+                jitter = random.uniform(0, 0.1 * retry_delay)  # Add 0-10% jitter
+                actual_delay = retry_delay + jitter
+                logger.info(f"Semantic Scholar retry {attempt+1}/{MAX_RETRIES}, waiting {actual_delay:.2f}s")
+                await asyncio.sleep(actual_delay)
+                retry_delay = min(retry_delay * 2, MAX_RETRY_DELAY)  # Double delay, but cap at MAX_RETRY_DELAY
             
             logger.info(f"Making Semantic Scholar API request (attempt {attempt+1}/{MAX_RETRIES})")
             
@@ -112,7 +119,7 @@ async def get_semantic_scholar_results(
                 
                 # Handle rate limiting explicitly
                 if response.status_code == 429:
-                    retry_after = int(response.headers.get('retry-after', 1))
+                    retry_after = int(response.headers.get('retry-after', retry_delay))
                     logger.warning(f"Semantic Scholar API rate limit hit. Retrying after {retry_after}s")
                     await asyncio.sleep(retry_after + random.random())
                     continue
@@ -161,18 +168,19 @@ async def get_semantic_scholar_results(
                         # Create result object
                         result = SearchResult(
                             title=paper.get("title", ""),
-                            authors=authors,
+                            author=authors,
                             abstract=paper.get("abstract", ""),
                             doi=doi,
                             year=paper.get("year"),
                             url=url,
                             source="semanticScholar",
                             rank=rank,
-                            citation_count=paper.get("citationCount")
+                            citation_count=paper.get("citationCount", 0)
                         )
                         results.append(result)
                     except Exception as e:
                         logger.error(f"Error processing Semantic Scholar result {rank}: {str(e)}")
+                        continue
                 
                 # Save to cache and return if we have results
                 if results:
