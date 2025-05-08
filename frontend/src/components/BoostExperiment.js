@@ -15,6 +15,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import SaveIcon from '@mui/icons-material/Save';
 import { experimentService, API_URL as DEFAULT_API_URL } from '../services/api';
 import { List as ListIcon } from '@mui/icons-material';
 import LaunchIcon from '@mui/icons-material/Launch';
@@ -59,6 +60,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     scholar: 10,
     quepid: 10
   });
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
@@ -1755,6 +1759,133 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     }
   };
 
+  // Add function to handle judgment submission
+  const handleSubmitJudgments = async () => {
+    if (!searchQuery.trim()) {
+      setError('Please enter a search query');
+      return;
+    }
+
+    setSubmitLoading(true);
+    setSubmitError(null);
+    setSubmitSuccess(false);
+
+    try {
+      // Get all records that have judgments (both Quepid and manual)
+      const judgmentsToSubmit = [];
+
+      // Helper function to add a judgment
+      const addJudgment = (record, judgment, source) => {
+        if (judgment === null || judgment === undefined) return;
+
+        const judgmentValue = typeof judgment === 'object' ? judgment.judgment : judgment;
+        if (judgmentValue === null || judgmentValue === undefined) return;
+
+        // Convert judgment value to 0-1 scale if it's in 0-3 scale
+        const normalizedScore = judgmentValue <= 3 ? judgmentValue / 3 : judgmentValue;
+
+        judgmentsToSubmit.push({
+          query: searchQuery,
+          information_need: informationNeed,
+          record_title: record.title,
+          publication_year: record.year,
+          record_bibcode: record.bibcode,
+          record_source: source,
+          judgement_score: normalizedScore,
+          judgement_note: judgment?.note || ''
+        });
+      };
+
+      // Collect judgments from all sources
+      searchResults?.results?.ads?.forEach(record => {
+        const recordId = record.bibcode || normalizeTitle(record.title);
+        const userJudgment = localJudgments[`original_${recordId}`];
+        const quepidJudgment = getJudgmentForTitle(record.title);
+
+        if (userJudgment !== undefined) {
+          addJudgment(record, userJudgment, 'ADS');
+        } else if (quepidJudgment !== null) {
+          addJudgment(record, { judgment: quepidJudgment }, 'ADS');
+        }
+      });
+
+      searchResults?.results?.scholar?.forEach(record => {
+        const recordId = normalizeTitle(record.title);
+        const userJudgment = localJudgments[`scholar_${recordId}`];
+        if (userJudgment !== undefined) {
+          addJudgment(record, userJudgment, 'Google Scholar');
+        }
+      });
+
+      boostedResults?.results?.ads?.forEach(record => {
+        const recordId = record.bibcode || normalizeTitle(record.title);
+        const userJudgment = localJudgments[`boosted_${recordId}`];
+        if (userJudgment !== undefined) {
+          addJudgment(record, userJudgment, 'Boosted ADS');
+        }
+      });
+
+      if (judgmentsToSubmit.length === 0) {
+        throw new Error('No judgments to submit. Please add some judgments first.');
+      }
+
+      // Submit judgments to the backend
+      const response = await fetch(`${API_URL}/api/judgements/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          judgements: judgmentsToSubmit
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to submit judgments');
+      }
+
+      setSubmitSuccess(true);
+      // Clear local judgments after successful submission
+      setLocalJudgments({});
+    } catch (err) {
+      console.error('Error submitting judgments:', err);
+      setSubmitError(err instanceof Error ? err.message : 'An error occurred while submitting judgments');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  // Add submit button to the top of the results panel
+  const renderSubmitButton = () => (
+    <Button
+      startIcon={submitLoading ? <CircularProgress size={20} /> : <SaveIcon />}
+      variant="contained"
+      size="small"
+      onClick={handleSubmitJudgments}
+      disabled={submitLoading || Object.keys(localJudgments).length === 0}
+      sx={{ ml: 2 }}
+    >
+      {submitLoading ? 'Submitting...' : 'Submit Judgments'}
+    </Button>
+  );
+
+  // Add success/error alerts
+  const renderSubmitAlerts = () => (
+    <>
+      {submitSuccess && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          Judgments submitted successfully!
+        </Alert>
+      )}
+      {submitError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {submitError}
+        </Alert>
+      )}
+    </>
+  );
+
   return (
     <Box sx={{ width: '100%', p: 2 }}>
       {renderSearchForm()}
@@ -1764,6 +1895,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
           {error}
         </Alert>
       )}
+
+      {renderSubmitAlerts()}
 
       {searchLoading && (
         <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -1794,6 +1927,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   Ranking Results
                 </Typography>
                 {loading && <CircularProgress size={24} sx={{ ml: 2 }} />}
+                {renderSubmitButton()}
                 {renderExportButton()}
                 {renderBoostControlsToggle()}
                 {renderComparisonEngineSelector()}

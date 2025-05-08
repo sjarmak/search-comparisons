@@ -88,6 +88,13 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_DELAY: int = 2
     
+    # Session settings
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")  # Change this in production
+    
+    # Search settings
+    MAX_SEARCH_RESULTS: int = 100
+    DEFAULT_SEARCH_RESULTS: int = 20
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

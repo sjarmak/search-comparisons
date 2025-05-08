@@ -15,13 +15,17 @@ from datetime import datetime
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from .api.routes.search_routes import router as search_router
 from .api.routes.debug_routes import router as debug_router
 from .api.routes.experiment_routes import router as experiment_router, back_compat_router
 from .api.routes.query_intent import router as query_intent_router
 from .routes.quepid import router as quepid_router
+from .routes.judgement import router as judgement_router
 from .api.models import ErrorResponse
+from .core.init_db import init_db
+from .core.config import settings
 
 # Set up platform-specific fixes and environment variables first
 # Apply macOS SSL certificate handling fix if needed
@@ -137,6 +141,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add session middleware
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SECRET_KEY,
+    session_cookie="search_comparisons_session"
+)
+
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -207,6 +218,7 @@ app.include_router(experiment_router)
 app.include_router(back_compat_router)  # Include the backward compatibility router
 app.include_router(query_intent_router)  # Include the query intent router
 app.include_router(quepid_router, prefix="/api/quepid")  # Include the Quepid router
+app.include_router(judgement_router, prefix="/api")  # Include the judgment router
 
 
 @app.on_event("startup")
@@ -221,6 +233,9 @@ async def startup_event() -> None:
     logger.info(f"Debug mode: {os.getenv('DEBUG', 'True')}")
     logger.info(f"Registered legacy endpoints for backward compatibility")
     logger.info(f"Query intent service: enabled, LLM: {os.getenv('USE_LLM', 'false')}")
+    
+    # Initialize database
+    init_db()
 
 
 @app.on_event("shutdown")
