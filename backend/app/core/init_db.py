@@ -2,7 +2,6 @@
 
 import logging
 from app.core.database import Base, engine
-from app.models.judgement import Judgement
 
 logger = logging.getLogger(__name__)
 
