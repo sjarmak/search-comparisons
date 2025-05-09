@@ -1,10 +1,13 @@
 services:
-  - type: web
-    name: search-comparisons-frontend
-    env: node
-    buildCommand: npm install && npm run build
-    startCommand: npx serve -s build
-    nodeVersion: 18.17.1
+  - type: static
+    name: search-tool
+    buildCommand: |
+      cd frontend
+      npm install
+      npm run build
+    staticPublishPath: ./frontend/build
     envVars:
-      - key: NODE_ENV
-        value: production 
+      - key: REACT_APP_API_URL
+        value: https://search-tool-api.onrender.com
+      - key: REACT_APP_DEBUG
+        value: "false" 

@@ -15,17 +15,25 @@ from datetime import datetime
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from .api.routes.search_routes import router as search_router
 from .api.routes.debug_routes import router as debug_router
 from .api.routes.experiment_routes import router as experiment_router, back_compat_router
 from .api.routes.query_intent import router as query_intent_router
+from .api.routes.health import router as health_router
 from .routes.quepid import router as quepid_router
 from .routes.judgement import router as judgement_router
 from .api.models import ErrorResponse
 from .core.init_db import init_db
 from .core.config import settings
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Set up platform-specific fixes and environment variables first
 # Apply macOS SSL certificate handling fix if needed
@@ -127,6 +135,10 @@ app = FastAPI(
     debug=False  # Disable debug mode in production
 )
 
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -134,11 +146,19 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8000",
         "https://search.sjarmak.ai",
-        "https://search-tool-api.onrender.com"
+        "https://search-tool-api.onrender.com",
+        "https://search-tool.onrender.com",
+        os.environ.get("FRONTEND_URL", "https://search-tool.onrender.com")
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Add security headers middleware
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"]  # Configure this based on your domains
 )
 
 # Add session middleware
@@ -217,6 +237,7 @@ app.include_router(debug_router)
 app.include_router(experiment_router)
 app.include_router(back_compat_router)  # Include the backward compatibility router
 app.include_router(query_intent_router)  # Include the query intent router
+app.include_router(health_router)  # Include the health check router
 app.include_router(quepid_router, prefix="/api/quepid")  # Include the Quepid router
 app.include_router(judgement_router, prefix="/api")  # Include the judgment router
 

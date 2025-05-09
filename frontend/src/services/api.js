@@ -7,9 +7,11 @@ import axios from 'axios';
 
 // Base API URL from environment or fallback to localhost
 const API_URL = process.env.REACT_APP_API_URL || process.env.VITE_API_URL || 
-    (window.location.hostname.includes('sjarmak.ai') 
+    (window.location.hostname.includes('render.com') 
         ? 'https://search-tool-api.onrender.com'
-        : 'http://localhost:8000');
+        : window.location.hostname.includes('sjarmak.ai')
+            ? 'https://search-tool-api.onrender.com'
+            : 'http://localhost:8000');
 const DEBUG = process.env.REACT_APP_DEBUG === 'true';
 
 // Create axios instance with consistent configuration

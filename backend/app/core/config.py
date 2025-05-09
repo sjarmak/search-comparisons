@@ -59,7 +59,17 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
     
     # Database Configuration
-    DATABASE_URL: str = "sqlite:///./search_comparisons.db"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./search_comparisons.db")
+    
+    # If using PostgreSQL on Render, convert the URL if needed
+    @validator("DATABASE_URL", pre=True)
+    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
+        if isinstance(v, str):
+            # If it's a Render PostgreSQL URL, ensure it's properly formatted
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql://", 1)
+            return v
+        return v
     
     # Cache Configuration
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -70,13 +80,19 @@ class Settings(BaseSettings):
     ADS_API_URL: str = "https://api.adsabs.harvard.edu/v1/search/query"
     
     # LLM Configuration
-    LLM_ENABLED: bool = True
-    LLM_MODEL_NAME: str = "qwen2:7b"
-    LLM_TEMPERATURE: float = 0.7
-    LLM_MAX_TOKENS: int = 1000
-    LLM_PROVIDER: str = "ollama"
-    LLM_API_ENDPOINT: str = "http://localhost:11434/api/generate"
-    LLM_PROMPT_TEMPLATE: Optional[str] = None
+    LLM_ENABLED: bool = os.getenv("LLM_ENABLED", "true").lower() == "true"
+    LLM_MODEL_NAME: str = os.getenv("LLM_MODEL_NAME", "qwen2:7b")
+    LLM_TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.7"))
+    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1000"))
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
+    LLM_API_ENDPOINT: str = os.getenv("LLM_API_ENDPOINT", "http://localhost:11434/api/generate")
+    LLM_PROMPT_TEMPLATE: Optional[str] = os.getenv("LLM_PROMPT_TEMPLATE")
+    
+    # Local LLM Configuration
+    LOCAL_LLM_ENABLED: bool = os.getenv("LOCAL_LLM_ENABLED", "false").lower() == "true"
+    LOCAL_LLM_HOST: str = os.getenv("LOCAL_LLM_HOST", "localhost")
+    LOCAL_LLM_PORT: int = int(os.getenv("LOCAL_LLM_PORT", "11434"))
+    LOCAL_LLM_TIMEOUT: int = int(os.getenv("LOCAL_LLM_TIMEOUT", "120"))
     
     # Query intent settings
     QUERY_INTENT_ENABLED: bool = True
