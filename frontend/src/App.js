@@ -1031,9 +1031,9 @@ function App() {
                                     
                                     {/* X-axis labels */}
                                     <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                                      <Typography variant="caption">ADS vs Google Scholar</Typography>
-                                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
-                                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                                      <Typography variant="caption" sx={{ width: '33%', textAlign: 'center' }}>ADS vs Google Scholar</Typography>
+                                      <Typography variant="caption" sx={{ width: '33%', textAlign: 'center' }}>ADS vs Semantic Scholar</Typography>
+                                      <Typography variant="caption" sx={{ width: '33%', textAlign: 'center' }}>ADS vs Web of Science</Typography>
                                     </Box>
                                     
                                     {/* Bar Chart area */}
@@ -1068,7 +1068,7 @@ function App() {
                                             >
                                               <Box
                                                 sx={{
-                                                  width: '20%',
+                                                  width: '25%',
                                                   height: barHeight,
                                                   bgcolor: pair.color,
                                                   borderRadius: '4px 4px 0 0',
@@ -1136,21 +1136,14 @@ function App() {
                                       <Typography variant="caption">0.0</Typography>
                                     </Box>
                                     
-                                    {/* X-axis labels */}
+                                    {/* X-axis labels for Rank-Biased Overlap chart */}
                                     <Box sx={{ position: 'absolute', left: 50, right: 0, bottom: 0, height: 20, display: 'flex', justifyContent: 'space-around', alignItems: 'center' }}>
-                                      <Typography variant="caption">ADS vs Google Scholar</Typography>
-                                      <Typography variant="caption">ADS vs Semantic Scholar</Typography>
-                                      <Typography variant="caption">ADS vs Web of Science</Typography>
+                                      <Typography variant="caption" sx={{ width: '33%', textAlign: 'center' }}>ADS vs Google Scholar</Typography>
+                                      <Typography variant="caption" sx={{ width: '33%', textAlign: 'center' }}>ADS vs Semantic Scholar</Typography>
+                                      <Typography variant="caption" sx={{ width: '33%', textAlign: 'center' }}>ADS vs Web of Science</Typography>
                                     </Box>
                                     
-                                    {/* Grid lines */}
-                                    <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                                      {[0, 0.2, 0.4, 0.6, 0.8, 1].map((line) => (
-                                        <Box key={line} sx={{ borderBottom: line < 1 ? '1px dashed #ddd' : 'none', width: '100%', height: 0 }} />
-                                      ))}
-                                    </Box>
-                                    
-                                    {/* Bar Chart area */}
+                                    {/* Bar Chart area for Rank-Biased Overlap */}
                                     <Box sx={{ position: 'absolute', left: 50, right: 0, top: 0, bottom: 20, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around' }}>
                                       {/* Process data for bar chart */}
                                       {(() => {
@@ -1182,7 +1175,7 @@ function App() {
                                             >
                                               <Box
                                                 sx={{
-                                                  width: '20%',
+                                                  width: '25%',
                                                   height: barHeight,
                                                   bgcolor: pair.color,
                                                   borderRadius: '4px 4px 0 0',
