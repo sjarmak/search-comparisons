@@ -3,6 +3,7 @@ Service module for applying boost factors to search results.
 
 This module provides functionality to apply various boost factors to search results,
 including citation count, publication recency, and document type boosts.
+Note: Field boosts are now handled by ADS's query field (qf) parameter.
 """
 import logging
 from typing import List, Dict, Any, Optional
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 async def apply_all_boosts(results: List[SearchResult], boost_config: Dict[str, Any]) -> List[SearchResult]:
     """
     Apply all configured boost factors to search results.
+    Note: Field boosts are now handled by ADS's query field (qf) parameter.
     
     Args:
         results: List of search results to boost
@@ -44,8 +46,7 @@ async def apply_all_boosts(results: List[SearchResult], boost_config: Dict[str, 
             result.boost_factors = {
                 'citation': 0.0,
                 'recency': 0.0,
-                'doctype': 0.0,
-                'field': 0.0
+                'doctype': 0.0
             }
             
             # Store original score and rank
@@ -80,17 +81,6 @@ async def apply_all_boosts(results: List[SearchResult], boost_config: Dict[str, 
                     if boost_factor > 0:
                         result._score *= (1.0 + boost_factor)
                         result.boost_factors['doctype'] = boost_factor
-        
-        # Apply field boosts if configured
-        if boost_config.get('field_boosts'):
-            for result in boosted_results:
-                field_boost_sum = 0.0
-                for field, boost in boost_config['field_boosts'].items():
-                    if boost > 0:
-                        field_boost_sum += boost
-                if field_boost_sum > 0:
-                    result._score *= (1.0 + field_boost_sum)
-                    result.boost_factors['field'] = field_boost_sum
         
         # Sort by boosted score and update ranks
         boosted_results.sort(key=lambda x: x._score, reverse=True)
@@ -199,43 +189,5 @@ def apply_doctype_boosts(
                 
             boost = 1 + doctype_boosts[doctype]
             result._score *= boost
-    
-    return results
-
-
-def apply_field_boosts(
-    results: List[SearchResult],
-    field_boosts: Dict[str, float]
-) -> List[SearchResult]:
-    """
-    Apply field-specific boosts to search results.
-    
-    Args:
-        results: List of search results
-        field_boosts: Dictionary mapping field names to boost factors
-        
-    Returns:
-        List[SearchResult]: Results with field boosts applied
-    """
-    for result in results:
-        for field, boost in field_boosts.items():
-            if boost > 0:
-                # Get the field value
-                field_value = getattr(result, field, None)
-                if field_value:
-                    # Make sure _score exists
-                    if not hasattr(result, '_score') or result._score is None:
-                        result._score = 1.0
-                    
-                    # Apply boost based on field value
-                    if isinstance(field_value, str):
-                        # For text fields, boost based on length
-                        result._score *= (1 + (boost * len(field_value) / 100))
-                    elif isinstance(field_value, (int, float)):
-                        # For numeric fields, apply direct boost
-                        result._score *= (1 + boost)
-                    elif isinstance(field_value, list):
-                        # For list fields (like authors), boost based on length
-                        result._score *= (1 + (boost * len(field_value) / 10))
     
     return results 

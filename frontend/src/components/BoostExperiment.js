@@ -69,17 +69,21 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   // State for boost configuration
   const [boostConfig, setBoostConfig] = useState({
     enableFieldBoosts: true,
-    fieldBoosts: {
-      title: 0.0,  // Set default to 0
-      abstract: 0.0,
-      authors: 0.0,
-      year: 0.0,
+    adsQueryFields: {
+      first_author: 0.9,
+      author: 0.85,
+      year: 0.8,
+      title: 0.8,
+      abstract: 0.7,
+      identifier: 0.8,
+      bibstem: 0.8,
+      keyword: 0.8
     },
-    citationBoost: 0.0,  // Set default to 0
-    recencyBoost: 0.0,  // Set default to 0
+    citationBoost: 0.0,
+    recencyBoost: 0.0,
     referenceYear: new Date().getFullYear(),
     doctypeBoosts: {
-      journal: 0.0,  // Set default to 0
+      journal: 0.0,
       conference: 0.0,
       book: 0.0,
       thesis: 0.0,
@@ -89,21 +93,68 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   // Function to handle boost changes
   const handleBoostChange = (type, field, value) => {
     setBoostConfig(prev => {
-      if (type === 'fieldBoosts' || type === 'doctypeBoosts') {
+      const defaultConfig = {
+        enableFieldBoosts: true,
+        adsQueryFields: {
+          first_author: 0.9,
+          author: 0.85,
+          year: 0.8,
+          title: 0.8,
+          abstract: 0.7,
+          identifier: 0.8,
+          bibstem: 0.8,
+          keyword: 0.8
+        },
+        citationBoost: 0.0,
+        recencyBoost: 0.0,
+        referenceYear: new Date().getFullYear(),
+        doctypeBoosts: {
+          journal: 0.0,
+          conference: 0.0,
+          book: 0.0,
+          thesis: 0.0
+        }
+      };
+
+      // If prev is null or undefined, return default config
+      if (prev == null) {
+        return defaultConfig;
+      }
+
+      // For nested objects (adsQueryFields and doctypeBoosts)
+      if (type === 'adsQueryFields' || type === 'doctypeBoosts') {
+        const currentFields = prev[type] || defaultConfig[type];
         return {
           ...prev,
           [type]: {
-            ...prev[type],
+            ...currentFields,
             [field]: value
           }
         };
       }
+
+      // For simple values
       return {
         ...prev,
         [type]: value
       };
     });
   };
+  
+  // Function to format ADS query fields
+  const formatAdsQueryFields = useCallback(() => {
+    if (!boostConfig?.enableFieldBoosts || !boostConfig?.adsQueryFields) {
+      return '';
+    }
+    
+    const fields = boostConfig.adsQueryFields || {};
+    // Filter out fields with zero or negative weights
+    const activeFields = Object.entries(fields)
+      .filter(([_, weight]) => weight > 0)
+      .map(([field, weight]) => `${field}^${weight.toFixed(2)}`);
+    
+    return activeFields.join(' ');
+  }, [boostConfig]);
   
   // Function to transform the query based on the field boosts
   const transformQuery = useCallback((originalQuery) => {
@@ -239,59 +290,26 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   
   // Debug logging
   useEffect(() => {
-    console.log('BoostExperiment mounted with:', {
-      searchQuery,
-      boostConfig
+    if (!searchQuery || !boostConfig) return;
+    
+    console.log('Current search query:', searchQuery);
+    console.log('Current boost config:', {
+      ...boostConfig,
+      adsQueryFields: boostConfig.adsQueryFields || {},
+      doctypeBoosts: boostConfig.doctypeBoosts || {}
     });
     
-    // Log the transformed query for debugging
-    if (searchQuery) {
-      const transformedQuery = transformQuery(searchQuery);
-      console.log('Transformed query:', transformedQuery);
-    }
-    
-    if (searchResults?.results?.ads?.length > 0) {
-      // COMPREHENSIVE LOGGING: Log the entire first result to see the complete structure
-      console.log("CRITICAL: Complete structure of first result:", JSON.stringify(searchResults.results.ads[0], null, 2));
-      
-      // Log much more detailed information about the original search results
-      const yearTypes = searchResults.results.ads.map(r => typeof r.year).filter((v, i, a) => a.indexOf(v) === i);
-      const sampleYears = searchResults.results.ads.slice(0, 5).map(r => r.year);
-      const hasArrayYears = searchResults.results.ads.some(r => Array.isArray(r.year));
-      const yearStructure = {
-        types_present: yearTypes,
-        sample_values: sampleYears,
-        any_arrays: hasArrayYears,
-        original_display: searchResults.results.ads.slice(0, 5).map(r => ({
-          title: truncateText(r.title, 30),
-          year_display: r.year,
-          year_type: typeof r.year,
-          year_json: JSON.stringify(r.year)
-        }))
-      };
-      
-      console.log("CRITICAL DEBUGGING - Years in original results:", yearStructure);
-      
-      // Check for alternative fields that might contain year information
-      const alternativeFields = searchResults.results.ads.slice(0, 3).map(r => ({
-        title: truncateText(r.title, 30),
-        pub_year: r.pub_year,
-        date: r.date,
-        pubdate: r.pubdate,
-        publication_year: r.publication_year,
-        year_of_publication: r.year_of_publication
-      }));
-      console.log("CHECKING ALTERNATIVE YEAR FIELDS:", alternativeFields);
-      
-      console.log("Sample result metadata:", {
-        citation: searchResults.results.ads[0].citation_count,
-        year: searchResults.results.ads[0].year,
-        year_type: typeof searchResults.results.ads[0].year,
-        doctype: searchResults.results.ads[0].doctype,
-        properties: searchResults.results.ads[0].property
+    if (searchResults?.results?.ads?.[0]) {
+      const firstResult = searchResults.results.ads[0];
+      console.log('First result details:', {
+        title: firstResult.title,
+        year: firstResult.year,
+        citation_count: firstResult.citation_count,
+        doctype: firstResult.doctype,
+        score: firstResult.score
       });
     }
-  }, [searchResults, searchQuery, boostConfig]);
+  }, [searchQuery, boostConfig, searchResults]);
   
   // Helper functions for title comparison
   const normalizeTitle = (title) => {
@@ -474,7 +492,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     } else {
       setPreviousJudgments({});
     }
-  }, [showPreviousJudgments]);
+  }, [showPreviousJudgments, searchQuery, searchResults]);
 
   // Function to handle the initial search
   const handleSearch = async () => {
@@ -557,38 +575,33 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     setLoading(true);
     setError(null);
     try {
-      // Transform the query
-      const transformedQuery = transformQuery(searchQuery);
+      // Get the formatted ADS query fields
+      const qf = formatAdsQueryFields();
       
       // Debug logging for boost config
       console.log('Current boost config:', boostConfig);
-      console.log('Field boosts:', boostConfig.fieldBoosts);
-      console.log('Citation boost:', boostConfig.citationBoost);
-      console.log('Recency boost:', boostConfig.recencyBoost);
-      console.log('Doctype boosts:', boostConfig.doctypeBoosts);
+      console.log('ADS Query Fields:', boostConfig?.adsQueryFields || {});
+      console.log('Citation boost:', boostConfig?.citationBoost || 0);
+      console.log('Recency boost:', boostConfig?.recencyBoost || 0);
+      console.log('Doctype boosts:', boostConfig?.doctypeBoosts || {});
       
       // Make the API request
       const requestBody = {
-        query: transformedQuery,
-        originalQuery: searchQuery,
+        query: searchQuery, // Use original query
+        qf: qf, // Add ADS query fields parameter
         sources: ['ads'],
         metrics: ['ndcg@10', 'precision@10', 'recall@10'],
         fields: ['title', 'abstract', 'author', 'year', 'citation_count', 'doctype'],
         max_results: 20,
-        useTransformedQuery: true,
         boost_config: {
           name: "Boosted Results",
-          citation_boost: parseFloat(boostConfig.citationBoost) || 0.0,
+          citation_boost: parseFloat(boostConfig?.citationBoost || 0),
           min_citations: 1,
-          recency_boost: parseFloat(boostConfig.recencyBoost) || 0.0,
-          reference_year: parseInt(boostConfig.referenceYear) || new Date().getFullYear(),
+          recency_boost: parseFloat(boostConfig?.recencyBoost || 0),
+          reference_year: parseInt(boostConfig?.referenceYear || new Date().getFullYear()),
           doctype_boosts: Object.fromEntries(
-            Object.entries(boostConfig.doctypeBoosts)
-              .map(([key, value]) => [key, parseFloat(value) || 0.0])
-          ),
-          field_boosts: Object.fromEntries(
-            Object.entries(boostConfig.fieldBoosts)
-              .map(([key, value]) => [key, parseFloat(value) || 0.0])
+            Object.entries(boostConfig?.doctypeBoosts || {})
+              .map(([key, value]) => [key, parseFloat(value || 0)])
           )
         }
       };
@@ -675,116 +688,119 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
   };
   
   // Function to render boost controls
-  const renderBoostControls = () => (
-    <Box sx={{ mb: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Boost Controls
-      </Typography>
-      
-      {/* Field Boosts */}
+  const renderBoostControls = () => {
+    const adsQueryFields = boostConfig?.adsQueryFields || {};
+    const doctypeBoosts = boostConfig?.doctypeBoosts || {};
+
+    return (
       <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Field Boosts
+        <Typography variant="h6" gutterBottom>
+          Boost Controls
         </Typography>
-        <Grid container spacing={2}>
-          {Object.entries(boostConfig.fieldBoosts).map(([field, value]) => (
-            <Grid item xs={12} sm={6} md={3} key={field}>
+        
+        {/* ADS Query Field Weights */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            ADS Query Field Weights
+          </Typography>
+          <Grid container spacing={2}>
+            {Object.entries(adsQueryFields).map(([field, value]) => (
+              <Grid item xs={12} sm={6} md={4} key={field}>
+                <TextField
+                  fullWidth
+                  label={`${field.replace('_', ' ').toUpperCase()} Weight`}
+                  type="number"
+                  value={value || 0}
+                  onChange={(e) => handleBoostChange('adsQueryFields', field, e.target.value)}
+                  inputProps={{ min: 0, max: 1, step: 0.05 }}
+                  helperText={`Weight for ${field.replace('_', ' ')} field`}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Citation Boost */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Citation Boost
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
-                label={`${field.charAt(0).toUpperCase() + field.slice(1)} Boost`}
+                label="Citation Boost Factor"
                 type="number"
-                value={value}
-                onChange={(e) => handleBoostChange('fieldBoosts', field, e.target.value)}
+                value={boostConfig?.citationBoost || 0}
+                onChange={(e) => handleBoostChange('citationBoost', null, e.target.value)}
                 inputProps={{ min: 0, step: 0.1 }}
               />
             </Grid>
-          ))}
-        </Grid>
-      </Box>
-
-      {/* Citation Boost */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Citation Boost
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Citation Boost Factor"
-              type="number"
-              value={boostConfig.citationBoost}
-              onChange={(e) => handleBoostChange('citationBoost', null, e.target.value)}
-              inputProps={{ min: 0, step: 0.1 }}
-            />
           </Grid>
-        </Grid>
-      </Box>
+        </Box>
 
-      {/* Recency Boost */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Recency Boost
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Recency Boost Factor"
-              type="number"
-              value={boostConfig.recencyBoost}
-              onChange={(e) => handleBoostChange('recencyBoost', null, e.target.value)}
-              inputProps={{ min: 0, step: 0.1 }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Reference Year"
-              type="number"
-              value={boostConfig.referenceYear}
-              onChange={(e) => handleBoostChange('referenceYear', null, e.target.value)}
-              inputProps={{ min: 1900, max: new Date().getFullYear() }}
-            />
-          </Grid>
-        </Grid>
-      </Box>
-
-      {/* Document Type Boosts */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Document Type Boosts
-        </Typography>
-        <Grid container spacing={2}>
-          {Object.entries(boostConfig.doctypeBoosts).map(([type, value]) => (
-            <Grid item xs={12} sm={6} md={3} key={type}>
+        {/* Recency Boost */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Recency Boost
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label={`${type.charAt(0).toUpperCase() + type.slice(1)} Boost`}
+                label="Recency Boost Factor"
                 type="number"
-                value={value}
-                onChange={(e) => handleBoostChange('doctypeBoosts', type, e.target.value)}
+                value={boostConfig?.recencyBoost || 0}
+                onChange={(e) => handleBoostChange('recencyBoost', null, e.target.value)}
                 inputProps={{ min: 0, step: 0.1 }}
               />
             </Grid>
-          ))}
-        </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Reference Year"
+                type="number"
+                value={boostConfig?.referenceYear || new Date().getFullYear()}
+                onChange={(e) => handleBoostChange('referenceYear', null, e.target.value)}
+                inputProps={{ min: 1900, max: new Date().getFullYear() }}
+              />
+            </Grid>
+          </Grid>
+        </Box>
+
+        {/* Document Type Boosts */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Document Type Boosts
+          </Typography>
+          <Grid container spacing={2}>
+            {Object.entries(doctypeBoosts).map(([type, value]) => (
+              <Grid item xs={12} sm={6} md={3} key={type}>
+                <TextField
+                  fullWidth
+                  label={`${type.charAt(0).toUpperCase() + type.slice(1)} Boost`}
+                  type="number"
+                  value={value || 0}
+                  onChange={(e) => handleBoostChange('doctypeBoosts', type, e.target.value)}
+                  inputProps={{ min: 0, step: 0.1 }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Run Experiment Button */}
+        <Button
+          variant="contained"
+          onClick={handleRunBoostExperiment}
+          disabled={loading || !searchResults?.results?.ads}
+          sx={{ mt: 2 }}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Run Boost Experiment'}
+        </Button>
       </Box>
-
-      {/* Transformed Query Display */}
-      <TransformedQuery query={searchQuery} fieldBoosts={boostConfig.fieldBoosts} />
-
-      {/* Run Experiment Button */}
-      <Button
-        variant="contained"
-        onClick={handleRunBoostExperiment}
-        disabled={loading || !searchResults?.results?.ads}
-        sx={{ mt: 2 }}
-      >
-        {loading ? <CircularProgress size={24} /> : 'Run Boost Experiment'}
-      </Button>
-    </Box>
-  );
+    );
+  };
   
   // Add the search form section at the top of the component
   const renderSearchForm = () => (
@@ -950,11 +966,14 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                        source === 'scholar' ? searchResults?.results?.scholar :
                        quepidResults;
 
-        if (results) {
+        if (Array.isArray(results)) {
           results.slice(0, 10).forEach(result => {
+            if (!result?.title) return;
             const recordId = result.bibcode || normalizeTitle(result.title);
+            if (!recordId) return;
+            
             const hasQuepidJudgment = getJudgmentForTitle(result.title) !== null;
-            const hasManualJudgment = localJudgments[`${source}_${recordId}`] !== undefined;
+            const hasManualJudgment = localJudgments?.[`${source}_${recordId}`] !== undefined;
             
             if (hasQuepidJudgment) newCounts[source].quepid++;
             if (hasManualJudgment) newCounts[source].manual++;
@@ -1153,10 +1172,12 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
 
   // Add this effect to update the judgment map when Quepid results change
   useEffect(() => {
-    if (quepidResults) {
+    if (quepidResults && Array.isArray(quepidResults)) {
       console.log('Quepid results updated:', quepidResults);
       const newMap = createJudgmentMap(quepidResults);
-      setJudgmentMap(newMap);
+      setJudgmentMap(newMap || {});
+    } else {
+      setJudgmentMap({});
     }
   }, [quepidResults, createJudgmentMap]);
 
