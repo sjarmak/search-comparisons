@@ -17,7 +17,7 @@ from ..api.models import SearchResult
 # Setup logging
 logger = logging.getLogger(__name__)
 
-# Default weights for boost combination
+# Default weights for boost combination - these are the original default values
 DEFAULT_BOOST_WEIGHTS = {
     'citation': 0.4,
     'recency': 0.3,
@@ -149,25 +149,21 @@ def combine_boost_factors(
     
     Args:
         boosts: Dictionary of individual boost factors
-        weights: Dictionary of weights for each boost factor
+        weights: Dictionary of weights for each boost factor. If not provided, uses DEFAULT_BOOST_WEIGHTS.
+                Weights are used exactly as provided without modification.
         
     Returns:
         float: Combined boost factor
     """
+    # Use provided weights or defaults, without any modification
     weights = weights or DEFAULT_BOOST_WEIGHTS
     
-    # Calculate weighted sum
-    total_weight = sum(weights.values())
-    if total_weight == 0:
-        return 0.0
-        
-    # Calculate weighted sum of boosts
+    # Calculate weighted sum of boosts using weights exactly as provided
     weighted_sum = sum(
-        boosts.get(boost_type, 0.0) * weights.get(boost_type, 0.0)
-        for boost_type in weights
+        boosts.get(boost_type, 0.0) * weight
+        for boost_type, weight in weights.items()
     )
     
-    # Return the weighted sum directly without normalization
     return weighted_sum
 
 async def apply_all_boosts(
@@ -180,7 +176,7 @@ async def apply_all_boosts(
     
     Args:
         results: List of search results to boost
-        boost_config: Dictionary containing boost configuration
+        boost_config: Dictionary containing boost configuration. Weights are used exactly as provided.
         citation_distributions: Dictionary of citation distributions by collection and year
         
     Returns:
@@ -193,9 +189,9 @@ async def apply_all_boosts(
         # Create a deep copy of results to avoid modifying originals
         boosted_results = [deepcopy(result) for result in results]
         
-        # Get boost weights from config or use defaults
+        # Get boost weights from config or use defaults, without modification
         weights = boost_config.get('boost_weights', DEFAULT_BOOST_WEIGHTS)
-        
+
         # Initialize scores and source_id for each result
         for i, result in enumerate(boosted_results):
             # Initialize _score based on rank (higher rank = higher score)

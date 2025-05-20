@@ -194,10 +194,10 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
     const activeFields = Object.entries(boostConfig.adsQueryFields)
       .filter(([_, weight]) => weight && parseFloat(weight) > 0)
       .map(([field, weight]) => {
-        // Convert weight from 0-1 scale to 1-100 scale
-        const scaledWeight = parseFloat(weight) * 100;
-        console.log(`Converting ${field} weight from ${weight} to ${scaledWeight}`);
-        return `${field}^${scaledWeight.toFixed(1)}`;
+        // Use weight exactly as provided without scaling
+        const weightValue = parseFloat(weight);
+        console.log(`Using ${field} weight: ${weightValue}`);
+        return `${field}^${weightValue.toFixed(1)}`;
       });
 
     if (activeFields.length === 0) {
