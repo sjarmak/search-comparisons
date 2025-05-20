@@ -23,18 +23,28 @@ CACHE_DIR = os.environ.get('CACHE_DIR', os.path.join(os.path.dirname(os.path.dir
 CACHE_EXPIRY = int(os.environ.get('CACHE_EXPIRY', 86400))  # Default: 1 day in seconds
 
 
-def get_cache_key(source: str, query: str, fields: List[str], num_results: Optional[int] = None) -> str:
+def get_cache_key(
+    source: str,
+    query: str,
+    fields: List[str],
+    num_results: Optional[int] = None,
+    qf: Optional[str] = None,
+    field_boosts: Optional[Dict[str, float]] = None
+) -> str:
     """
     Generate a cache key for storing search results.
     
-    Creates a unique key based on the source, query, requested fields, and number of results.
-    This allows for caching based on the specific search parameters.
+    Creates a unique key based on the source, query, requested fields, number of results,
+    query field weights (qf), and field boosts if provided. This allows for caching based
+    on the specific search parameters.
     
     Args:
         source: The search engine source (e.g., 'ads', 'scholar')
         query: The search query string
         fields: List of requested fields
         num_results: Maximum number of results to return (optional)
+        qf: Query field weights (optional)
+        field_boosts: Dictionary mapping field names to boost values (optional)
     
     Returns:
         str: A unique cache key as a hex string
@@ -43,9 +53,18 @@ def get_cache_key(source: str, query: str, fields: List[str], num_results: Optio
     if isinstance(query, list):
         query = " ".join(str(item) for item in query)
     
-    # Create a string to hash, include num_results if provided
+    # Create a string to hash, include num_results and qf if provided
     results_str = f":{num_results}" if num_results is not None else ""
-    hash_input = f"{source}:{query}:{':'.join(sorted(fields))}{results_str}"
+    qf_str = f":{qf}" if qf is not None else ""
+    
+    # Add field_boosts to the hash input if provided
+    field_boosts_str = ""
+    if field_boosts:
+        # Sort the field boosts by field name for consistent hashing
+        sorted_boosts = sorted(field_boosts.items())
+        field_boosts_str = ":" + ":".join(f"{field}^{weight}" for field, weight in sorted_boosts)
+    
+    hash_input = f"{source}:{query}:{':'.join(sorted(fields))}{results_str}{qf_str}{field_boosts_str}"
     
     # Create SHA-256 hash
     return hashlib.sha256(hash_input.encode('utf-8')).hexdigest()

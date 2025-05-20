@@ -146,7 +146,9 @@ async def get_results_with_fallback(
     max_results: Optional[int] = None,
     attempts: int = 2,
     use_transformed_query: bool = False,
-    original_query: Optional[str] = None
+    original_query: Optional[str] = None,
+    qf: Optional[str] = None,  # Query field weights for qf parameter
+    field_boosts: Optional[Dict[str, float]] = None  # Field boosts for query transformation
 ) -> Dict[str, List[SearchResult]]:
     """
     Get search results from multiple sources with fallback mechanisms.
@@ -159,6 +161,8 @@ async def get_results_with_fallback(
         attempts: Maximum number of retry attempts per source
         use_transformed_query: Whether to use the transformed query
         original_query: The original query before transformation
+        qf: Query field weights (e.g., "title^50 author^30")
+        field_boosts: Dictionary mapping field names to boost values for query transformation
     
     Returns:
         Dict[str, List[SearchResult]]: Dictionary mapping source names to result lists
@@ -169,45 +173,18 @@ async def get_results_with_fallback(
     if isinstance(query, list):
         query = " ".join(str(item) for item in query)
         logger.warning(f"Query was a list, converted to string: {query}")
-        
-    # Convert original_query to string if it's a list
-    if original_query is not None and isinstance(original_query, list):
-        original_query = " ".join(str(item) for item in original_query)
-        logger.warning(f"Original query was a list, converted to string: {original_query}")
     
-    # Use default if max_results is not specified
-    num_results = max_results if max_results is not None else DEFAULT_NUM_RESULTS
-    logger.info(f"Fetching up to {num_results} results per source")
+    # Set number of results
+    num_results = max_results or DEFAULT_NUM_RESULTS
     
-    # Check if sources is empty or invalid
-    if not sources:
-        logger.warning("No sources specified for search")
-        return results
-    
-    # Process each requested source
+    # Process each source
     for source in sources:
-        logger.info(f"Processing source: {source}")
-        
-        # Skip disabled sources
-        if source in SERVICE_CONFIG and not SERVICE_CONFIG[source]["enabled"]:
-            logger.info(f"Source {source} is disabled, skipping")
+        if source not in SERVICE_CONFIG or not SERVICE_CONFIG[source]["enabled"]:
+            logger.warning(f"Source {source} is not enabled or not configured")
             continue
         
-        # Try to get from cache first
-        cache_key = get_cache_key(source, query, fields, num_results)
-        cached_results = load_from_cache(cache_key)
-        
-        if cached_results:
-            logger.info(f"Retrieved {len(cached_results)} results for {source} from cache")
-            results[source] = cached_results
-            continue
-        
-        # Not in cache, need to fetch live
-        source_results: List[SearchResult] = []
-        
-        # Track attempts for this source
-        attempt_count = 0
         success = False
+        attempt_count = 0
         
         while attempt_count < attempts and not success:
             attempt_count += 1
@@ -232,7 +209,13 @@ async def get_results_with_fallback(
                 # Create a task for the source query with timeout
                 async def query_source():
                     if source == "ads":
-                        return await get_ads_results(effective_query, fields, num_results)
+                        return await get_ads_results(
+                            effective_query, 
+                            fields, 
+                            num_results, 
+                            qf=qf,  # Pass qf parameter
+                            field_boosts=field_boosts  # Pass field boosts
+                        )
                     elif source == "scholar":
                         if attempt_count == 1:
                             return await get_scholar_results(effective_query, fields, num_results)
@@ -268,6 +251,15 @@ async def get_results_with_fallback(
         
         # Save results to cache if successful
         if success and source_results:
+            # Generate cache key with all parameters
+            cache_key = get_cache_key(
+                source=source,
+                query=effective_query,  # Use the effective query that was actually used
+                fields=fields,
+                num_results=num_results,
+                qf=qf,
+                field_boosts=field_boosts
+            )
             save_to_cache(cache_key, source_results)
             results[source] = source_results
     

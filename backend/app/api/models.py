@@ -43,6 +43,7 @@ class BoostConfig(BaseModel):
         reference_year: Reference year for recency calculations (optional)
         doctype_boosts: Dictionary mapping document types to boost factors
         field_boosts: Dictionary mapping field names to boost factors
+        adsQueryFields: Dictionary mapping ADS query fields to weights (e.g., "title^0.8 author^0.6")
     """
     name: Optional[str] = "Default Boost Config"
     citation_boost: float = Field(default=0.0, ge=0.0)
@@ -51,6 +52,7 @@ class BoostConfig(BaseModel):
     reference_year: Optional[int] = None
     doctype_boosts: Dict[str, float] = Field(default_factory=dict)
     field_boosts: Dict[str, float] = Field(default_factory=dict)
+    adsQueryFields: Optional[Dict[str, float]] = None
 
 
 class BoostFactors(BaseModel):

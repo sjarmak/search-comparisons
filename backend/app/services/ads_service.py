@@ -6,6 +6,7 @@ and retrieving bibliographic information.
 """
 import os
 import logging
+import json
 from typing import List, Dict, Any, Optional, Union, TypedDict, Literal
 
 import httpx
@@ -42,15 +43,26 @@ class ADSQueryParams(TypedDict):
     sort: str
 
 # Field mappings
-ADS_FIELD_MAPPING: ADSFieldMapping = {
+ADS_FIELD_MAPPING = {
     "title": "title",
-    "authors": "author",
+    "author": "author",
     "abstract": "abstract",
-    "doi": "doi",
     "year": "year",
     "citation_count": "citation_count",
     "doctype": "doctype",
-    "property": "property"
+    "property": "property",
+    "bibcode": "bibcode",
+    "doi": "doi",
+    "keyword": "keyword",
+    "pub": "pub",
+    "volume": "volume",
+    "page": "page",
+    "aff": "aff",
+    "inst": "inst",
+    "lang": "lang",
+    "orcid": "orcid",
+    "read_count": "read_count",
+    "vizier": "vizier"
 }
 
 def get_ads_api_key() -> str:
@@ -228,7 +240,9 @@ async def get_ads_results(
     num_results: int = NUM_RESULTS,
     use_cache: bool = False,
     intent: Optional[str] = None,
-    sort: Optional[str] = None
+    sort: Optional[str] = None,
+    qf: Optional[str] = None,  # Query field weights (e.g., "title^50 author^30")
+    field_boosts: Optional[Dict[str, float]] = None  # Field boosts for query transformation
 ) -> List[SearchResult]:
     """
     Get search results from ADS API.
@@ -240,11 +254,23 @@ async def get_ads_results(
         use_cache: Whether to use caching
         intent: Query intent (e.g., "influential", "recent")
         sort: Sort parameter (e.g., "citation_count desc", "date desc")
+        qf: Query field weights (e.g., "title^50 author^30")
+        field_boosts: Dictionary mapping field names to boost values for query transformation
         
     Returns:
         List[SearchResult]: List of search results
     """
     try:
+        # Log input parameters
+        logger.info("=== ADS API Request Parameters ===")
+        logger.info(f"Query: {query}")
+        logger.info(f"Fields: {fields}")
+        logger.info(f"Num results: {num_results}")
+        logger.info(f"Intent: {intent}")
+        logger.info(f"Sort: {sort}")
+        logger.info(f"QF parameter: {qf}")
+        logger.info(f"Field boosts: {field_boosts}")
+        
         # Set default fields if not provided
         fields = fields or _get_default_fields()
         
@@ -254,9 +280,15 @@ async def get_ads_results(
             logger.error("ADS API key not configured")
             return []
         
+        # Transform query if field boosts are provided
+        effective_query = query
+        if field_boosts:
+            effective_query = transform_query_with_boosts(query, field_boosts)
+            logger.info(f"Transformed query with field boosts: {effective_query}")
+        
         # Check cache first if enabled
         if use_cache:
-            cache_key = get_cache_key("ads_api", query, fields, num_results)
+            cache_key = get_cache_key("ads_api", effective_query, fields, num_results, qf)
             cached_results = load_from_cache(cache_key)
             
             if cached_results is not None:
@@ -272,14 +304,62 @@ async def get_ads_results(
             
             # Prepare query parameters
             params: ADSQueryParams = {
-                "q": query,
+                "q": effective_query,
                 "fl": ",".join(_map_fields_to_ads(fields)),
                 "rows": num_results,
                 "sort": _get_sort_parameter(intent, sort)
             }
             
+            # Add qf parameter if provided
+            if qf:
+                try:
+                    logger.info(f"Processing qf parameter: {qf}")
+                    # Split into field-weight pairs and validate
+                    field_weights = []
+                    for fw in qf.split():
+                        logger.info(f"Processing field weight pair: {fw}")
+                        if "^" in fw:
+                            field, weight = fw.split("^")
+                            # Convert field to lowercase for case-insensitive matching
+                            field = field.lower()
+                            logger.info(f"Field: {field}, Weight: {weight}")
+                            # Check if field exists in mapping
+                            if field in ADS_FIELD_MAPPING:
+                                # Use the mapped field name
+                                mapped_field = ADS_FIELD_MAPPING[field]
+                                logger.info(f"Mapped field {field} to {mapped_field}")
+                                try:
+                                    # Validate weight is a positive number
+                                    weight_float = float(weight)
+                                    if weight_float > 0:
+                                        field_weights.append(f"{mapped_field}^{weight}")
+                                        logger.info(f"Added field weight: {mapped_field}^{weight}")
+                                    else:
+                                        logger.warning(f"Invalid weight value in qf parameter: {weight} for field {field}")
+                                except ValueError:
+                                    logger.warning(f"Invalid weight format in qf parameter: {weight} for field {field}")
+                            else:
+                                logger.warning(f"Invalid field name in qf parameter: {field}")
+                        else:
+                            logger.warning(f"Invalid field weight format in qf parameter: {fw}")
+                    
+                    if field_weights:
+                        params["qf"] = " ".join(field_weights)
+                        logger.info(f"Final qf parameter: {params['qf']}")
+                    else:
+                        logger.warning("No valid field weights found in qf parameter")
+                except Exception as e:
+                    logger.error(f"Error formatting qf parameter: {str(e)}")
+            
+            # Log request details
+            logger.info("=== ADS API Request Details ===")
+            logger.info(f"URL: {ADS_API_URL}")
+            logger.info(f"Query: {effective_query}")
+            logger.info(f"Parameters: {json.dumps(params, indent=2)}")
+            logger.info(f"Field weights (qf): {params.get('qf', 'None')}")
+            logger.info(f"Field boosts: {field_boosts}")
+            
             # Make request
-            logger.info(f"Querying ADS API with: {query}")
             response_data = await safe_api_request(
                 client, 
                 "GET", 
@@ -289,10 +369,17 @@ async def get_ads_results(
                 timeout=TIMEOUT_SECONDS
             )
             
+            # Log response data for debugging
+            logger.info("=== ADS API Response Details ===")
+            logger.info(f"Status: {response_data.get('responseHeader', {}).get('status', 'unknown')}")
+            logger.info(f"Response time: {response_data.get('responseHeader', {}).get('QTime', 'unknown')}ms")
+            logger.info(f"Response params: {json.dumps(response_data.get('responseHeader', {}).get('params', {}), indent=2)}")
+            logger.info(f"Number of results: {response_data.get('response', {}).get('numFound', 'unknown')}")
+            
             # Check if we got a response
             docs = response_data.get("response", {}).get("docs", [])
             if not docs:
-                logger.warning(f"No results found from ADS API for query: {query}")
+                logger.warning(f"No results found from ADS API for query: {effective_query}")
                 return []
             
             # Process results

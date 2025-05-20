@@ -6,7 +6,7 @@ including the main comparison endpoint that handles searching across
 multiple engines and computing similarity metrics.
 """
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel
 
@@ -25,6 +25,7 @@ router = APIRouter(
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# Create a single instance of SearchService
 search_service = SearchService()
 
 class TransformQueryRequest(BaseModel):
@@ -79,6 +80,32 @@ async def compare_search_engines(
             if search_request.originalQuery:
                 logger.info(f"Original query was: {search_request.originalQuery}")
         
+        # Format field weights if provided in boost config
+        qf = None
+        field_boosts = None
+        
+        if search_request.boost_config:
+            # Handle adsQueryFields for qf parameter
+            if search_request.boost_config.adsQueryFields:
+                # Filter out fields with zero or negative weights
+                active_fields = {
+                    field: weight for field, weight in search_request.boost_config.adsQueryFields.items()
+                    if weight and float(weight) > 0
+                }
+                if active_fields:
+                    qf = " ".join(f"{field}^{weight}" for field, weight in active_fields.items())
+                    logger.info(f"Using query field weights (qf): {qf}")
+            
+            # Handle field_boosts for query transformation
+            if search_request.boost_config.field_boosts:
+                # Filter out fields with zero or negative weights
+                field_boosts = {
+                    field: weight for field, weight in search_request.boost_config.field_boosts.items()
+                    if weight and float(weight) > 0
+                }
+                if field_boosts:
+                    logger.info(f"Using field boosts for query transformation: {field_boosts}")
+        
         # Get results from each source with fallback mechanisms
         results = await get_results_with_fallback(
             query=search_request.query,
@@ -86,7 +113,9 @@ async def compare_search_engines(
             fields=search_request.fields,
             max_results=search_request.max_results,
             use_transformed_query=search_request.useTransformedQuery,
-            original_query=search_request.originalQuery
+            original_query=search_request.originalQuery,
+            qf=qf,  # Pass query field weights
+            field_boosts=field_boosts  # Pass field boosts for query transformation
         )
         
         # Check if we got any results
@@ -112,7 +141,7 @@ async def compare_search_engines(
                         boost_config
                     )
                     results[source] = boosted_results
-                    logger.info(f"Retrieved {len(boosted_results)} results from {source}")
+                    logger.info(f"Applied boosts to {len(boosted_results)} results from {source}")
         
         # Compare results if we have multiple sources
         comparison_metrics = {}
@@ -129,7 +158,11 @@ async def compare_search_engines(
             "metrics": search_request.metrics,
             "fields": search_request.fields,
             "results": results,
-            "comparison": comparison_metrics
+            "comparison": comparison_metrics,
+            "field_weights": {
+                "qf": qf,  # Query field weights
+                "field_boosts": field_boosts  # Field boosts for query transformation
+            }
         }
         
     except HTTPException:
@@ -186,4 +219,88 @@ async def transform_query(request: TransformQueryRequest) -> TransformQueryRespo
         transformed_query = transform_query_with_boosts(request.query, request.field_boosts)
         return TransformQueryResponse(transformed_query=transformed_query)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/compare")
+async def compare_search_results(
+    request: SearchRequest,
+    background_tasks: BackgroundTasks
+) -> SearchResponse:
+    """
+    Compare search results from multiple sources.
+    
+    Args:
+        request: The search request containing query and configuration
+        background_tasks: FastAPI background tasks
+        
+    Returns:
+        SearchResponse: The search results from all sources
+    """
+    logger.info(f"Search request received: {request.model_dump_json()}")
+    
+    # Log boost configuration
+    if hasattr(request, 'boost_config') and request.boost_config:
+        logger.info(f"Boost configuration: {request.boost_config.model_dump()}")
+        if request.boost_config.adsQueryFields:
+            logger.info(f"Field weights (qf): {request.boost_config.adsQueryFields}")
+        if request.boost_config.field_boosts:
+            logger.info(f"Field boosts: {request.boost_config.field_boosts}")
+    
+    # Get results from each source
+    results = {}
+    for source in request.sources:
+        try:
+            logger.info(f"Attempting search for {source}")
+            source_results = await search_service.get_results(
+                query=request.query,
+                source=source,
+                max_results=request.max_results,
+                fields=request.fields,
+                use_transformed_query=getattr(request, 'use_transformed_query', False),
+                boost_config=getattr(request, 'boost_config', None)
+            )
+            logger.info(f"Successfully retrieved {len(source_results)} results from {source}")
+            results[source] = source_results
+        except Exception as e:
+            logger.error(f"Error getting results from {source}: {str(e)}")
+            results[source] = []
+    
+    # Apply boosts if configured
+    if hasattr(request, 'boost_config') and request.boost_config:
+        logger.info(f"Applying boosts with config: {request.boost_config.model_dump_json()}")
+        for source, source_results in results.items():
+            if source_results:
+                # Create a boost config dictionary from the BoostConfig model
+                boost_config = {
+                    "citation_boost": request.boost_config.citation_boost,
+                    "min_citations": request.boost_config.min_citations,
+                    "recency_boost": request.boost_config.recency_boost,
+                    "reference_year": request.boost_config.reference_year,
+                    "doctype_boosts": request.boost_config.doctype_boosts,
+                    "field_boosts": request.boost_config.field_boosts
+                }
+                boosted_results = await apply_all_boosts(
+                    source_results,
+                    boost_config
+                )
+                results[source] = boosted_results
+                logger.info(f"Applied boosts to {len(boosted_results)} results from {source}")
+    
+    # Compare results if we have multiple sources
+    comparison_metrics = {}
+    if len(request.sources) > 1:
+        comparison_metrics = compare_results(
+            results,
+            request.metrics,
+            request.fields
+        )
+    
+    return SearchResponse(
+        query=request.query,
+        sources=request.sources,
+        metrics=request.metrics,
+        fields=request.fields,
+        results=results,
+        comparison=comparison_metrics,
+        field_weights=request.boost_config.adsQueryFields if hasattr(request, 'boost_config') and request.boost_config else None
+    ) 

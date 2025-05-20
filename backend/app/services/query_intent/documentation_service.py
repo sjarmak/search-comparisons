@@ -9,10 +9,8 @@ import logging
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import json
-
-from sentence_transformers import SentenceTransformer
-import faiss
 import numpy as np
+from sentence_transformers import SentenceTransformer
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
@@ -53,7 +51,7 @@ class DocumentationService:
                 'docs'
             )
             self.model = None
-            self.vector_store = None
+            self.embeddings = None
             self.docs = []
             self.initialized = True
             logger.info(f"Using docs directory: {self.docs_dir}")
@@ -82,9 +80,9 @@ class DocumentationService:
             try:
                 await self._ensure_model_loaded()
                 logger.info("Loading existing vector store")
-                vector_store_path = os.path.join(self.docs_dir, 'vector_store.faiss')
+                vector_store_path = os.path.join(self.docs_dir, 'embeddings.npy')
                 if os.path.exists(vector_store_path):
-                    self.vector_store = faiss.read_index(vector_store_path)
+                    self.embeddings = np.load(vector_store_path)
                     with open(os.path.join(self.docs_dir, 'docs.json'), 'r') as f:
                         self.docs = json.load(f)
                 else:
@@ -111,18 +109,20 @@ class DocumentationService:
         # Encode query
         query_vector = self.model.encode([query])[0]
         
-        # Search vector store
-        distances, indices = self.vector_store.search(
-            np.array([query_vector]).astype('float32'),
-            top_k
+        # Calculate cosine similarity
+        similarities = np.dot(self.embeddings, query_vector) / (
+            np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(query_vector)
         )
+        
+        # Get top k results
+        top_indices = np.argsort(similarities)[-top_k:][::-1]
         
         # Return results
         results = []
-        for i, idx in enumerate(indices[0]):
+        for idx in top_indices:
             if idx < len(self.docs):
                 doc = self.docs[idx]
-                doc['score'] = float(distances[0][i])
+                doc['score'] = float(similarities[idx])
                 results.append(doc)
         
         return results
@@ -144,15 +144,10 @@ class DocumentationService:
             
             # Encode documents
             texts = [doc['content'] for doc in docs]
-            embeddings = self.model.encode(texts)
+            self.embeddings = self.model.encode(texts)
             
-            # Create vector store
-            dimension = embeddings.shape[1]
-            self.vector_store = faiss.IndexFlatL2(dimension)
-            self.vector_store.add(np.array(embeddings).astype('float32'))
-            
-            # Save vector store and docs
-            faiss.write_index(self.vector_store, os.path.join(self.docs_dir, 'vector_store.faiss'))
+            # Save embeddings and docs
+            np.save(os.path.join(self.docs_dir, 'embeddings.npy'), self.embeddings)
             with open(os.path.join(self.docs_dir, 'docs.json'), 'w') as f:
                 json.dump(docs, f)
             

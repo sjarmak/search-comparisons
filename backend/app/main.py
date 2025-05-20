@@ -84,9 +84,18 @@ if not WEB_OF_SCIENCE_API_KEY:
         os.environ["WEB_OF_SCIENCE_API_KEY"] = "dev_placeholder_key_not_for_production"
 
 # Set up logging
+# Create logs directory if it doesn't exist
+logs_dir = Path(__file__).parent.parent / 'logs'
+logs_dir.mkdir(exist_ok=True)
+
+# Configure logging to write to both file and console
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(logs_dir / 'app.log'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 

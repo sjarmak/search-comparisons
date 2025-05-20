@@ -122,12 +122,6 @@ class Settings(BaseSettings):
 # Create settings instance
 settings = Settings()
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL),
-    format=settings.LOG_FORMAT
-)
-
 # Update DEBUG based on environment if not explicitly set
 if os.getenv("DEBUG") is None:
     settings.DEBUG = settings.ENVIRONMENT in [EnvironmentType.LOCAL, EnvironmentType.DEVELOPMENT]
@@ -141,7 +135,6 @@ log_level_map = {
     "CRITICAL": logging.CRITICAL,
 }
 
-logging.basicConfig(
-    level=log_level_map.get(settings.LOG_LEVEL, logging.INFO),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-) 
+# Get logger for this module
+logger = logging.getLogger(__name__)
+logger.setLevel(log_level_map.get(settings.LOG_LEVEL, logging.INFO)) 

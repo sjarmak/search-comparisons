@@ -223,19 +223,27 @@ async def boost_search_results(
         HTTPException: If search or boosting fails
     """
     try:
-        # Extract query and transformed query from request body
+        # Extract query, transformed query, and qf parameter from request body
         data = await request.json()
         query = data.get("query", "")
         transformed_query = data.get("transformed_query", query)
+        qf = data.get("qf")  # Get the qf parameter
         
         if not query:
             raise HTTPException(status_code=400, detail="Query is required")
         
         logger.info(f"Starting boost experiment with query: {query}")
+        logger.info(f"Boost configuration: {boost_config.model_dump()}")
+        if qf:
+            logger.info(f"Using query field weights (qf): {qf}")
         
-        # Get original results
-        fields = ["title", "authors", "abstract", "doi", "year", "citation_count", "doctype", "property", "url"]
-        original_results = await get_ads_results(query, fields)
+        # Get original results with qf parameter if provided
+        fields = ["title", "author", "abstract", "doi", "year", "citation_count", "doctype", "property", "url"]
+        original_results = await get_ads_results(
+            query=query,
+            fields=fields,
+            qf=qf  # Pass the qf parameter to get_ads_results
+        )
         
         if not original_results:
             logger.warning(f"No results found for query: {query}")
@@ -258,7 +266,7 @@ async def boost_search_results(
                     if citation_count > 0:
                         cite_boost = boost_config.citation_boost * math.log1p(citation_count)
                         boost_factors.cite_boost = cite_boost
-                        logger.debug(f"Applied citation boost: {cite_boost} (citation count: {citation_count})")
+                        logger.info(f"Applied citation boost: {cite_boost} (citation count: {citation_count}, boost factor: {boost_config.citation_boost})")
                 
                 # Apply recency boost if configured
                 if boost_config.recency_boost > 0:
@@ -272,7 +280,7 @@ async def boost_search_results(
                         if age_months > 0:
                             recency_boost = boost_config.recency_boost / age_months
                             boost_factors.recency_boost = recency_boost
-                            logger.debug(f"Applied recency boost: {recency_boost} for {age_months} months old paper")
+                            logger.info(f"Applied recency boost: {recency_boost} for {age_months} months old paper (boost factor: {boost_config.recency_boost})")
                 
                 # Apply document type boosts if configured
                 doctype = getattr(result, "doctype", "") or ""
@@ -302,9 +310,15 @@ async def boost_search_results(
                     # Get all fields from the original result
                     result_dict = result.model_dump()
                     
-                    # Remove any existing boost_factors to avoid conflict
+                    # Remove any existing boost_factors, rank, and original_rank to avoid conflict
                     if 'boost_factors' in result_dict:
                         del result_dict['boost_factors']
+                    if 'rank' in result_dict:
+                        del result_dict['rank']
+                    if 'original_rank' in result_dict:
+                        del result_dict['original_rank']
+                    if 'rank_change' in result_dict:
+                        del result_dict['rank_change']
                     
                     # Create the boosted result with our new boost factors
                     boosted_result = BoostedSearchResult(
@@ -312,7 +326,8 @@ async def boost_search_results(
                         boost_factors=boost_factors,
                         final_boost=final_boost,
                         original_rank=idx + 1,
-                        rank_change=0  # Will be calculated after sorting
+                        rank_change=0,  # Will be calculated after sorting
+                        rank=idx + 1  # Set initial rank
                     )
                     
                     boosted_results.append(boosted_result)
@@ -323,9 +338,9 @@ async def boost_search_results(
                         title=getattr(result, "title", "Unknown"),
                         url=getattr(result, "url", ""),
                         abstract=getattr(result, "abstract", ""),
-                        authors=getattr(result, "authors", []),
+                        author=getattr(result, "author", []),
                         source=getattr(result, "source", "ads"),
-                        rank=idx + 1,
+                        rank=idx + 1,  # Set initial rank
                         boost_factors=boost_factors,
                         final_boost=final_boost,
                         original_rank=idx + 1,
@@ -340,14 +355,20 @@ async def boost_search_results(
                     # Get all fields from the original result
                     result_dict = result.model_dump()
                     
-                    # Remove any existing boost_factors to avoid conflict
+                    # Remove any existing boost_factors, rank, and original_rank to avoid conflict
                     if 'boost_factors' in result_dict:
                         del result_dict['boost_factors']
+                    if 'rank' in result_dict:
+                        del result_dict['rank']
+                    if 'original_rank' in result_dict:
+                        del result_dict['original_rank']
+                    if 'rank_change' in result_dict:
+                        del result_dict['rank_change']
                     
                     boosted_result = BoostedSearchResult(
                         **result_dict,
                         source=getattr(result, "source", "ads"),
-                        rank=idx + 1,
+                        rank=idx + 1,  # Set initial rank
                         boost_factors=BoostFactors(),
                         final_boost=0.0,
                         original_rank=idx + 1,
@@ -361,9 +382,9 @@ async def boost_search_results(
                         title=getattr(result, "title", "Unknown"),
                         url=getattr(result, "url", ""),
                         abstract=getattr(result, "abstract", ""),
-                        authors=getattr(result, "authors", []),
+                        author=getattr(result, "author", []),
                         source=getattr(result, "source", "ads"),
-                        rank=idx + 1,
+                        rank=idx + 1,  # Set initial rank
                         boost_factors=BoostFactors(),
                         final_boost=0.0,
                         original_rank=idx + 1,
@@ -878,7 +899,7 @@ async def boost_experiment_legacy(
                 boosted_results.append({
                     "bibcode": doc["bibcode"],
                     "title": doc.get("title", ""),
-                    "authors": doc.get("author", []),
+                    "author": doc.get("author", []),
                     "year": doc.get("year"),
                     "abstract": doc.get("abstract", ""),
                     "citation_count": doc.get("citation_count", 0),
