@@ -26,10 +26,12 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button
+  Button,
+  ButtonGroup
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { API_URL as DEFAULT_API_URL } from '../services/api';
 
 /**
@@ -55,6 +57,9 @@ const JudgementsDatabase = ({ API_URL = DEFAULT_API_URL }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [judgementToDelete, setJudgementToDelete] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportType, setExportType] = useState('all'); // 'all' or 'filtered'
 
   // Fetch judgements from the backend
   const fetchJudgements = async () => {
@@ -197,6 +202,208 @@ const JudgementsDatabase = ({ API_URL = DEFAULT_API_URL }) => {
     return new Date(dateString).toLocaleString();
   };
 
+  // Helper function to get score label with epsilon comparison
+  const getScoreLabel = (score) => {
+    // Convert to number and round to 3 decimal places for comparison
+    const numScore = Number(score);
+    const roundedScore = Math.round(numScore * 1000) / 1000;
+    
+    // Use a larger epsilon for floating point comparison
+    const epsilon = 0.001;
+    
+    if (Math.abs(roundedScore - 1) < epsilon) return 'Perfect (1)';
+    if (Math.abs(roundedScore - 0.667) < epsilon) return 'Good (0.67)';
+    if (Math.abs(roundedScore - 0.333) < epsilon) return 'Fair (0.33)';
+    if (Math.abs(roundedScore - 0) < epsilon) return 'Poor (0)';
+    return `Unknown (${roundedScore})`;
+  };
+
+  // Helper function to get score color
+  const getScoreColor = (score) => {
+    // Convert to number and round to 3 decimal places for comparison
+    const numScore = Number(score);
+    const roundedScore = Math.round(numScore * 1000) / 1000;
+    
+    // Use a larger epsilon for floating point comparison
+    const epsilon = 0.001;
+    
+    if (Math.abs(roundedScore - 1) < epsilon) return 'success';
+    if (Math.abs(roundedScore - 0.667) < epsilon) return 'info';
+    if (Math.abs(roundedScore - 0.333) < epsilon) return 'warning';
+    if (Math.abs(roundedScore - 0) < epsilon) return 'error';
+    return 'default';
+  };
+
+  // Format judgement data for export
+  const formatJudgementForExport = (judgement) => {
+    // Helper function to get source label
+    const getSourceLabel = (source) => {
+      switch (source) {
+        case 'ADS': return 'ADS';
+        case 'Google Scholar': return 'Google Scholar';
+        case 'Boosted ADS': return 'Boosted ADS';
+        default: return source || 'Unknown';
+      }
+    };
+
+    // Get the numeric score from judgement_score
+    const score = Number(judgement.judgement_score);
+
+    return {
+      'Query': judgement.query || '',
+      'Title': judgement.record_title || '',
+      'Source': getSourceLabel(judgement.record_source),
+      'Score': score,  // Use the numeric score
+      'Score Label': getScoreLabel(score),  // Generate label from the numeric score
+      'Note': judgement.judgement_note || '',
+      'Date': formatDate(judgement.created_at),
+      'Rater ID': judgement.rater_id || ''
+    };
+  };
+
+  // Convert data to CSV format
+  const convertToCSV = (data) => {
+    if (!data.length) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvRows = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = row[header]?.toString() || '';
+          // Escape quotes and wrap in quotes if contains comma or quote
+          return value.includes(',') || value.includes('"') 
+            ? `"${value.replace(/"/g, '""')}"` 
+            : value;
+        }).join(',')
+      )
+    ];
+    
+    return csvRows.join('\n');
+  };
+
+  // Convert data to TXT format
+  const convertToTXT = (data) => {
+    if (!data.length) return '';
+    
+    const headers = Object.keys(data[0]);
+    const maxLengths = headers.reduce((acc, header) => {
+      acc[header] = Math.max(
+        header.length,
+        ...data.map(row => (row[header]?.toString() || '').length)
+      );
+      return acc;
+    }, {});
+
+    const formatRow = (row) => 
+      headers.map(header => 
+        (row[header]?.toString() || '').padEnd(maxLengths[header])
+      ).join(' | ');
+
+    const separator = headers.map(header => 
+      '-'.repeat(maxLengths[header])
+    ).join('-+-');
+
+    return [
+      formatRow(Object.fromEntries(headers.map(h => [h, h]))),
+      separator,
+      ...data.map(formatRow)
+    ].join('\n');
+  };
+
+  // Sanitize string for use in filename
+  const sanitizeFilename = (str) => {
+    // Replace invalid filename characters with underscores
+    // Keep alphanumeric, spaces, hyphens, and underscores
+    return str
+      .replace(/[^a-zA-Z0-9\s-_]/g, '_')
+      .replace(/\s+/g, '_')
+      .substring(0, 50); // Limit length to avoid too long filenames
+  };
+
+  // Extract identifier from similar query
+  const extractSimilarIdentifier = (query) => {
+    console.log('Extracting from query:', query); // Debug log
+    const match = query.match(/^similar\((.*?)\)/);
+    const result = match ? match[1] : query;
+    console.log('Extracted result:', result); // Debug log
+    return result;
+  };
+
+  // Handle export
+  const handleExport = async (format) => {
+    setExportLoading(true);
+    try {
+      const dataToExport = exportType === 'all' 
+        ? judgements 
+        : getSortedAndFilteredJudgements();
+      
+      // Debug log the data being exported
+      console.log('Data to export:', dataToExport.map(j => ({
+        score: j.judgement_score,
+        scoreType: typeof j.judgement_score,
+        raw: j
+      })));
+      
+      const formattedData = dataToExport.map(formatJudgementForExport);
+      const content = format === 'csv' 
+        ? convertToCSV(formattedData)
+        : convertToTXT(formattedData);
+      
+      const blob = new Blob([content], { 
+        type: format === 'csv' ? 'text/csv' : 'text/plain' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      
+      // Generate filename based on export type
+      let filename;
+      if (exportType === 'filtered' && filters.query) {
+        console.log('Original query:', filters.query); // Debug log
+        // For filtered exports, use the query in the filename
+        const queryContent = filters.query.startsWith('similar(') 
+          ? extractSimilarIdentifier(filters.query)
+          : filters.query;
+        console.log('Query content after processing:', queryContent); // Debug log
+        const sanitizedQuery = sanitizeFilename(queryContent);
+        console.log('Sanitized query:', sanitizedQuery); // Debug log
+        filename = `judgements_query_${sanitizedQuery}.${format}`;
+        console.log('Final filename:', filename); // Debug log
+      } else {
+        // For all exports or filtered exports without query, use timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        filename = `judgements_${exportType}_${timestamp}.${format}`;
+      }
+      
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      setExportDialogOpen(false);
+    } catch (err) {
+      console.error('Error exporting data:', err);
+      setError('Failed to export data');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  // Handle export dialog open
+  const handleExportClick = (type) => {
+    console.log('Export clicked with type:', type); // Debug log
+    console.log('Current filters:', filters); // Debug log
+    setExportType(type);
+    setExportDialogOpen(true);
+  };
+
+  // Handle export dialog close
+  const handleExportDialogClose = () => {
+    setExportDialogOpen(false);
+  };
+
   // Render the component
   return (
     <Box sx={{ width: '100%', p: 2 }}>
@@ -205,11 +412,29 @@ const JudgementsDatabase = ({ API_URL = DEFAULT_API_URL }) => {
           <Typography variant="h6" component="div">
             Judgements Database
           </Typography>
-          <Tooltip title="Refresh">
-            <IconButton onClick={fetchJudgements} disabled={loading}>
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <ButtonGroup variant="outlined" size="small">
+              <Button
+                startIcon={<FileDownloadIcon />}
+                onClick={() => handleExportClick('all')}
+                disabled={loading || judgements.length === 0}
+              >
+                Export All
+              </Button>
+              <Button
+                startIcon={<FileDownloadIcon />}
+                onClick={() => handleExportClick('filtered')}
+                disabled={loading || getSortedAndFilteredJudgements().length === 0}
+              >
+                Export Filtered
+              </Button>
+            </ButtonGroup>
+            <Tooltip title="Refresh">
+              <IconButton onClick={fetchJudgements} disabled={loading}>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
 
         {/* Filters */}
@@ -354,19 +579,9 @@ const JudgementsDatabase = ({ API_URL = DEFAULT_API_URL }) => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={
-                            judgement.judgement_score === 1 ? 'Perfect (1)' :
-                            judgement.judgement_score === 0.67 ? 'Good (0.67)' :
-                            judgement.judgement_score === 0.33 ? 'Fair (0.33)' :
-                            'Poor (0)'
-                          }
+                          label={getScoreLabel(judgement.judgement_score)}
                           size="small"
-                          color={
-                            judgement.judgement_score === 1 ? 'success' :
-                            judgement.judgement_score === 0.67 ? 'info' :
-                            judgement.judgement_score === 0.33 ? 'warning' :
-                            'error'
-                          }
+                          color={getScoreColor(judgement.judgement_score)}
                         />
                       </TableCell>
                       <TableCell>
@@ -431,6 +646,38 @@ const JudgementsDatabase = ({ API_URL = DEFAULT_API_URL }) => {
             startIcon={deleteLoading ? <CircularProgress size={20} /> : null}
           >
             {deleteLoading ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Export Format Dialog */}
+      <Dialog
+        open={exportDialogOpen}
+        onClose={handleExportDialogClose}
+      >
+        <DialogTitle>Choose Export Format</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Select the format to export {exportType === 'all' ? 'all' : 'filtered'} judgements:
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleExportDialogClose} disabled={exportLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => handleExport('csv')}
+            disabled={exportLoading}
+            startIcon={exportLoading ? <CircularProgress size={20} /> : null}
+          >
+            {exportLoading ? 'Exporting...' : 'CSV'}
+          </Button>
+          <Button
+            onClick={() => handleExport('txt')}
+            disabled={exportLoading}
+            startIcon={exportLoading ? <CircularProgress size={20} /> : null}
+          >
+            {exportLoading ? 'Exporting...' : 'TXT'}
           </Button>
         </DialogActions>
       </Dialog>

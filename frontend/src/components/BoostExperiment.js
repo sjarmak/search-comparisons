@@ -98,8 +98,17 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
       recency: 0.3,
       doctype: 0.2,
       refereed: 0.1
-    }
+    },
+    boost_combination_method: 'weighted_sum' // Add new state for combination method
   });
+  
+  // Add boost combination method options
+  const boostCombinationMethods = [
+    { value: 'simple_product', label: 'Simple Product (multiply all boosts)' },
+    { value: 'simple_sum', label: 'Simple Sum (add all boosts)' },
+    { value: 'weighted_geometric_mean', label: 'Weighted Geometric Mean (multiply with weights)' },
+    { value: 'weighted_sum', label: 'Weighted Sum (add with weights)' }
+  ];
   
   // Function to handle boost changes
   const handleBoostChange = (type, field, value) => {
@@ -646,6 +655,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         boost_config: {
           citation_boost: parseFloat(boostConfig.citation_boost || 0),
           recency_boost: parseFloat(boostConfig.recency_boost || 0),
+          recency_multiplier: parseFloat(boostConfig.recency_multiplier || 1.0),
           doctype_boosts: Object.fromEntries(
             Object.entries(boostConfig.doctype_ranks).map(([type, rank]) => [type, 1.0 / rank])
           ),
@@ -655,7 +665,9 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
             author: parseFloat(boostConfig.adsQueryFields.author || 0),
             year: parseFloat(boostConfig.adsQueryFields.year || 0),
             keyword: parseFloat(boostConfig.adsQueryFields.keyword || 0)
-          }
+          },
+          boost_combination_method: boostConfig.boost_combination_method,
+          boost_weights: boostConfig.boost_weights
         }
       };
       
@@ -770,7 +782,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         {/* ADS Query Field Weights */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
-            ADS Query Field Weights (0-1 scale)
+            ADS Query Field Weights
           </Typography>
           <Grid container spacing={2}>
             {Object.entries(boostConfig.adsQueryFields).map(([field, value]) => (
@@ -781,8 +793,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   type="number"
                   value={value}
                   onChange={(e) => handleBoostChange('adsQueryFields', field, e.target.value)}
-                  inputProps={{ min: 0, max: 1, step: 0.1 }}
-                  helperText={`Weight for ${field.replace('_', ' ')} field (0-1 scale)`}
+                  inputProps={{ min: 0, step: 0.1 }}
+                  helperText={`Weight for ${field.replace('_', ' ')} field`}
                 />
               </Grid>
             ))}
@@ -802,8 +814,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 type="number"
                 value={boostConfig.citation_boost}
                 onChange={(e) => handleBoostChange('citation_boost', null, e.target.value)}
-                inputProps={{ min: 0, max: 1, step: 0.1 }}
-                helperText="Boost factor for citation count (0-1 scale)"
+                inputProps={{ min: 0, step: 0.1 }}
+                helperText="Boost factor for citation count"
               />
             </Grid>
           </Grid>
@@ -822,8 +834,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 type="number"
                 value={boostConfig.recency_boost}
                 onChange={(e) => handleBoostChange('recency_boost', null, e.target.value)}
-                inputProps={{ min: 0, max: 1, step: 0.1 }}
-                helperText="Boost factor for recent papers (0-1 scale)"
+                inputProps={{ min: 0, step: 0.1 }}
+                helperText="Overall strength of recency boost"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -834,7 +846,31 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 value={boostConfig.recency_multiplier}
                 onChange={(e) => handleBoostChange('recency_multiplier', null, e.target.value)}
                 inputProps={{ min: 0.1, max: 10, step: 0.1 }}
-                helperText="Controls how quickly the recency boost decays"
+                helperText={
+                  <Box>
+                    <Typography variant="caption" component="div">
+                      Controls how quickly the recency boost decays with age:
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      • Higher value = faster decay (papers age more quickly)
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      • Lower value = slower decay (papers stay relevant longer)
+                    </Typography>
+                    <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+                      Example with multiplier = {boostConfig.recency_multiplier}:
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      • 1 month old: {((1/(1 + boostConfig.recency_multiplier * 1)) * 100).toFixed(1)}% boost
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      • 6 months old: {((1/(1 + boostConfig.recency_multiplier * 6)) * 100).toFixed(1)}% boost
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      • 12 months old: {((1/(1 + boostConfig.recency_multiplier * 12)) * 100).toFixed(1)}% boost
+                    </Typography>
+                  </Box>
+                }
               />
             </Grid>
           </Grid>
@@ -875,8 +911,8 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                 type="number"
                 value={boostConfig.refereed_boost}
                 onChange={(e) => handleBoostChange('refereed_boost', null, e.target.value)}
-                inputProps={{ min: 0, max: 1, step: 0.1 }}
-                helperText="Boost factor for refereed papers (0-1 scale)"
+                inputProps={{ min: 0, step: 0.1 }}
+                helperText="Boost factor for refereed papers"
               />
             </Grid>
           </Grid>
@@ -885,7 +921,7 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
         {/* Boost Weights */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
-            Boost Weights (0-1 scale)
+            Boost Weights
           </Typography>
           <Grid container spacing={2}>
             {Object.entries(boostConfig.boost_weights).map(([type, weight]) => (
@@ -896,11 +932,46 @@ const BoostExperiment = ({ API_URL = DEFAULT_API_URL }) => {
                   type="number"
                   value={weight}
                   onChange={(e) => handleBoostChange('boost_weights', type, parseFloat(e.target.value))}
-                  inputProps={{ min: 0, max: 1, step: 0.1 }}
-                  helperText={`Weight for ${type} boost in final score (0-1 scale)`}
+                  inputProps={{ min: 0, step: 0.1 }}
+                  helperText={`Weight for ${type} boost in final score`}
                 />
               </Grid>
             ))}
+          </Grid>
+        </Box>
+
+        {/* Boost Combination Method */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Boost Combination Method
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Combination Method</InputLabel>
+                <Select
+                  value={boostConfig.boost_combination_method}
+                  onChange={(e) => handleBoostChange('boost_combination_method', null, e.target.value)}
+                  label="Combination Method"
+                >
+                  {boostCombinationMethods.map(method => (
+                    <MenuItem key={method.value} value={method.value}>
+                      {method.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  {boostConfig.boost_combination_method === 'simple_product' && 
+                    'Multiply all boost factors together (strict combination)'}
+                  {boostConfig.boost_combination_method === 'simple_sum' && 
+                    'Add all boost factors together (lenient combination)'}
+                  {boostConfig.boost_combination_method === 'weighted_geometric_mean' && 
+                    'Multiply boost factors with weights (balanced combination)'}
+                  {boostConfig.boost_combination_method === 'weighted_sum' && 
+                    'Add boost factors with weights (weighted combination)'}
+                </Typography>
+              </FormControl>
+            </Grid>
           </Grid>
         </Box>
 

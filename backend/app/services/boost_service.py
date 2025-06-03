@@ -3,7 +3,7 @@ Service module for applying boost factors to search results.
 
 This module provides functionality to apply various boost factors to search results,
 including citation count, publication recency, document type, and refereed status boosts.
-The boost factors are combined using a weighted sum approach as specified in the RFC.
+The boost factors are combined using a weighted sum approach.
 """
 import logging
 from typing import List, Dict, Any, Optional, Tuple
@@ -17,7 +17,7 @@ from ..api.models import SearchResult
 # Setup logging
 logger = logging.getLogger(__name__)
 
-# Default weights for boost combination - these are the original default values
+# Default weights for boost combination
 DEFAULT_BOOST_WEIGHTS = {
     'citation': 0.4,
     'recency': 0.3,
@@ -25,24 +25,38 @@ DEFAULT_BOOST_WEIGHTS = {
     'refereed': 0.1
 }
 
-# Default document type ranks (from RFC)
+# Document type ranks based on the provided table
 DEFAULT_DOCTYPE_RANKS = {
     'article': 1,      # Journal article
-    'book': 2,         # Book
-    'inbook': 3,       # Book chapter
-    'proceedings': 4,  # Conference proceedings
-    'inproceedings': 5,# Conference paper
-    'phdthesis': 6,    # PhD thesis
-    'mastersthesis': 7,# Masters thesis
-    'techreport': 8,   # Technical report
-    'preprint': 9,     # Preprint
-    'abstract': 10,    # Abstract
-    'other': 11        # Other/unknown
+    'eprint': 1,       # Article preprinted in arXiv
+    'inproceedings': 2,# Article appearing in conference proceedings
+    'inbook': 1,       # Article appearing in a book
+    'abstract': 5,     # Meeting abstract
+    'book': 1,         # Book (monograph)
+    'bookreview': 4,   # Published book review
+    'catalog': 2,      # Data catalog
+    'circular': 3,     # Printed or electronic circular
+    'erratum': 6,      # Erratum to a journal article
+    'mastersthesis': 3,# Masters thesis
+    'newsletter': 5,   # Printed or electronic newsletter
+    'obituary': 6,     # Obituary
+    'phdthesis': 3,    # PhD thesis
+    'pressrelease': 7, # Press release
+    'proceedings': 3,  # Conference proceedings book
+    'proposal': 4,     # Observing or funding proposal
+    'software': 2,     # Software package
+    'talk': 4,         # Research talk
+    'techreport': 3,   # Technical report
+    'misc': 8,         # Anything not in the above list
+    'other': 8         # Default for unknown types
 }
 
 def calculate_doctype_boost(doctype: str, doctype_ranks: Dict[str, int] = None) -> float:
     """
-    Calculate document type boost based on rank.
+    Calculate document type boost based on rank using even distribution.
+    
+    The boost factor is calculated as: 1 - (rank_index / (num_unique_ranks - 1))
+    where rank_index is the position of the rank in the sorted list of unique ranks.
     
     Args:
         doctype: Document type string
@@ -57,17 +71,29 @@ def calculate_doctype_boost(doctype: str, doctype_ranks: Dict[str, int] = None) 
     # Get rank for doctype, default to 'other' if not found
     rank = doctype_ranks.get(doctype, doctype_ranks['other'])
     
-    # Calculate boost factor (higher for better ranks)
-    # Use inverse of rank to get higher boost for better ranks
-    return 1.0 / rank
+    # Get unique ranks and sort them
+    unique_ranks = sorted(set(doctype_ranks.values()))
+    
+    # Calculate boost factor using even distribution
+    rank_index = unique_ranks.index(rank)
+    num_unique_ranks = len(unique_ranks)
+    
+    # Avoid division by zero if there's only one rank
+    if num_unique_ranks <= 1:
+        return 1.0
+        
+    return 1.0 - (rank_index / (num_unique_ranks - 1))
 
-def calculate_recency_boost(pubdate: str, boost_factor: float = 1.0) -> float:
+def calculate_recency_boost(pubdate: str, multiplier: float = 1.0) -> float:
     """
-    Calculate recency boost using exponential decay.
+    Calculate recency boost using reciprocal function.
+    
+    The boost factor is calculated as: 1 / (1 + multiplier * age_months)
+    where age_months is the number of months since publication.
     
     Args:
         pubdate: Publication date string (YYYY-MM-DD)
-        boost_factor: Multiplier to control decay rate
+        multiplier: Tuning parameter that controls decay rate
         
     Returns:
         float: Boost factor based on recency
@@ -81,9 +107,8 @@ def calculate_recency_boost(pubdate: str, boost_factor: float = 1.0) -> float:
         age_months = ((now.year - pub_date.year) * 12 + 
                      (now.month - pub_date.month))
         
-        # Apply exponential decay: exp(-boost_factor * age_months/12)
-        # This gives higher boost for recent papers and decays exponentially
-        return math.exp(-boost_factor * age_months / 12)
+        # Apply reciprocal function
+        return 1.0 / (1.0 + multiplier * age_months)
         
     except (ValueError, TypeError):
         logger.warning(f"Invalid publication date: {pubdate}")
@@ -121,7 +146,6 @@ def calculate_citation_boost(
             return 0.0
             
         # Calculate boost relative to median using log scale
-        # This gives diminishing returns for very high citation counts
         return math.log1p(citation_count / median)
             
     except Exception as e:
@@ -142,29 +166,67 @@ def calculate_refereed_boost(is_refereed: bool) -> float:
 
 def combine_boost_factors(
     boosts: Dict[str, float],
-    weights: Dict[str, float] = None
+    weights: Dict[str, float] = None,
+    combination_method: str = 'weighted_sum'
 ) -> float:
     """
-    Combine boost factors using weighted sum.
+    Combine boost factors using the specified combination method.
     
     Args:
         boosts: Dictionary of individual boost factors
-        weights: Dictionary of weights for each boost factor. If not provided, uses DEFAULT_BOOST_WEIGHTS.
-                Weights are used exactly as provided without modification.
+        weights: Dictionary of weights for each boost factor. Only used for weighted methods.
+        combination_method: Method to use for combining boosts:
+            - 'simple_product': Multiply all boosts together
+            - 'simple_sum': Add all boosts together
+            - 'weighted_geometric_mean': Multiply boosts with weights
+            - 'weighted_sum': Add boosts with weights (default)
         
     Returns:
         float: Combined boost factor
     """
-    # Use provided weights or defaults, without any modification
-    weights = weights or DEFAULT_BOOST_WEIGHTS
+    if not boosts:
+        return 0.0
+        
+    # Filter out any None or negative boosts
+    valid_boosts = {k: v for k, v in boosts.items() if v is not None and v >= 0}
     
-    # Calculate weighted sum of boosts using weights exactly as provided
-    weighted_sum = sum(
-        boosts.get(boost_type, 0.0) * weight
-        for boost_type, weight in weights.items()
-    )
-    
-    return weighted_sum
+    if not valid_boosts:
+        return 0.0
+        
+    if combination_method == 'simple_product':
+        # Multiply all boosts together
+        return math.prod(valid_boosts.values())
+        
+    elif combination_method == 'simple_sum':
+        # Add all boosts together
+        return sum(valid_boosts.values())
+        
+    elif combination_method == 'weighted_geometric_mean':
+        # Use provided weights or defaults
+        weights = weights or DEFAULT_BOOST_WEIGHTS
+        
+        # Calculate weighted geometric mean
+        # For each boost: boost^weight, then multiply all together
+        weighted_products = [
+            math.pow(valid_boosts.get(boost_type, 0.0), weight)
+            for boost_type, weight in weights.items()
+            if valid_boosts.get(boost_type, 0.0) > 0
+        ]
+        
+        if not weighted_products:
+            return 0.0
+            
+        return math.prod(weighted_products)
+        
+    else:  # weighted_sum (default)
+        # Use provided weights or defaults
+        weights = weights or DEFAULT_BOOST_WEIGHTS
+        
+        # Calculate weighted sum
+        return sum(
+            valid_boosts.get(boost_type, 0.0) * weight
+            for boost_type, weight in weights.items()
+        )
 
 async def apply_all_boosts(
     results: List[SearchResult],
@@ -176,7 +238,14 @@ async def apply_all_boosts(
     
     Args:
         results: List of search results to boost
-        boost_config: Dictionary containing boost configuration. Weights are used exactly as provided.
+        boost_config: Dictionary containing boost configuration including:
+            - citation_boost: Overall strength of citation boost
+            - recency_boost: Overall strength of recency boost
+            - recency_multiplier: Controls decay rate of recency boost
+            - doctype_boosts: Document type boost factors
+            - field_boosts: Field-specific boost factors
+            - boost_combination_method: Method to combine boosts
+            - boost_weights: Weights for weighted combination methods
         citation_distributions: Dictionary of citation distributions by collection and year
         
     Returns:
@@ -189,8 +258,14 @@ async def apply_all_boosts(
         # Create a deep copy of results to avoid modifying originals
         boosted_results = [deepcopy(result) for result in results]
         
-        # Get boost weights from config or use defaults, without modification
-        weights = boost_config.get('boost_weights', DEFAULT_BOOST_WEIGHTS)
+        # Get boost configuration
+        citation_boost = boost_config.get('citation_boost', 0.0)
+        recency_boost = boost_config.get('recency_boost', 0.0)
+        recency_multiplier = boost_config.get('recency_multiplier', 1.0)
+        doctype_boosts = boost_config.get('doctype_boosts', {})
+        field_boosts = boost_config.get('field_boosts', {})
+        combination_method = boost_config.get('boost_combination_method', 'weighted_sum')
+        boost_weights = boost_config.get('boost_weights', DEFAULT_BOOST_WEIGHTS)
 
         # Initialize scores and source_id for each result
         for i, result in enumerate(boosted_results):
@@ -215,39 +290,38 @@ async def apply_all_boosts(
             boosts = {}
             
             # Citation boost
-            if boost_config.get('citation_boost', 0.0) > 0:
+            if citation_boost > 0:
                 base_boost = calculate_citation_boost(
                     result.citation_count or 0,
                     result.collection or 'general',
                     result.year,
                     citation_distributions or {}
                 )
-                boosts['citation'] = base_boost * boost_config['citation_boost']
+                boosts['citation'] = base_boost * citation_boost
                 result.boost_factors['citation'] = boosts['citation']
             
             # Recency boost
-            if boost_config.get('recency_boost', 0.0) > 0 and result.pubdate:
+            if recency_boost > 0 and result.pubdate:
                 base_boost = calculate_recency_boost(
                     result.pubdate,
-                    boost_config.get('recency_multiplier', 1.0)
+                    recency_multiplier
                 )
-                boosts['recency'] = base_boost * boost_config['recency_boost']
+                boosts['recency'] = base_boost * recency_boost
                 result.boost_factors['recency'] = boosts['recency']
             
             # Document type boost
-            if boost_config.get('doctype_boosts'):
+            if doctype_boosts:
                 base_boost = calculate_doctype_boost(
                     result.doctype,
-                    boost_config.get('doctype_boosts', {})
+                    doctype_boosts
                 )
-                # Apply doctype boost directly without additional multiplier
                 boosts['doctype'] = base_boost
                 result.boost_factors['doctype'] = boosts['doctype']
             
             # Field boost
-            if boost_config.get('field_boosts'):
+            if field_boosts:
                 field_boost = 0.0
-                for field, weight in boost_config['field_boosts'].items():
+                for field, weight in field_boosts.items():
                     if weight > 0:
                         # Get the field value from the result
                         field_value = getattr(result, field, None)
@@ -271,11 +345,14 @@ async def apply_all_boosts(
                 ) * boost_config['refereed_boost']
                 result.boost_factors['refereed'] = boosts['refereed']
             
-            # Combine boost factors
-            final_boost = combine_boost_factors(boosts, weights)
+            # Combine boost factors using the specified method
+            final_boost = combine_boost_factors(
+                boosts, 
+                boost_weights,
+                combination_method
+            )
             
-            # Apply final boost to score with more impact
-            # Use exponential scaling to make boosts more impactful
+            # Apply final boost to score
             result._score *= math.exp(final_boost)
             result.boosted_score = result._score
         
