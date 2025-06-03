@@ -32,88 +32,40 @@ logger = logging.getLogger(__name__)
 
 # Constants
 NUM_RESULTS = 20
-TIMEOUT_SECONDS = 20
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+TIMEOUT_SECONDS = int(os.getenv('SCHOLAR_TIMEOUT_SECONDS', '30'))  # Increased default timeout
+MAX_RETRIES = int(os.getenv('SCHOLAR_MAX_RETRIES', '3'))
+RETRY_DELAY = int(os.getenv('SCHOLAR_RETRY_DELAY', '5'))
+BLOCK_DELAY = int(os.getenv('SCHOLAR_BLOCK_DELAY', '300'))  # 5 minutes delay after being blocked
+USER_AGENT = os.getenv('SCHOLAR_USER_AGENT', "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-# Proxy management
-last_proxy_refresh_time = 0
-PROXY_REFRESH_INTERVAL = 3600  # 1 hour in seconds
-proxy_generator = None
+# Track block status
+last_block_time = 0
+is_blocked = False
 
-
-def setup_scholarly_proxy() -> bool:
+def is_currently_blocked() -> bool:
     """
-    Set up a proxy for Scholarly to avoid Google Scholar blocking.
-    
-    Configures Scholarly to use Tor or free proxies to make requests to
-    Google Scholar, reducing the likelihood of being blocked.
+    Check if we're currently blocked by Google Scholar.
     
     Returns:
-        bool: True if proxy setup was successful, False otherwise
+        bool: True if we're currently blocked, False otherwise
     """
-    global proxy_generator
-    
-    if not SCHOLARLY_AVAILABLE:
-        logger.warning("Scholarly package not available, cannot set up proxy")
-        return False
-    
-    logger.info("Setting up Scholarly proxy...")
-    
-    try:
-        proxy_generator = ProxyGenerator()
-        
-        # Try to use Tor if available
-        tor_success = proxy_generator.Tor_External(tor_sock_port=9050, tor_control_port=9051)
-        if tor_success:
-            logger.info("Successfully connected to Tor for Scholarly proxy")
-            scholarly.use_proxy(proxy_generator)
-            return True
-            
-        # Fall back to free proxies if Tor is not available
-        proxy_success = proxy_generator.FreeProxies()
-        if proxy_success:
-            logger.info("Successfully set up free proxies for Scholarly")
-            scholarly.use_proxy(proxy_generator)
-            return True
-            
-        logger.warning("Failed to set up any proxy for Scholarly")
-        return False
-        
-    except Exception as e:
-        logger.error(f"Error setting up Scholarly proxy: {str(e)}")
-        return False
+    global is_blocked, last_block_time
+    if is_blocked:
+        # Check if block period has passed
+        if time.time() - last_block_time > BLOCK_DELAY:
+            is_blocked = False
+            logger.info("Block period has passed, resuming normal operation")
+        return is_blocked
+    return False
 
-
-async def refresh_scholarly_proxy_if_needed() -> bool:
+def mark_as_blocked() -> None:
     """
-    Refresh the Scholarly proxy if it hasn't been refreshed recently.
-    
-    Checks if the proxy refresh interval has passed since the last refresh,
-    and refreshes the proxy if needed.
-    
-    Returns:
-        bool: True if proxy was refreshed or didn't need refreshing, False if refresh failed
+    Mark the service as blocked by Google Scholar.
     """
-    global last_proxy_refresh_time
-    
-    if not SCHOLARLY_AVAILABLE:
-        logger.warning("Scholarly package not available, cannot refresh proxy")
-        return False
-    
-    current_time = time.time()
-    
-    # Check if we need to refresh the proxy
-    if current_time - last_proxy_refresh_time < PROXY_REFRESH_INTERVAL:
-        return True  # No need to refresh yet
-    
-    logger.info("Refreshing Scholarly proxy...")
-    
-    # Update the last refresh time regardless of success to avoid hammering
-    last_proxy_refresh_time = current_time
-    
-    # Set up a new proxy
-    return setup_scholarly_proxy()
-
+    global is_blocked, last_block_time
+    is_blocked = True
+    last_block_time = time.time()
+    logger.warning(f"Marked as blocked by Google Scholar. Will retry after {BLOCK_DELAY} seconds")
 
 async def get_scholar_direct_html(
     query: str, 
@@ -123,7 +75,8 @@ async def get_scholar_direct_html(
     Get Google Scholar search results HTML directly using httpx.
     
     Makes a direct HTTP request to Google Scholar with the search query
-    and returns the HTML response for parsing.
+    and returns the HTML response for parsing. Includes retry logic and
+    block detection.
     
     Args:
         query: Search query string
@@ -132,6 +85,10 @@ async def get_scholar_direct_html(
     Returns:
         Optional[str]: HTML content if successful, None otherwise
     """
+    if is_currently_blocked():
+        logger.warning("Skipping Google Scholar request due to active block")
+        return None
+
     url = "https://scholar.google.com/scholar"
     
     params = {
@@ -146,35 +103,61 @@ async def get_scholar_direct_html(
         "Accept": "text/html,application/xhtml+xml,application/xml",
         "Accept-Language": "en-US,en;q=0.9",
         "Referer": "https://scholar.google.com/",
-        "DNT": "1"
+        "DNT": "1",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache"
     }
     
-    try:
-        async with httpx.AsyncClient() as client:
-            # Add random delay to avoid looking like a bot
-            await asyncio.sleep(random.uniform(1.0, 3.0))
-            
-            # Make request with timeout
-            logger.info(f"Making direct HTML request to Google Scholar for: {query}")
-            response = await client.get(
-                url, 
-                params=params, 
-                headers=headers, 
-                timeout=TIMEOUT_SECONDS,
-                follow_redirects=True
-            )
-            
-            # Check for success
-            if response.status_code == 200:
-                logger.info("Successfully retrieved Google Scholar HTML")
-                return response.text
-            else:
-                logger.warning(f"Google Scholar HTML request failed with status code: {response.status_code}")
-                return None
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+                # Add random delay to avoid looking like a bot
+                await asyncio.sleep(random.uniform(2.0, 5.0))
                 
-    except Exception as e:
-        logger.error(f"Error retrieving Google Scholar HTML: {str(e)}")
-        return None
+                # Make request with timeout
+                logger.info(f"Making direct HTML request to Google Scholar for: {query} (attempt {attempt + 1}/{MAX_RETRIES})")
+                response = await client.get(
+                    url, 
+                    params=params, 
+                    headers=headers, 
+                    timeout=TIMEOUT_SECONDS,
+                    follow_redirects=True
+                )
+                
+                # Check for success
+                if response.status_code == 200:
+                    logger.info("Successfully retrieved Google Scholar HTML")
+                    return response.text
+                elif response.status_code == 429:  # Too Many Requests
+                    logger.warning("Rate limited by Google Scholar, waiting before retry...")
+                    mark_as_blocked()
+                    await asyncio.sleep(RETRY_DELAY * (attempt + 1))  # Exponential backoff
+                    continue
+                elif response.status_code == 403:  # Forbidden
+                    logger.warning("Access denied by Google Scholar (403)")
+                    mark_as_blocked()
+                    return None
+                else:
+                    logger.warning(f"Google Scholar HTML request failed with status code: {response.status_code}")
+                    if attempt < MAX_RETRIES - 1:
+                        await asyncio.sleep(RETRY_DELAY)
+                        continue
+                    return None
+                    
+        except httpx.TimeoutException:
+            logger.warning(f"Timeout while requesting Google Scholar (attempt {attempt + 1}/{MAX_RETRIES})")
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY)
+                continue
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving Google Scholar HTML: {str(e)}")
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY)
+                continue
+            return None
+    
+    return None
 
 
 async def parse_scholar_html(html_content: str) -> List[SearchResult]:
@@ -350,7 +333,8 @@ async def get_scholar_results(
     Get search results from Google Scholar.
     
     Attempts to retrieve results from Google Scholar using direct HTML scraping
-    with fallback to the Scholarly library if needed.
+    with fallback to the Scholarly library if needed. Includes improved error
+    handling and block detection.
     
     Args:
         query: Search query string
@@ -360,6 +344,11 @@ async def get_scholar_results(
     Returns:
         List[SearchResult]: List of search results from Google Scholar
     """
+    # Check if we're blocked
+    if is_currently_blocked():
+        logger.warning("Skipping Google Scholar search due to active block")
+        return []
+    
     # Check cache first
     cache_key = get_cache_key("scholar", query, fields, num_results)
     cached_results = load_from_cache(cache_key)
@@ -368,11 +357,17 @@ async def get_scholar_results(
         logger.info(f"Retrieved {len(cached_results)} Google Scholar results from cache")
         return cached_results
     
+    # Log the environment for debugging
+    logger.info(f"Google Scholar search environment: TIMEOUT={TIMEOUT_SECONDS}s, MAX_RETRIES={MAX_RETRIES}, "
+                f"SCHOLARLY_AVAILABLE={SCHOLARLY_AVAILABLE}, BLOCKED={is_blocked}")
+    
     # First try with Scholarly if available
     if SCHOLARLY_AVAILABLE:
         try:
             results = await get_scholar_results_scholarly(query, fields, num_results)
             if results:
+                # Cache successful results
+                save_to_cache(cache_key, results)
                 return results
         except Exception as e:
             logger.error(f"Error with Scholarly method: {str(e)}")
@@ -381,9 +376,21 @@ async def get_scholar_results(
     logger.info("Falling back to direct HTML method for Google Scholar")
     html_content = await get_scholar_direct_html(query, num_results)
     if html_content:
-        return await parse_scholar_html(html_content)
+        results = await parse_scholar_html(html_content)
+        if results:
+            # Cache successful results
+            save_to_cache(cache_key, results)
+        return results
     
-    return []
+    # If both methods fail, try the fallback method
+    logger.warning("Both primary methods failed, attempting fallback method")
+    fallback_results = await get_scholar_results_fallback(query, num_results)
+    if fallback_results:
+        # Cache fallback results with a different key
+        fallback_cache_key = get_cache_key("scholar_fallback", query, fields, num_results)
+        save_to_cache(fallback_cache_key, fallback_results)
+    
+    return fallback_results
 
 
 async def get_scholar_results_fallback(
